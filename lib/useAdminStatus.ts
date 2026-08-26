@@ -2,8 +2,28 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+/**
+ * The next-round credit prediction the roulette's affordability filter
+ * runs on, mirrored here so it can be tracked from the dashboard rather
+ * than only being visible on the overlay mid-round.
+ *
+ * Optional on AdminStatus rather than required: a backend that hasn't been
+ * updated yet simply doesn't send the key, and the panel says so instead
+ * of rendering a row of undefineds.
+ */
+export interface CreditPrediction {
+  predicted_credits: number | null;
+  readings: number[];
+  filter_enabled: boolean;
+  votable_count: number;
+  total_weapons: number;
+  votable_weapons: string[];
+  weapon_creds_costs: Record<string, number>;
+}
+
 export interface AdminStatus {
   streamerbot_connected: boolean;
+  credit_prediction?: CreditPrediction | null;
   widget_connections: {
     total: number;
     roulette: number;

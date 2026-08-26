@@ -1,6 +1,6 @@
 "use client";
 
-import { useAdminStatus } from "@/lib/useAdminStatus";
+import { useAdminStatus, type CreditPrediction } from "@/lib/useAdminStatus";
 
 function StatusBadge({ value }: { value: boolean | null }) {
   if (value === null) {
@@ -12,6 +12,64 @@ function StatusBadge({ value }: { value: boolean | null }) {
     >
       {value ? "Connected" : "Disconnected"}
     </span>
+  );
+}
+
+/**
+ * Valorant's own credit glyph. Written as an escape rather than pasted in
+ * literally so it survives any editor that isn't confident about the
+ * character - it's the same symbol the roulette overlay prints.
+ */
+const CREDS = "\u00A4";
+
+function CreditPredictionBlock({ prediction }: { prediction: CreditPrediction | null | undefined }) {
+  if (!prediction) {
+    return (
+      <p className="text-xs text-[#9AA3AC]">
+        This backend isn&apos;t reporting a credit prediction yet.
+      </p>
+    );
+  }
+
+  const { predicted_credits, readings, filter_enabled, votable_count, total_weapons } = prediction;
+  const hasReading = predicted_credits !== null && predicted_credits !== undefined;
+
+  return (
+    <div>
+      <div className="flex items-baseline gap-3">
+        <span className="text-2xl font-bold tabular-nums text-[#34f5c5]">
+          {hasReading ? `${CREDS}${predicted_credits}` : "No reading yet"}
+        </span>
+        <span className="text-xs uppercase tracking-widest text-[#9AA3AC]">
+          {filter_enabled
+            ? `${votable_count} / ${total_weapons} weapons in budget`
+            : `Filter off - all ${total_weapons} votable`}
+        </span>
+      </div>
+
+      <p className="mt-1 text-xs text-[#9AA3AC]">
+        {readings.length === 0
+          ? "No valid readings in the window - the roulette will open the full roster."
+          : `Window: ${readings.join(", ")} - the lowest wins, so the prediction is ${CREDS}${predicted_credits}.`}
+      </p>
+
+      {filter_enabled && hasReading && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {prediction.votable_weapons.map((weapon) => (
+            <span
+              key={weapon}
+              className="rounded border border-[#34f5c5]/20 px-2 py-0.5 text-xs text-[#ECE8E1]"
+            >
+              {weapon}{" "}
+              <span className="tabular-nums text-[#9AA3AC]">
+                {CREDS}
+                {prediction.weapon_creds_costs[weapon]}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -60,6 +118,13 @@ export function StatusPanel() {
             <p className="text-[#9AA3AC]">Cloudflare Tunnel</p>
             <StatusBadge value={status.cloudflare_tunnel_up} />
           </div>
+        </div>
+      )}
+
+      {status && (
+        <div className="mt-6 border-t border-[#34f5c5]/20 pt-4">
+          <p className="mb-2 text-sm text-[#9AA3AC]">Next-round credits</p>
+          <CreditPredictionBlock prediction={status.credit_prediction} />
         </div>
       )}
     </div>
