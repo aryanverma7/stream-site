@@ -136,4 +136,26 @@ describe("StatusPanel", () => {
     await waitFor(() => expect(getByText(/isn't reporting a credit prediction/i)).toBeTruthy());
     expect(container.innerHTML).not.toContain("undefined");
   });
+  it("warns when Streamer.bot is connected but has no event subscription", async () => {
+    mockFetchOf({ ...mockStatus, streamerbot_connected: true, streamerbot_subscribed: false });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/no event subscription/i)).toBeTruthy());
+  });
+
+  it("does not warn about the subscription once Streamer.bot has accepted it", async () => {
+    mockFetchOf({ ...mockStatus, streamerbot_connected: true, streamerbot_subscribed: true });
+    const { getAllByText, queryByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getAllByText("Connected").length).toBeGreaterThan(0));
+    expect(queryByText(/no event subscription/i)).toBeNull();
+  });
+
+  it("does not warn about the subscription against a backend that doesn't report it", async () => {
+    mockFetchOf(mockStatus);
+    const { getAllByText, queryByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getAllByText("Connected").length).toBeGreaterThan(0));
+    expect(queryByText(/no event subscription/i)).toBeNull();
+  });
 });

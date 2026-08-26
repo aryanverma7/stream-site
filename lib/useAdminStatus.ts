@@ -23,6 +23,14 @@ export interface CreditPrediction {
 
 export interface AdminStatus {
   streamerbot_connected: boolean;
+  /**
+   * Whether Streamer.bot accepted the event subscription. Separate from
+   * the connection flag because an open socket that was never subscribed
+   * delivers no chat events at all, which is indistinguishable from a
+   * quiet chat - and that exact state is what stopped every chat command
+   * from firing. Optional for the same reason as credit_prediction below.
+   */
+  streamerbot_subscribed?: boolean;
   credit_prediction?: CreditPrediction | null;
   widget_connections: {
     total: number;

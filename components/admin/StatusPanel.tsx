@@ -97,6 +97,11 @@ export function StatusPanel() {
           <div>
             <p className="text-[#9AA3AC]">Streamer.bot</p>
             <StatusBadge value={status.streamerbot_connected} />
+            {status.streamerbot_connected && status.streamerbot_subscribed === false && (
+              <p className="mt-1 text-xs text-[#B8323F]">
+                Connected, but no event subscription - no chat command can fire.
+              </p>
+            )}
           </div>
           <div>
             <p className="text-[#9AA3AC]">Widget connections</p>
