@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import Script from "next/script";
 
 /**
@@ -21,7 +20,6 @@ import Script from "next/script";
  * for plain scripts loaded this way.
  */
 export function Dragon() {
-  const router = useRouter();
   const [threeReady, setThreeReady] = useState(false);
   const [orbitReady, setOrbitReady] = useState(false);
   const [tweenReady, setTweenReady] = useState(false);
@@ -36,14 +34,23 @@ export function Dragon() {
         flashRef.current.style.transition = "opacity 0.6s ease-in";
         flashRef.current.style.opacity = "1";
       }
-      setTimeout(() => router.push("/admin"), 850);
+      // A real document navigation, deliberately NOT router.push(). The
+      // dashboard is served and gated by the Python backend, not by Next:
+      // a client-side push makes the router fetch its own route data from
+      // /admin/__next.*.txt first, which the backend answers with a 401
+      // when there's no session cookie yet - and a failed route-data fetch
+      // surfaces as "This page couldn't load" instead of the login
+      // redirect the person actually needs. Handing the URL to the browser
+      // lets the backend's 302 to /auth/login do its job, and costs
+      // nothing: /admin shares no state with this page.
+      setTimeout(() => window.location.assign("/admin"), 850);
     };
 
     return () => {
       (window as unknown as { __dragonCleanup?: () => void }).__dragonCleanup?.();
       delete (window as unknown as { __onDragonMaxSneeze?: () => void }).__onDragonMaxSneeze;
     };
-  }, [router]);
+  }, []);
 
   return (
     <>
