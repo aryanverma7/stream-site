@@ -10,8 +10,24 @@ const mockStatus = {
   streamerbot_connected: true,
   widget_connections: { total: 2, roulette: 1, badge: 0, spotify: 1 },
   obs_websocket_connected: null,
-  ocr_loop_running: null,
-  cloudflare_tunnel_up: false,
+};
+
+const liveAgent = {
+  connected: true,
+  last_heartbeat_age_seconds: 4,
+  last_capture_age_seconds: 90,
+  last_accepted_age_seconds: 95,
+  captures_received: 40,
+  captures_accepted: 12,
+  heartbeat_timeout_seconds: 45,
+  tesseract_available: true,
+};
+
+const reachablePublicUrl = {
+  reachable: true,
+  url: "https://hub.dualbladex.org/health",
+  detail: "The public URL reaches this backend.",
+  checked_age_seconds: 12,
 };
 
 const pistolRoundPrediction = {
@@ -47,9 +63,7 @@ describe("StatusPanel", () => {
   });
 
   it("shows Disconnected for a false status value", async () => {
-    global.fetch = asFetchMock(
-      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(mockStatus) }),
-    );
+    mockFetchOf({ ...mockStatus, streamerbot_connected: false });
     const { getByText } = render(<StatusPanel />);
 
     await waitFor(() => expect(getByText("Disconnected")).toBeTruthy());
@@ -61,7 +75,9 @@ describe("StatusPanel", () => {
     );
     const { getAllByText } = render(<StatusPanel />);
 
-    await waitFor(() => expect(getAllByText(/not yet implemented/i).length).toBe(2)); // obs + ocr
+    // Only OBS is still a placeholder - the OCR agent and the public URL
+    // both report for real now.
+    await waitFor(() => expect(getAllByText(/not yet implemented/i).length).toBe(1));
   });
 
   it("shows an error message when the backend can't be reached", async () => {
@@ -182,5 +198,115 @@ describe("StatusPanel", () => {
 
     await waitFor(() => expect(getAllByText("Connected").length).toBeGreaterThan(0));
     expect(queryByText(/Authentication refused/i)).toBeNull();
+  });
+
+  it("shows the OCR agent as connected, with how much of what it sent was readable", async () => {
+    mockFetchOf({ ...mockStatus, ocr_agent: liveAgent });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/12\/40 captures read/)).toBeTruthy());
+    expect(getByText(/Last seen 4s ago/)).toBeTruthy();
+  });
+
+  it("reports the agent as seen recently on captures alone, with no heartbeat", async () => {
+    // An agent build older than the heartbeat sends captures and nothing
+    // else. Calling that "never seen" while it is actively working would
+    // send someone hunting a problem that isn't there.
+    mockFetchOf({
+      ...mockStatus,
+      ocr_agent: { ...liveAgent, last_heartbeat_age_seconds: null, last_capture_age_seconds: 3 },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/Last seen 3s ago/)).toBeTruthy());
+  });
+
+  it("says plainly when the agent has never reported at all", async () => {
+    mockFetchOf({
+      ...mockStatus,
+      ocr_agent: {
+        ...liveAgent,
+        connected: false,
+        last_heartbeat_age_seconds: null,
+        last_capture_age_seconds: null,
+        last_accepted_age_seconds: null,
+        captures_received: 0,
+        captures_accepted: 0,
+      },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/Nothing heard since the backend started/i)).toBeTruthy());
+  });
+
+  it("names the cutoff when the agent went quiet after being seen", async () => {
+    mockFetchOf({
+      ...mockStatus,
+      ocr_agent: { ...liveAgent, connected: false, last_heartbeat_age_seconds: 300, last_capture_age_seconds: null },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/past the 45s cutoff/i)).toBeTruthy());
+  });
+
+  it("flags a missing Tesseract even while the agent is happily connected", async () => {
+    // The nastiest of the three: the agent runs, the network works, and
+    // every single capture comes back 503.
+    mockFetchOf({ ...mockStatus, ocr_agent: { ...liveAgent, tesseract_available: false } });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/Tesseract isn't where the Mac Mini expects it/i)).toBeTruthy());
+  });
+
+  it("shows the public URL as reachable, with when it was last checked", async () => {
+    mockFetchOf({ ...mockStatus, public_url: reachablePublicUrl });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText("Reachable")).toBeTruthy());
+    expect(getByText("The public URL reaches this backend.")).toBeTruthy();
+    expect(getByText(/Checked 12s ago/)).toBeTruthy();
+  });
+
+  it("shows the backend's own explanation when the public URL can't be reached", async () => {
+    mockFetchOf({
+      ...mockStatus,
+      public_url: {
+        reachable: false,
+        url: "https://hub.dualbladex.org/health",
+        detail: "No answer from https://hub.dualbladex.org/health within 8s - the tunnel is most likely down.",
+        checked_age_seconds: 3,
+      },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText("Unreachable")).toBeTruthy());
+    expect(getByText(/the tunnel is most likely down/i)).toBeTruthy();
+  });
+
+  it("does not call an unconfigured public URL a failure", async () => {
+    // null, not false - the same rule the Streamer.bot authentication row
+    // follows. Nothing is broken; there is simply no address to try.
+    mockFetchOf({
+      ...mockStatus,
+      public_url: {
+        reachable: null,
+        url: null,
+        detail: "public_base_url isn't set in config.json, so there's nothing to check.",
+        checked_age_seconds: null,
+      },
+    });
+    const { getByText, queryByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText("Not checked")).toBeTruthy());
+    expect(queryByText("Unreachable")).toBeNull();
+  });
+
+  it("says 'Not reporting' for the new rows against an older backend", async () => {
+    // mockStatus carries neither key, which is exactly what a Mac Mini
+    // running yesterday's backend sends.
+    mockFetchOf(mockStatus);
+    const { getAllByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getAllByText("Not reporting").length).toBe(2));
   });
 });

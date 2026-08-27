@@ -21,6 +21,37 @@ export interface CreditPrediction {
   weapon_creds_costs: Record<string, number>;
 }
 
+/**
+ * Whether the gaming PC's OCR agent is switched on.
+ *
+ * `connected` comes from the agent's own heartbeat, not from whether
+ * captures are arriving - captures only travel while the buy menu is open,
+ * so their absence is the normal state for most of a match and says
+ * nothing at all about whether the agent is running.
+ */
+export interface OcrAgentStatus {
+  connected: boolean;
+  last_heartbeat_age_seconds: number | null;
+  last_capture_age_seconds: number | null;
+  last_accepted_age_seconds: number | null;
+  captures_received: number;
+  captures_accepted: number;
+  heartbeat_timeout_seconds: number;
+  tesseract_available: boolean;
+}
+
+/**
+ * Whether the public hostname still reaches the backend. `reachable` is
+ * tri-state: null means the check has no address configured or hasn't run
+ * yet, and `detail` is the sentence explaining which.
+ */
+export interface PublicUrlStatus {
+  reachable: boolean | null;
+  url: string | null;
+  detail: string;
+  checked_age_seconds: number | null;
+}
+
 export interface AdminStatus {
   streamerbot_connected: boolean;
   /**
@@ -41,9 +72,12 @@ export interface AdminStatus {
     badge: number;
     spotify: number;
   };
+  // Both optional for the same reason as credit_prediction above: the Mac
+  // Mini routinely runs a backend older than the built site, and a panel
+  // that says "not reporting" is more useful than one rendering undefined.
+  ocr_agent?: OcrAgentStatus | null;
+  public_url?: PublicUrlStatus | null;
   obs_websocket_connected: boolean | null;
-  ocr_loop_running: boolean | null;
-  cloudflare_tunnel_up: boolean | null;
 }
 
 /**

@@ -1,6 +1,11 @@
 "use client";
 
-import { useAdminStatus, type CreditPrediction } from "@/lib/useAdminStatus";
+import {
+  useAdminStatus,
+  type CreditPrediction,
+  type OcrAgentStatus,
+  type PublicUrlStatus,
+} from "@/lib/useAdminStatus";
 
 function StatusBadge({ value }: { value: boolean | null }) {
   if (value === null) {
@@ -12,6 +17,101 @@ function StatusBadge({ value }: { value: boolean | null }) {
     >
       {value ? "Connected" : "Disconnected"}
     </span>
+  );
+}
+
+/**
+ * A badge for a check that genuinely reports, as opposed to one that is
+ * still a placeholder. `undefined` is its own case on purpose: it means
+ * the backend didn't send the field at all, which is a Mac Mini running
+ * older code rather than anything being down.
+ */
+function LiveBadge({
+  value,
+  up,
+  down,
+  unknown = "Not checked",
+}: {
+  value: boolean | null | undefined;
+  up: string;
+  down: string;
+  unknown?: string;
+}) {
+  if (value === undefined) {
+    return <span className="text-xs uppercase tracking-widest text-[#9AA3AC]">Not reporting</span>;
+  }
+  if (value === null) {
+    return <span className="text-xs uppercase tracking-widest text-[#9AA3AC]">{unknown}</span>;
+  }
+  return (
+    <span
+      className={`text-xs font-bold uppercase tracking-widest ${value ? "text-[#34f5c5]" : "text-[#B8323F]"}`}
+    >
+      {value ? up : down}
+    </span>
+  );
+}
+
+function formatAge(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined) return "never";
+  if (seconds < 60) return `${Math.round(seconds)}s ago`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
+  return `${Math.round(seconds / 3600)}h ago`;
+}
+
+function OcrAgentBlock({ agent }: { agent: OcrAgentStatus | null | undefined }) {
+  if (!agent) {
+    return <LiveBadge value={undefined} up="Connected" down="Not running" />;
+  }
+
+  // Whichever kind of contact was most recent. A build of the agent older
+  // than the heartbeat sends captures and nothing else, and reporting it
+  // as never seen while it is actively working would be plainly wrong.
+  const ages = [agent.last_heartbeat_age_seconds, agent.last_capture_age_seconds].filter(
+    (a): a is number => a !== null,
+  );
+  const lastSeen = ages.length > 0 ? Math.min(...ages) : null;
+
+  return (
+    <>
+      <LiveBadge value={agent.connected} up="Connected" down="Not running" />
+      {agent.connected ? (
+        <p className="mt-1 text-xs text-[#9AA3AC]">
+          Last seen {formatAge(lastSeen)} · {agent.captures_accepted}/{agent.captures_received} captures read
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-[#B8323F]">
+          {lastSeen === null
+            ? "Nothing heard since the backend started - agent.py isn't running on the gaming PC, or its secret doesn't match."
+            : `Last seen ${formatAge(lastSeen)}, past the ${agent.heartbeat_timeout_seconds}s cutoff.`}
+        </p>
+      )}
+      {!agent.tesseract_available && (
+        <p className="mt-1 text-xs text-[#B8323F]">
+          Tesseract isn&apos;t where the Mac Mini expects it - every capture will come back 503.
+        </p>
+      )}
+    </>
+  );
+}
+
+function PublicUrlBlock({ publicUrl }: { publicUrl: PublicUrlStatus | null | undefined }) {
+  if (!publicUrl) {
+    return <LiveBadge value={undefined} up="Reachable" down="Unreachable" />;
+  }
+
+  return (
+    <>
+      <LiveBadge value={publicUrl.reachable} up="Reachable" down="Unreachable" />
+      <p
+        className={`mt-1 text-xs ${publicUrl.reachable === false ? "text-[#B8323F]" : "text-[#9AA3AC]"}`}
+      >
+        {publicUrl.detail}
+      </p>
+      {publicUrl.checked_age_seconds !== null && (
+        <p className="mt-1 text-xs text-[#9AA3AC]">Checked {formatAge(publicUrl.checked_age_seconds)}</p>
+      )}
+    </>
   );
 }
 
@@ -117,16 +217,16 @@ export function StatusPanel() {
             </p>
           </div>
           <div>
+            <p className="text-[#9AA3AC]">OCR agent (gaming PC)</p>
+            <OcrAgentBlock agent={status.ocr_agent} />
+          </div>
+          <div>
             <p className="text-[#9AA3AC]">OBS WebSocket</p>
             <StatusBadge value={status.obs_websocket_connected} />
           </div>
-          <div>
-            <p className="text-[#9AA3AC]">OCR loop</p>
-            <StatusBadge value={status.ocr_loop_running} />
-          </div>
-          <div>
-            <p className="text-[#9AA3AC]">Cloudflare Tunnel</p>
-            <StatusBadge value={status.cloudflare_tunnel_up} />
+          <div className="col-span-2">
+            <p className="text-[#9AA3AC]">Public URL / Cloudflare Tunnel</p>
+            <PublicUrlBlock publicUrl={status.public_url} />
           </div>
         </div>
       )}
