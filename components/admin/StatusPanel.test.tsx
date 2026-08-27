@@ -393,4 +393,14 @@ describe("StatusPanel credit history between buy phases", () => {
     await waitFor(() => expect(getByText(/Window: 1400, 900, 900/)).toBeTruthy());
     expect(queryByText(/last read/i)).toBeNull();
   });
+
+  it("explains the window by the rule the backend actually applies", async () => {
+    // The line is read while deciding whether a reading looks wrong, so it
+    // saying "the lowest wins" while credit_ocr picks the newest
+    // corroborated value would send someone hunting a bug that isn't there.
+    mockFetchOf(statusWithPrediction());
+    const { getByText, queryByText } = render(<StatusPanel />);
+    await waitFor(() => expect(getByText(/the newest value the window agrees on wins/i)).toBeTruthy());
+    expect(queryByText(/the lowest wins/i)).toBeNull();
+  });
 });
