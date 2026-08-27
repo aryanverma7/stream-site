@@ -3,15 +3,35 @@ import { render, waitFor, fireEvent } from "@testing-library/react";
 import { PointsTool } from "./PointsTool";
 import { asFetchMock } from "@/lib/testUtils";
 
+/**
+ * PointsTool reads /api/status on mount to show which points ledger is
+ * live, so every mock here has to answer that call as well as the points
+ * one - a single canned response for all URLs would hand the ledger
+ * lookup a balance payload.
+ */
+function mockFetch(
+  pointsResponse: unknown,
+  opts: { ok?: boolean; status?: number; backend?: string | null } = {},
+) {
+  const { ok = true, status = 200, backend = "api" } = opts;
+  return vi.fn().mockImplementation((url: string) => {
+    if (url === "/api/status") {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(backend === null ? {} : { points_backend: backend }),
+      });
+    }
+    return Promise.resolve({ ok, status, json: () => Promise.resolve(pointsResponse) });
+  });
+}
+
 describe("PointsTool", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
   it("looks up a balance and displays the result", async () => {
-    global.fetch = asFetchMock(
-      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ username: "someviewer", points: 500 }) }),
-    );
+    global.fetch = asFetchMock(mockFetch({ username: "someviewer", points: 500 }));
 
     const { container, getByText } = render(<PointsTool />);
     const balanceInput = container.querySelectorAll('input[placeholder="username"]')[0];
@@ -23,17 +43,14 @@ describe("PointsTool", () => {
   });
 
   it("disables the Check button until a username is entered", () => {
-    global.fetch = asFetchMock(vi.fn());
+    global.fetch = asFetchMock(mockFetch(null));
     const { getByText } = render(<PointsTool />);
 
     expect(getByText("Check")).toBeDisabled();
   });
 
   it("grants points and shows the new balance", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ username: "someviewer", granted: 100, new_balance: 600 }),
-    });
+    const fetchMock = mockFetch({ username: "someviewer", granted: 100, new_balance: 600 });
     global.fetch = asFetchMock(fetchMock);
 
     const { getByText, container } = render(<PointsTool />);
@@ -47,11 +64,7 @@ describe("PointsTool", () => {
 
   it("shows a realistic error (e.g. no Streamlabs token yet) without crashing", async () => {
     global.fetch = asFetchMock(
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 502,
-        json: () => Promise.resolve({ error: "streamlabs_access_token is empty" }),
-      }),
+      mockFetch({ error: "streamlabs_access_token is empty" }, { ok: false, status: 502 }),
     );
 
     const { container, getByText } = render(<PointsTool />);
@@ -60,5 +73,57 @@ describe("PointsTool", () => {
     fireEvent.click(getByText("Check"));
 
     await waitFor(() => expect(getByText(/streamlabs_access_token is empty/i)).toBeTruthy());
+  });
+
+  describe("ledger switch", () => {
+    it("marks the live ledger as the selected one", async () => {
+      global.fetch = asFetchMock(mockFetch(null, { backend: "local" }));
+
+      const { getByText } = render(<PointsTool />);
+
+      await waitFor(() => expect(getByText("Local file")).toHaveAttribute("aria-pressed", "true"));
+      expect(getByText("Streamlabs")).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("switching sends only points_backend, so it can't clobber a secret", async () => {
+      const fetchMock = mockFetch(null, { backend: "api" });
+      global.fetch = asFetchMock(fetchMock);
+
+      const { getByText } = render(<PointsTool />);
+      await waitFor(() => expect(getByText("Streamlabs")).toHaveAttribute("aria-pressed", "true"));
+
+      fireEvent.click(getByText("Local file"));
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/config",
+          expect.objectContaining({
+            method: "PUT",
+            body: JSON.stringify({ points_backend: "local" }),
+          }),
+        ),
+      );
+      await waitFor(() => expect(getByText("Local file")).toHaveAttribute("aria-pressed", "true"));
+    });
+
+    it("warns that the local ledger is not viewers' real points", async () => {
+      global.fetch = asFetchMock(mockFetch(null, { backend: "local" }));
+
+      const { container } = render(<PointsTool />);
+
+      await waitFor(() =>
+        expect(container.textContent).toContain("not the balances viewers see"),
+      );
+    });
+
+    it("says so plainly when the backend is too old to report a ledger", async () => {
+      global.fetch = asFetchMock(mockFetch(null, { backend: null }));
+
+      const { container } = render(<PointsTool />);
+
+      await waitFor(() =>
+        expect(container.textContent).toContain("isn't reporting a points ledger"),
+      );
+    });
   });
 });
