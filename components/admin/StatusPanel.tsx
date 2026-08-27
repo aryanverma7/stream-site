@@ -156,7 +156,7 @@ function CreditPredictionBlock({ prediction }: { prediction: CreditPrediction | 
 
       <p className="mt-1 text-xs text-[#9AA3AC]">
         {readings.length > 0
-          ? `Window: ${readings.join(", ")} - the newest value the window agrees on wins, so the prediction is ${CREDS}${predicted_credits}.`
+          ? `Window: ${readings.join(", ")} - the newest reading wins unless it rose without a second sighting, so the prediction is ${CREDS}${predicted_credits}.`
           : lastCredits !== null
             ? `Nothing this buy phase yet - last read ${CREDS}${lastCredits} ${formatAge(last?.age_seconds)}, so the pipeline itself is working. The roulette will open the full roster until the next buy menu.`
             : "Nothing has been read since this backend started - the roulette will open the full roster."}

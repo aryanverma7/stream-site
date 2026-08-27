@@ -395,12 +395,18 @@ describe("StatusPanel credit history between buy phases", () => {
   });
 
   it("explains the window by the rule the backend actually applies", async () => {
-    // The line is read while deciding whether a reading looks wrong, so it
-    // saying "the lowest wins" while credit_ocr picks the newest
-    // corroborated value would send someone hunting a bug that isn't there.
+    // The line is read while deciding whether a reading looks wrong, so a
+    // stale description of the rule would send someone hunting a bug that
+    // isn't there. credit_ocr takes the newest reading outright on the way
+    // down and only makes a RISE wait for a second sighting (finding #8),
+    // so neither "the lowest wins" nor a flat "the window has to agree"
+    // describes what the number on screen came from.
     mockFetchOf(statusWithPrediction());
     const { getByText, queryByText } = render(<StatusPanel />);
-    await waitFor(() => expect(getByText(/the newest value the window agrees on wins/i)).toBeTruthy());
+    await waitFor(() =>
+      expect(getByText(/the newest reading wins unless it rose without a second sighting/i)).toBeTruthy(),
+    );
     expect(queryByText(/the lowest wins/i)).toBeNull();
+    expect(queryByText(/the newest value the window agrees on wins/i)).toBeNull();
   });
 });
