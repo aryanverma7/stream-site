@@ -5,8 +5,34 @@ import { usePointsTool } from "@/lib/usePointsTool";
 import { usePointsBackend, type PointsBackend } from "@/lib/usePointsBackend";
 
 const BACKEND_LABELS: Record<PointsBackend, string> = {
-  api: "Streamlabs",
+  api: "Streamlabs API",
+  cloudbot: "Cloudbot",
   local: "Local file",
+};
+
+/**
+ * What each ledger actually is, in the terms that matter when choosing
+ * one: whose balance it holds, and what is wrong with it right now.
+ * "Cloudbot" and "Streamlabs API" are the SAME wallet reached two ways,
+ * which is the thing most worth saying out loud - only "Local file" is a
+ * different set of numbers from the one `!points` reports.
+ */
+const BACKEND_NOTES: Record<PointsBackend, { tone: string; lead: string; body: string }> = {
+  api: {
+    tone: "text-[#34f5c5]",
+    lead: "Streamlabs API.",
+    body: "Viewers' real balances, over REST. Every call returns 401 until Streamlabs approves this app's Loyalty Points access.",
+  },
+  cloudbot: {
+    tone: "text-[#34f5c5]",
+    lead: "Cloudbot.",
+    body: "The same wallet !points reports, reached by asking Cloudbot in chat. Needs the bot account to be a moderator, and each lookup costs a visible chat line.",
+  },
+  local: {
+    tone: "text-[#E8B33F]",
+    lead: "Local file.",
+    body: "A ledger on the Mac Mini. Not what !points reports - it holds nothing anyone earned by watching, so viewers see two different balances. Testing only.",
+  },
 };
 
 /**
@@ -60,20 +86,8 @@ function BackendSwitch() {
           </div>
 
           <p className="mt-3 text-xs text-[#9AA3AC]">
-            {backend === "local" ? (
-              <>
-                <span className="text-[#E8B33F]">Local file.</span> A ledger on the Mac Mini,
-                not the balances viewers see with <code>!points</code>. Starts empty and
-                doesn&apos;t accrue with watch time - grant points below to test. Streamlabs
-                still owes this app Loyalty Points API approval.
-              </>
-            ) : (
-              <>
-                <span className="text-[#34f5c5]">Streamlabs.</span> Viewers&apos; real loyalty
-                points. Every call returns 401 until Streamlabs approves this app&apos;s Loyalty
-                Points API access.
-              </>
-            )}
+            <span className={BACKEND_NOTES[backend].tone}>{BACKEND_NOTES[backend].lead}</span>{" "}
+            {BACKEND_NOTES[backend].body}
           </p>
 
           <p className="mt-2 text-xs text-[#9AA3AC]">

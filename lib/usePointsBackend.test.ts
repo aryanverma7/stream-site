@@ -34,7 +34,7 @@ describe("usePointsBackend", () => {
   });
 
   it("treats an unrecognized ledger name as unknown rather than displaying it", async () => {
-    global.fetch = asFetchMock(statusReturning({ points_backend: "cloudbot" }));
+    global.fetch = asFetchMock(statusReturning({ points_backend: "carrier-pigeon" }));
 
     const { result } = renderHook(() => usePointsBackend());
 

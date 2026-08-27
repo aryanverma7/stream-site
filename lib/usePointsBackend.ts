@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-export type PointsBackend = "api" | "local";
+export type PointsBackend = "api" | "cloudbot" | "local";
 
-export const POINTS_BACKENDS: PointsBackend[] = ["api", "local"];
+export const POINTS_BACKENDS: PointsBackend[] = ["api", "cloudbot", "local"];
 
 function isPointsBackend(value: unknown): value is PointsBackend {
   return typeof value === "string" && (POINTS_BACKENDS as string[]).includes(value);

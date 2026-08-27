@@ -76,13 +76,25 @@ describe("PointsTool", () => {
   });
 
   describe("ledger switch", () => {
+    it("offers the Cloudbot ledger alongside the other two", async () => {
+      global.fetch = asFetchMock(mockFetch(null, { backend: "cloudbot" }));
+
+      const { getByText } = render(<PointsTool />);
+
+      await waitFor(() => expect(getByText("Cloudbot")).toHaveAttribute("aria-pressed", "true"));
+      // Cloudbot and the REST API are the same wallet reached two ways;
+      // only the local file is a different set of numbers.
+      expect(getByText("Streamlabs API")).toHaveAttribute("aria-pressed", "false");
+      expect(getByText("Local file")).toHaveAttribute("aria-pressed", "false");
+    });
+
     it("marks the live ledger as the selected one", async () => {
       global.fetch = asFetchMock(mockFetch(null, { backend: "local" }));
 
       const { getByText } = render(<PointsTool />);
 
       await waitFor(() => expect(getByText("Local file")).toHaveAttribute("aria-pressed", "true"));
-      expect(getByText("Streamlabs")).toHaveAttribute("aria-pressed", "false");
+      expect(getByText("Streamlabs API")).toHaveAttribute("aria-pressed", "false");
     });
 
     it("switching sends only points_backend, so it can't clobber a secret", async () => {
@@ -90,7 +102,7 @@ describe("PointsTool", () => {
       global.fetch = asFetchMock(fetchMock);
 
       const { getByText } = render(<PointsTool />);
-      await waitFor(() => expect(getByText("Streamlabs")).toHaveAttribute("aria-pressed", "true"));
+      await waitFor(() => expect(getByText("Streamlabs API")).toHaveAttribute("aria-pressed", "true"));
 
       fireEvent.click(getByText("Local file"));
 
@@ -111,9 +123,7 @@ describe("PointsTool", () => {
 
       const { container } = render(<PointsTool />);
 
-      await waitFor(() =>
-        expect(container.textContent).toContain("not the balances viewers see"),
-      );
+      await waitFor(() => expect(container.textContent).toContain("Not what !points reports"));
     });
 
     it("says so plainly when the backend is too old to report a ledger", async () => {
