@@ -102,6 +102,11 @@ export function StatusPanel() {
                 Connected, but no event subscription - no chat command can fire.
               </p>
             )}
+            {status.streamerbot_connected && status.streamerbot_authenticated === false && (
+              <p className="mt-1 text-xs text-[#B8323F]">
+                Authentication refused - check streamerbot_ws_password. Chat replies won&apos;t send.
+              </p>
+            )}
           </div>
           <div>
             <p className="text-[#9AA3AC]">Widget connections</p>

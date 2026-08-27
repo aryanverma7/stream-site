@@ -31,6 +31,9 @@ export interface AdminStatus {
    * from firing. Optional for the same reason as credit_prediction below.
    */
   streamerbot_subscribed?: boolean;
+  // Tri-state: null when Streamer.bot never issued an authentication
+  // challenge, false only when one was answered and refused.
+  streamerbot_authenticated?: boolean | null;
   credit_prediction?: CreditPrediction | null;
   widget_connections: {
     total: number;

@@ -158,4 +158,29 @@ describe("StatusPanel", () => {
     await waitFor(() => expect(getAllByText("Connected").length).toBeGreaterThan(0));
     expect(queryByText(/no event subscription/i)).toBeNull();
   });
+
+  it("warns when Streamer.bot refused the authentication", async () => {
+    mockFetchOf({ ...mockStatus, streamerbot_connected: true, streamerbot_authenticated: false });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/Authentication refused/i)).toBeTruthy());
+  });
+
+  it("does not warn about authentication when the server never asked for any", async () => {
+    // null, not false: Streamer.bot's Authentication toggle is simply off,
+    // which is not a failure and must not be flagged as one.
+    mockFetchOf({ ...mockStatus, streamerbot_connected: true, streamerbot_authenticated: null });
+    const { getAllByText, queryByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getAllByText("Connected").length).toBeGreaterThan(0));
+    expect(queryByText(/Authentication refused/i)).toBeNull();
+  });
+
+  it("does not warn about authentication against a backend that doesn't report it", async () => {
+    mockFetchOf(mockStatus);
+    const { getAllByText, queryByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getAllByText("Connected").length).toBeGreaterThan(0));
+    expect(queryByText(/Authentication refused/i)).toBeNull();
+  });
 });
