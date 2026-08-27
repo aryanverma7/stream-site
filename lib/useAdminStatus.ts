@@ -85,6 +85,13 @@ export interface AdminStatus {
   // that says "not reporting" is more useful than one rendering undefined.
   ocr_agent?: OcrAgentStatus | null;
   public_url?: PublicUrlStatus | null;
+  // Which points ledger the backend is reading: "api" for Streamlabs'
+  // real Loyalty Points, "local" for the flat-file stand-in that stands
+  // in while Streamlabs' API approval is pending. Optional like the rest,
+  // and worth showing precisely because the two are indistinguishable
+  // from the numbers alone - a local ledger reads 0 for a viewer with
+  // thousands of real points, which looks exactly like a broken lookup.
+  points_backend?: string;
   obs_websocket_connected: boolean | null;
 }
 

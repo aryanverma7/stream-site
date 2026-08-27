@@ -117,6 +117,40 @@ function PublicUrlBlock({ publicUrl }: { publicUrl: PublicUrlStatus | null | und
 }
 
 /**
+ * Which points ledger the backend is reading.
+ *
+ * "local" is deliberately the loud one. It is not a fault - it is the
+ * stand-in that keeps the roulette usable while Streamlabs reviews this
+ * app's Loyalty Points API access - but it reads zero for every viewer
+ * who hasn't been granted points here, including viewers holding
+ * thousands of real ones. Without a line saying so, that is
+ * indistinguishable from a lookup that has quietly broken.
+ */
+function PointsBackendBlock({ backend }: { backend: string | undefined }) {
+  if (!backend) {
+    return <p className="text-xs text-[#9AA3AC]">This backend isn&apos;t reporting a points ledger.</p>;
+  }
+
+  if (backend === "local") {
+    return (
+      <>
+        <p className="font-semibold text-[#E8B33F]">Local file</p>
+        <p className="mt-1 text-xs text-[#9AA3AC]">
+          Not viewers&apos; real !points balances. Grant points below to test.
+        </p>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <p className="font-semibold">Streamlabs</p>
+      <p className="mt-1 text-xs text-[#9AA3AC]">Viewers&apos; real loyalty points.</p>
+    </>
+  );
+}
+
+/**
  * Valorant's own credit glyph. Written as an escape rather than pasted in
  * literally so it survives any editor that isn't confident about the
  * character - it's the same symbol the roulette overlay prints.
@@ -248,6 +282,10 @@ export function StatusPanel() {
           <div>
             <p className="text-[#9AA3AC]">OBS WebSocket</p>
             <StatusBadge value={status.obs_websocket_connected} />
+          </div>
+          <div>
+            <p className="text-[#9AA3AC]">Points ledger</p>
+            <PointsBackendBlock backend={status.points_backend} />
           </div>
           <div className="col-span-2">
             <p className="text-[#9AA3AC]">Public URL / Cloudflare Tunnel</p>
