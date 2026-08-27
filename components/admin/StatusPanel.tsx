@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  STATUS_POLL_INTERVAL_MS,
   useAdminStatus,
   type CreditPrediction,
   type OcrAgentStatus,
@@ -134,6 +135,12 @@ function CreditPredictionBlock({ prediction }: { prediction: CreditPrediction | 
   const { predicted_credits, readings, filter_enabled, votable_count, total_weapons } = prediction;
   const hasReading = predicted_credits !== null && predicted_credits !== undefined;
 
+  // The history that outlives a buy-phase reset. An empty window on its own
+  // says nothing about whether OCR works, and reading it as "broken" is
+  // exactly the wrong conclusion between rounds - which is most of a match.
+  const last = prediction.last_reading;
+  const lastCredits = last?.credits ?? null;
+
   return (
     <div>
       <div className="flex items-baseline gap-3">
@@ -148,9 +155,11 @@ function CreditPredictionBlock({ prediction }: { prediction: CreditPrediction | 
       </div>
 
       <p className="mt-1 text-xs text-[#9AA3AC]">
-        {readings.length === 0
-          ? "No valid readings in the window - the roulette will open the full roster."
-          : `Window: ${readings.join(", ")} - the lowest wins, so the prediction is ${CREDS}${predicted_credits}.`}
+        {readings.length > 0
+          ? `Window: ${readings.join(", ")} - the lowest wins, so the prediction is ${CREDS}${predicted_credits}.`
+          : lastCredits !== null
+            ? `Nothing this buy phase yet - last read ${CREDS}${lastCredits} ${formatAge(last?.age_seconds)}, so the pipeline itself is working. The roulette will open the full roster until the next buy menu.`
+            : "Nothing has been read since this backend started - the roulette will open the full roster."}
       </p>
 
       {filter_enabled && hasReading && (
@@ -180,17 +189,33 @@ export function StatusPanel() {
     <div className="rounded border border-[#34f5c5]/20 bg-[#151F2B] p-6">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm uppercase tracking-widest text-[#ECE8E1]">System Status</h3>
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={loading}
-          className="text-xs uppercase tracking-widest text-[#34f5c5]/70 hover:text-[#34f5c5] disabled:opacity-40"
-        >
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs uppercase tracking-widest text-[#9AA3AC]">
+            Auto every {Math.round(STATUS_POLL_INTERVAL_MS / 1000)}s
+          </span>
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={loading}
+            className="text-xs uppercase tracking-widest text-[#34f5c5]/70 hover:text-[#34f5c5] disabled:opacity-40"
+          >
+            {loading ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
       </div>
 
-      {error && <p className="text-sm text-[#B8323F]">Couldn&apos;t reach the backend - try refreshing.</p>}
+      {/*
+        Kept above the values rather than replacing them: a failed poll
+        during a backend restart shouldn't blank a panel whose last known
+        answers are still the most useful thing on screen.
+      */}
+      {error && (
+        <p className="mb-4 text-sm text-[#B8323F]">
+          {status
+            ? "Couldn't reach the backend on the last check - the values below are from before that."
+            : "Couldn't reach the backend - try refreshing."}
+        </p>
+      )}
 
       {status && (
         <div className="grid grid-cols-2 gap-4 text-sm text-[#ECE8E1]">

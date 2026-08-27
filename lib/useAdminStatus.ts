@@ -14,6 +14,14 @@ import { useCallback, useEffect, useState } from "react";
 export interface CreditPrediction {
   predicted_credits: number | null;
   readings: number[];
+  /**
+   * The last value OCR ever read, and how long ago - which survives the
+   * per-buy-phase history reset that `readings` does not. Optional because
+   * a backend older than this field simply doesn't send it, and because
+   * an empty window with no last reading at all is a genuinely different
+   * situation from one that had a reading four minutes ago.
+   */
+  last_reading?: { credits: number | null; age_seconds: number | null } | null;
   filter_enabled: boolean;
   votable_count: number;
   total_weapons: number;
@@ -81,10 +89,34 @@ export interface AdminStatus {
 }
 
 /**
- * Fetches /api/status - already built and tested in Task #4. Manual
- * refresh rather than auto-polling: an admin actively checking this page
- * can click refresh, which avoids an extra timer to maintain for a tool
- * that's only ever open while someone's actually looking at it.
+ * How often the panel re-reads /api/status on its own.
+ *
+ * This used to be manual-only, on the reasoning that a page nobody is
+ * looking at doesn't need a timer. That reasoning was wrong about how the
+ * page is actually used: it's open on a second monitor during setup while
+ * things are being plugged in, restarted and calibrated on two other
+ * machines, and every one of those changes has to be discovered by
+ * clicking. Five seconds is short enough that a restart on the Mac Mini
+ * shows up before you've finished alt-tabbing back, and long enough that
+ * a whole stream's worth of polling is still a trivial amount of traffic.
+ */
+export const STATUS_POLL_INTERVAL_MS = 5000;
+
+/**
+ * Fetches /api/status on mount, on a timer, and on demand.
+ *
+ * `loading` deliberately only covers the fetches a person is waiting on -
+ * the first one and any explicit refresh(). A background poll flipping it
+ * would make the Refresh button read "Refreshing..." every five seconds
+ * forever, which looks like something is wrong rather than like something
+ * is working. For the same reason a failed background poll leaves the
+ * last good status on screen instead of blanking the panel; the error
+ * flag says the last attempt failed, and the values keep their own
+ * "checked N ago" context.
+ *
+ * Polling stops while the tab is hidden and fires immediately when it
+ * comes back, since this page spends most of a stream behind OBS and a
+ * poll nobody can see is pure tunnel traffic.
  *
  * credentials: "same-origin" is explicit here (it's actually the default
  * for same-origin fetches already) specifically to make clear this relies
@@ -103,22 +135,54 @@ export function useAdminStatus(): {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const refresh = useCallback(() => {
-    setLoading(true);
-    setError(false);
-    fetch("/api/status", { credentials: "same-origin" })
+  const load = useCallback((visible: boolean) => {
+    if (visible) {
+      setLoading(true);
+      setError(false);
+    }
+    return fetch("/api/status", { credentials: "same-origin" })
       .then((res) => {
         if (!res.ok) throw new Error(`status ${res.status}`);
         return res.json();
       })
-      .then((data) => setStatus(data))
+      .then((data) => {
+        setStatus(data);
+        setError(false);
+      })
       .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (visible) setLoading(false);
+      });
   }, []);
 
+  const refresh = useCallback(() => {
+    load(true);
+  }, [load]);
+
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    load(true);
+  }, [load]);
+
+  useEffect(() => {
+    const hidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
+
+    const timer = setInterval(() => {
+      if (!hidden()) load(false);
+    }, STATUS_POLL_INTERVAL_MS);
+
+    // Catching up on return matters more than the polling itself: whatever
+    // was being fixed on another machine happened entirely while this tab
+    // was hidden, so the first thing it should show is the result of it.
+    const onVisibility = () => {
+      if (!hidden()) load(false);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [load]);
 
   return { status, loading, error, refresh };
 }

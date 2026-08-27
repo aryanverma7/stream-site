@@ -310,3 +310,87 @@ describe("StatusPanel", () => {
     await waitFor(() => expect(getAllByText("Not reporting").length).toBe(2));
   });
 });
+
+describe("StatusPanel auto-refresh", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("tells you it is refreshing on its own, so nobody sits there clicking", async () => {
+    mockFetchOf(mockStatus);
+    const { getByText } = render(<StatusPanel />);
+    await waitFor(() => expect(getByText(/Auto every 5s/i)).toBeTruthy());
+  });
+
+  it("keeps the values on screen when a later check fails, and says they are stale", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockStatus) })
+      .mockRejectedValue(new Error("backend restarting"));
+    global.fetch = asFetchMock(fetchMock);
+
+    const { getByText, getAllByText } = render(<StatusPanel />);
+    await waitFor(() => expect(getAllByText("Connected").length).toBeGreaterThan(0));
+
+    fireEvent.click(getByText("Refresh"));
+
+    await waitFor(() => expect(getByText(/values below are from before that/i)).toBeTruthy());
+    expect(getAllByText("Connected").length).toBeGreaterThan(0);
+  });
+});
+
+describe("StatusPanel credit history between buy phases", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("an empty window with an earlier reading says the pipeline works", async () => {
+    // The reported symptom, from the other side. Between rounds the window
+    // is legitimately empty, and rendering that as bare "No reading yet"
+    // is indistinguishable from OCR having never worked at all.
+    mockFetchOf(
+      statusWithPrediction({
+        predicted_credits: null,
+        readings: [],
+        last_reading: { credits: 3900, age_seconds: 240 },
+      }),
+    );
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/last read/i)).toBeTruthy());
+    expect(getByText(/3900/)).toBeTruthy();
+    expect(getByText(/4m ago/)).toBeTruthy();
+    expect(getByText(/pipeline itself is working/i)).toBeTruthy();
+  });
+
+  it("an empty window with no earlier reading at all says exactly that instead", async () => {
+    mockFetchOf(
+      statusWithPrediction({
+        predicted_credits: null,
+        readings: [],
+        last_reading: { credits: null, age_seconds: null },
+      }),
+    );
+    const { getByText, queryByText } = render(<StatusPanel />);
+
+    await waitFor(() =>
+      expect(getByText(/Nothing has been read since this backend started/i)).toBeTruthy(),
+    );
+    expect(queryByText(/last read/i)).toBeNull();
+  });
+
+  it("a backend too old to send last_reading still renders the never-read line", async () => {
+    mockFetchOf(statusWithPrediction({ predicted_credits: null, readings: [] }));
+    const { getByText } = render(<StatusPanel />);
+    await waitFor(() =>
+      expect(getByText(/Nothing has been read since this backend started/i)).toBeTruthy(),
+    );
+  });
+
+  it("a live window still wins over the remembered reading", async () => {
+    mockFetchOf(statusWithPrediction({ last_reading: { credits: 3900, age_seconds: 240 } }));
+    const { getByText, queryByText } = render(<StatusPanel />);
+    await waitFor(() => expect(getByText(/Window: 1400, 900, 900/)).toBeTruthy());
+    expect(queryByText(/last read/i)).toBeNull();
+  });
+});
