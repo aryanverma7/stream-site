@@ -10,7 +10,11 @@ interface BalanceResult {
 interface GrantResult {
   username: string;
   granted: number;
-  new_balance: number;
+  // null when the backend confirmed the grant but cannot report a total.
+  // The cloudbot points backend usually can't: Cloudbot's confirmation
+  // carries the amount added, and there is no way to read a balance back.
+  // Rendered as "granted", never as a balance of zero.
+  new_balance: number | null;
 }
 
 /**

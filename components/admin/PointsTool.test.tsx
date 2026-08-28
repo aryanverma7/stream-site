@@ -62,6 +62,24 @@ describe("PointsTool", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/points/grant", expect.objectContaining({ method: "POST" }));
   });
 
+  it("says so rather than showing a zero when the backend can't report a total", async () => {
+    // The cloudbot backend's normal case: Cloudbot confirms the amount
+    // added and there is no way to read a balance back. Rendering null as
+    // "new balance: 0" would read as the grant having failed.
+    global.fetch = asFetchMock(
+      mockFetch({ username: "someviewer", granted: 100, new_balance: null }),
+    );
+
+    const { getByText, container } = render(<PointsTool />);
+    const grantUsernameInput = container.querySelectorAll('input[placeholder="username"]')[1];
+    fireEvent.change(grantUsernameInput, { target: { value: "someviewer" } });
+    fireEvent.click(getByText("Grant"));
+
+    await waitFor(() => expect(container.textContent).toContain("Granted 100"));
+    expect(container.textContent).toContain("not reported by this backend");
+    expect(container.textContent).not.toContain("new balance: 0");
+  });
+
   it("shows a realistic error (e.g. no Streamlabs token yet) without crashing", async () => {
     global.fetch = asFetchMock(
       mockFetch({ error: "streamlabs_access_token is empty" }, { ok: false, status: 502 }),

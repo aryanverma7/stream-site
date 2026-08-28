@@ -175,8 +175,12 @@ export function PointsTool() {
         {grantError && <p className="mt-3 text-sm text-[#B8323F]">{grantError}</p>}
         {grantResult && (
           <p className="mt-3 text-sm text-[#ECE8E1]">
-            Granted {grantResult.granted} to <span className="text-[#34f5c5]">{grantResult.username}</span> -
-            new balance: <span className="font-semibold">{grantResult.new_balance}</span>
+            Granted {grantResult.granted} to <span className="text-[#34f5c5]">{grantResult.username}</span>
+            {grantResult.new_balance === null ? (
+              <> - new balance not reported by this backend</>
+            ) : (
+              <> - new balance: <span className="font-semibold">{grantResult.new_balance}</span></>
+            )}
           </p>
         )}
       </div>
