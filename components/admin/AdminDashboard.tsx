@@ -5,22 +5,23 @@ import { StatusPanel } from "./StatusPanel";
 import { LogViewer } from "./LogViewer";
 import { ConfigEditor } from "./ConfigEditor";
 import { PointsTool } from "./PointsTool";
+import { AgentPicker } from "./AgentPicker";
 
-type Tab = "status" | "logs" | "config" | "points";
+type Tab = "status" | "logs" | "config" | "points" | "agent";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "status", label: "Status" },
   { id: "logs", label: "Logs" },
   { id: "config", label: "Config" },
   { id: "points", label: "Points" },
+  { id: "agent", label: "Agent" },
 ];
 
 /**
  * Per spec Section 14: config editor, points tool, log viewer, status
- * panel - all consuming the Task #4 backend, already built and tested.
- * Status and Logs are real in this pass; Config and Points are genuinely
- * still placeholders, built in a following pass rather than crammed in
- * alongside these to keep this batch reviewable.
+ * panel - all consuming the Task #4 backend. Agent was added later; it
+ * sets how many credits the roulette reserves for abilities, which
+ * decides which weapons it offers.
  */
 export function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("status");
@@ -56,6 +57,7 @@ export function AdminDashboard() {
         {activeTab === "logs" && <LogViewer />}
         {activeTab === "config" && <ConfigEditor />}
         {activeTab === "points" && <PointsTool />}
+        {activeTab === "agent" && <AgentPicker />}
       </div>
     </div>
   );
