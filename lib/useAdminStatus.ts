@@ -13,6 +13,28 @@ import { useCallback, useEffect, useState } from "react";
  */
 export interface CreditPrediction {
   predicted_credits: number | null;
+  /**
+   * What is actually left for a gun once shields and abilities are taken
+   * out - the number the roster was built from. The raw reading is what
+   * the streamer sees in game, and showing only that makes a correct
+   * roster look broken.
+   */
+  spendable_credits?: number | null;
+  reserved_credits?: number | null;
+  /**
+   * Which agent's kit the reserve was calculated for, and what that kit
+   * costs. A null cost means no prices are on file for them and the flat
+   * fallback is in use, which is the state somebody has to fix.
+   */
+  agent?: string | null;
+  agent_kit_cost?: number | null;
+  /**
+   * Whether the roster was built for a pistol round. Worth its own field
+   * because it changes the roster twice over - a smaller reserve, and the
+   * sidearms staying on the wheel - and without it a pistol-round roster
+   * reads as the filter misbehaving.
+   */
+  pistol_round?: boolean;
   readings: number[];
   /**
    * The last value OCR ever read, and how long ago - which survives the
@@ -60,6 +82,40 @@ export interface PublicUrlStatus {
   checked_age_seconds: number | null;
 }
 
+/**
+ * What the wheel is doing, and what it last landed on.
+ *
+ * `last_result` deliberately outlives both the session that produced it
+ * and the forced-buy badge: the question it answers - which gun am I
+ * supposed to be buying - gets asked during the buy phase, by which point
+ * the overlay has finished its spin. Answering it used to mean opening
+ * the stream on a second screen to watch a widget.
+ */
+export interface RouletteResult {
+  winner: string | null;
+  randomly_picked: boolean;
+  final_weights: Record<string, number>;
+  wheel_shares: Record<string, number>;
+  predicted_credits: number | null;
+  platform: string;
+  age_seconds: number;
+  winner_share_percent: number | null;
+  total_votes: number;
+}
+
+export interface RouletteStatus {
+  active: {
+    weights: Record<string, number>;
+    wheel_shares: Record<string, number>;
+    predicted_credits: number | null;
+    platform: string;
+    seconds_elapsed: number;
+  } | null;
+  last_result: RouletteResult | null;
+  forced_buy: { weapon: string | null; phase: string | null };
+  on_cooldown: boolean;
+}
+
 export interface AdminStatus {
   streamerbot_connected: boolean;
   /**
@@ -74,6 +130,9 @@ export interface AdminStatus {
   // challenge, false only when one was answered and refused.
   streamerbot_authenticated?: boolean | null;
   credit_prediction?: CreditPrediction | null;
+  // Optional for the same reason as everything else here - the Mac Mini
+  // routinely runs a backend older than the built site.
+  roulette?: RouletteStatus | null;
   widget_connections: {
     total: number;
     roulette: number;

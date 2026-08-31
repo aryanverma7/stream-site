@@ -48,6 +48,154 @@ function mockFetchOf(body: unknown) {
   global.fetch = asFetchMock(vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(body) }));
 }
 
+function rouletteResult(overrides: Record<string, unknown> = {}) {
+  return {
+    active: null,
+    last_result: {
+      winner: "vandal",
+      randomly_picked: false,
+      final_weights: { vandal: 3, phantom: 0 },
+      wheel_shares: { vandal: 4, phantom: 1 },
+      predicted_credits: 4500,
+      platform: "twitch",
+      age_seconds: 12,
+      winner_share_percent: 80,
+      total_votes: 3,
+      ...overrides,
+    },
+    forced_buy: { weapon: "vandal", phase: "queued" },
+    on_cooldown: true,
+  };
+}
+
+describe("StatusPanel forced buy", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("names the weapon the wheel landed on", async () => {
+    mockFetchOf({ ...mockStatus, roulette: rouletteResult() });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText("vandal")).toBeTruthy());
+    expect(getByText(/80% of the wheel from 3 votes/)).toBeTruthy();
+  });
+
+  it("says whether the weapon is still to be bought or already in play", async () => {
+    mockFetchOf({ ...mockStatus, roulette: rouletteResult() });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText("Buy this next round")).toBeTruthy());
+  });
+
+  it("keeps showing the winner after the badge has been cleared", async () => {
+    // The whole reason the result is separate state. The badge's life is
+    // two buy phases; the answer to "what am I buying" is still wanted
+    // after that, and used to require opening the stream to find.
+    mockFetchOf({
+      ...mockStatus,
+      roulette: { ...rouletteResult(), forced_buy: { weapon: null, phase: null } },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText("vandal")).toBeTruthy());
+    expect(getByText("Done")).toBeTruthy();
+  });
+
+  it("says a voteless result was the wheel's own pick, not chat's", async () => {
+    mockFetchOf({
+      ...mockStatus,
+      roulette: rouletteResult({ randomly_picked: true, total_votes: 0, final_weights: {} }),
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/Nobody voted/)).toBeTruthy());
+  });
+
+  it("shows the running wheel while voting is open", async () => {
+    mockFetchOf({
+      ...mockStatus,
+      roulette: {
+        active: {
+          weights: { vandal: 2, phantom: 0 },
+          wheel_shares: { vandal: 3, phantom: 1 },
+          predicted_credits: 4500,
+          platform: "twitch",
+          seconds_elapsed: 6,
+        },
+        last_result: null,
+        forced_buy: { weapon: null, phase: null },
+        on_cooldown: false,
+      },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/Voting open/)).toBeTruthy());
+    expect(getByText(/75%/)).toBeTruthy();
+  });
+
+  it("degrades to a plain line on a backend that doesn't report the roulette", async () => {
+    mockFetchOf(mockStatus);
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/isn't reporting the roulette yet/)).toBeTruthy());
+  });
+});
+
+describe("StatusPanel budget breakdown", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shows what is left for a gun after shields and abilities", async () => {
+    // The raw reading is what the streamer sees in game, so a roster built
+    // from a smaller number looks wrong without this line.
+    mockFetchOf(
+      statusWithPrediction({
+        predicted_credits: 4500,
+        spendable_credits: 2900,
+        reserved_credits: 1600,
+        pistol_round: false,
+        agent: "cypher",
+        agent_kit_cost: 600,
+      }),
+    );
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/2900 for a gun after/)).toBeTruthy());
+    expect(getByText(/cypher, kit/)).toBeTruthy();
+  });
+
+  it("says an agent has no prices on file rather than printing a zero", async () => {
+    mockFetchOf(
+      statusWithPrediction({
+        predicted_credits: 4500,
+        spendable_credits: 3100,
+        reserved_credits: 1400,
+        pistol_round: false,
+        agent: "clove",
+        agent_kit_cost: null,
+      }),
+    );
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/no kit prices on file/)).toBeTruthy());
+  });
+
+  it("says a pistol round is a pistol round", async () => {
+    mockFetchOf(
+      statusWithPrediction({
+        spendable_credits: 500,
+        reserved_credits: 400,
+        pistol_round: true,
+      }),
+    );
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/sidearms stay on the wheel/)).toBeTruthy());
+  });
+});
+
 describe("StatusPanel", () => {
   afterEach(() => {
     vi.restoreAllMocks();

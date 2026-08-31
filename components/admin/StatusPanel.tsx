@@ -6,6 +6,7 @@ import {
   type CreditPrediction,
   type OcrAgentStatus,
   type PublicUrlStatus,
+  type RouletteStatus,
 } from "@/lib/useAdminStatus";
 
 function StatusBadge({ value }: { value: boolean | null }) {
@@ -188,6 +189,22 @@ function CreditPredictionBlock({ prediction }: { prediction: CreditPrediction | 
         </span>
       </div>
 
+      {hasReading && prediction.spendable_credits !== undefined && prediction.spendable_credits !== null && (
+        <p className="mt-1 text-xs text-[#9AA3AC]">
+          {CREDS}
+          {prediction.spendable_credits} for a gun after {CREDS}
+          {prediction.reserved_credits} held back for{" "}
+          {prediction.pistol_round ? "a light shield" : "shields and abilities"}
+          {prediction.agent ? ` (${prediction.agent}` : ""}
+          {prediction.agent && prediction.agent_kit_cost !== null && prediction.agent_kit_cost !== undefined
+            ? `, kit ${CREDS}${prediction.agent_kit_cost})`
+            : prediction.agent
+              ? ", no kit prices on file)"
+              : ""}
+          {prediction.pistol_round ? " · pistol round, so the sidearms stay on the wheel" : ""}
+        </p>
+      )}
+
       <p className="mt-1 text-xs text-[#9AA3AC]">
         {readings.length > 0
           ? `Window: ${readings.join(", ")} - the newest reading wins unless it rose without a second sighting, so the prediction is ${CREDS}${predicted_credits}.`
@@ -212,6 +229,95 @@ function CreditPredictionBlock({ prediction }: { prediction: CreditPrediction | 
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * What the wheel is doing, and what it last landed on.
+ *
+ * The last result is the reason this block exists at all. It outlives its
+ * session on purpose: "which gun am I being forced into" is asked during
+ * the buy phase, after the overlay has spun and gone, and answering it
+ * meant opening the stream on a second screen to watch a widget.
+ */
+function RouletteBlock({ roulette }: { roulette: RouletteStatus | null | undefined }) {
+  if (!roulette) {
+    return <p className="text-xs text-[#9AA3AC]">This backend isn&apos;t reporting the roulette yet.</p>;
+  }
+
+  const { active, last_result: result, forced_buy: forcedBuy } = roulette;
+
+  if (active) {
+    // Sorted by share rather than by vote count so this reads the same way
+    // the wheel does - an unvoted weapon still occupies room on it.
+    const leaders = Object.entries(active.wheel_shares)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+    const total = Object.values(active.wheel_shares).reduce((sum, share) => sum + share, 0);
+    return (
+      <div>
+        <p className="text-sm font-semibold text-[#34f5c5]">
+          Voting open · {Math.round(active.seconds_elapsed)}s in
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {leaders.map(([weapon, share]) => (
+            <span
+              key={weapon}
+              className="rounded border border-[#34f5c5]/20 px-2 py-0.5 text-xs text-[#ECE8E1]"
+            >
+              {weapon}{" "}
+              <span className="tabular-nums text-[#9AA3AC]">
+                {total > 0 ? Math.round((100 * share) / total) : 0}%
+              </span>
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!result) {
+    return (
+      <p className="text-xs text-[#9AA3AC]">
+        No roulette has run since this backend started.
+        {roulette.on_cooldown ? " On cooldown." : ""}
+      </p>
+    );
+  }
+
+  if (!result.winner) {
+    return (
+      <p className="text-sm text-[#9AA3AC]">
+        Last roulette closed with no winner {formatAge(result.age_seconds)} - nothing to buy.
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-baseline gap-3">
+        <span className="text-2xl font-bold uppercase tracking-wide text-[#34f5c5]">{result.winner}</span>
+        <span className="text-xs uppercase tracking-widest text-[#9AA3AC]">
+          {/*
+            The badge's own state machine, which runs on a different clock
+            from the result: queued for the next buy phase, active for the
+            round, then cleared - while the result stays put.
+          */}
+          {forcedBuy.weapon === result.winner && forcedBuy.phase === "queued"
+            ? "Buy this next round"
+            : forcedBuy.weapon === result.winner && forcedBuy.phase === "active"
+              ? "In play this round"
+              : "Done"}
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-[#9AA3AC]">
+        {result.randomly_picked
+          ? `Nobody voted, so the wheel picked it - ${formatAge(result.age_seconds)}.`
+          : `${result.winner_share_percent}% of the wheel from ${result.total_votes} vote${
+              result.total_votes === 1 ? "" : "s"
+            } - ${formatAge(result.age_seconds)}.`}
+      </p>
     </div>
   );
 }
@@ -291,6 +397,13 @@ export function StatusPanel() {
             <p className="text-[#9AA3AC]">Public URL / Cloudflare Tunnel</p>
             <PublicUrlBlock publicUrl={status.public_url} />
           </div>
+        </div>
+      )}
+
+      {status && (
+        <div className="mt-6 border-t border-[#34f5c5]/20 pt-4">
+          <p className="mb-2 text-sm text-[#9AA3AC]">Forced buy</p>
+          <RouletteBlock roulette={status.roulette} />
         </div>
       )}
 
