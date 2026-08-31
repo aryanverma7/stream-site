@@ -4,6 +4,7 @@ import {
   STATUS_POLL_INTERVAL_MS,
   useAdminStatus,
   type CreditPrediction,
+  type GameEventsStatus,
   type OcrAgentStatus,
   type PublicUrlStatus,
   type RouletteStatus,
@@ -322,6 +323,78 @@ function RouletteBlock({ roulette }: { roulette: RouletteStatus | null | undefin
   );
 }
 
+/**
+ * Live game state from the Overwolf app, and the reason it is rendered
+ * beside the OCR reading rather than instead of it: this is the pipeline
+ * that could delete `credit_ocr.py`, and the only way to earn that is to
+ * be right next to the number it would replace for a few real sessions.
+ *
+ * The two credit figures are NOT the same quantity and the panel says so
+ * rather than inviting a silent comparison - Valorant's "min next round"
+ * is a projection, Overwolf's `money` is the current balance, and they
+ * agree only during a buy phase.
+ */
+function GameEventsBlock({ game }: { game: GameEventsStatus | null | undefined }) {
+  if (!game) {
+    return <p className="text-xs text-[#9AA3AC]">This backend isn&apos;t reporting live game state.</p>;
+  }
+
+  if (!game.connected) {
+    return (
+      <>
+        <LiveBadge value={false} up="Reporting" down="Not running" />
+        <p className="mt-1 text-xs text-[#9AA3AC]">
+          {game.last_snapshot_age_seconds === null
+            ? "Nothing heard since the backend started - the Overwolf app isn't running on the gaming PC, or its secret doesn't match."
+            : `Last snapshot ${formatAge(game.last_snapshot_age_seconds)}, past the ${game.snapshot_timeout_seconds}s cutoff.`}
+        </p>
+      </>
+    );
+  }
+
+  if (!game.game_running) {
+    return (
+      <>
+        <LiveBadge value={true} up="Reporting" down="Not running" />
+        <p className="mt-1 text-xs text-[#9AA3AC]">Overwolf is up, Valorant isn&apos;t running.</p>
+      </>
+    );
+  }
+
+  const score = game.score;
+  return (
+    <>
+      <LiveBadge value={true} up="Reporting" down="Not running" />
+      <p className="mt-1 text-xs text-[#ECE8E1]">
+        {game.round_phase ? (
+          <>
+            <span className="uppercase tracking-widest text-[#34f5c5]">{game.round_phase}</span>
+            {game.round_number ? ` · round ${game.round_number}` : ""}
+            {score && score.won !== null ? ` · ${score.won}–${score.lost}` : ""}
+          </>
+        ) : (
+          "In the menus - no round in progress."
+        )}
+      </p>
+      <p className="mt-1 text-xs text-[#9AA3AC]">
+        {game.money !== null
+          ? `${CREDS}${game.money} in hand right now`
+          : "No credits reported"}
+        {game.agent ? ` · ${game.agent}` : ""}
+        {game.map ? ` · ${game.map}` : ""}
+      </p>
+      {/*
+        Said out loud, because two credit numbers on one panel that differ
+        by a thousand look like a bug unless somebody explains that they
+        are answers to different questions.
+      */}
+      <p className="mt-1 text-xs text-[#9AA3AC]">
+        Current balance, not the &quot;min next round&quot; figure below - the two only agree during a buy phase.
+      </p>
+    </>
+  );
+}
+
 export function StatusPanel() {
   const { status, loading, error, refresh } = useAdminStatus();
 
@@ -392,6 +465,10 @@ export function StatusPanel() {
           <div>
             <p className="text-[#9AA3AC]">Points ledger</p>
             <PointsBackendBlock backend={status.points_backend} />
+          </div>
+          <div>
+            <p className="text-[#9AA3AC]">Live game (Overwolf)</p>
+            <GameEventsBlock game={status.game_events} />
           </div>
           <div className="col-span-2">
             <p className="text-[#9AA3AC]">Public URL / Cloudflare Tunnel</p>

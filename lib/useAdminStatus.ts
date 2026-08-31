@@ -116,6 +116,32 @@ export interface RouletteStatus {
   on_cooldown: boolean;
 }
 
+/**
+ * Live Valorant state from the Overwolf app on the gaming PC.
+ *
+ * `money` is the local player's CURRENT credits, which is deliberately not
+ * the same number as `CreditPrediction.predicted_credits` - that one is
+ * Valorant's own projection for NEXT round, read off a screenshot. They
+ * agree during a buy phase and nowhere else. Both are shown, side by side,
+ * because this pipeline is the one that could replace the OCR entirely and
+ * neither has earned that yet.
+ */
+export interface GameEventsStatus {
+  connected: boolean;
+  last_snapshot_age_seconds: number | null;
+  snapshot_timeout_seconds: number;
+  app_version: string | null;
+  game_running: boolean;
+  round_phase: string | null;
+  round_number: number | null;
+  score: { won: number | null; lost: number | null } | null;
+  match_outcome: string | null;
+  map: string | null;
+  game_mode: string | null;
+  agent: string | null;
+  money: number | null;
+}
+
 export interface AdminStatus {
   streamerbot_connected: boolean;
   /**
@@ -133,6 +159,7 @@ export interface AdminStatus {
   // Optional for the same reason as everything else here - the Mac Mini
   // routinely runs a backend older than the built site.
   roulette?: RouletteStatus | null;
+  game_events?: GameEventsStatus | null;
   widget_connections: {
     total: number;
     roulette: number;

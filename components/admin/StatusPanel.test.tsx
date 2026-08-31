@@ -68,6 +68,77 @@ function rouletteResult(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const liveGame = {
+  connected: true,
+  last_snapshot_age_seconds: 3,
+  snapshot_timeout_seconds: 45,
+  app_version: "1.0.0",
+  game_running: true,
+  round_phase: "shopping",
+  round_number: 7,
+  score: { won: 4, lost: 2 },
+  match_outcome: null,
+  map: "ascent",
+  game_mode: "competitive",
+  agent: "cypher",
+  money: 4200,
+};
+
+describe("StatusPanel live game", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shows the round phase, score and current credits", async () => {
+    mockFetchOf({ ...mockStatus, game_events: liveGame });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText("shopping")).toBeTruthy());
+    expect(getByText(/round 7/)).toBeTruthy();
+    expect(getByText(/4200 in hand right now/)).toBeTruthy();
+  });
+
+  it("says the two credit numbers are different questions", async () => {
+    // Two figures a thousand apart on one panel read as a bug unless
+    // something explains that one is a projection and one is a balance.
+    mockFetchOf({
+      ...mockStatus,
+      game_events: liveGame,
+      credit_prediction: { ...pistolRoundPrediction, predicted_credits: 5800 },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/only agree during a buy phase/)).toBeTruthy());
+  });
+
+  it("separates Overwolf being down from Valorant not running", async () => {
+    mockFetchOf({
+      ...mockStatus,
+      game_events: { ...liveGame, game_running: false, round_phase: null },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/Valorant isn't running/)).toBeTruthy());
+  });
+
+  it("says nothing has been heard rather than showing a stale round", async () => {
+    mockFetchOf({
+      ...mockStatus,
+      game_events: { ...liveGame, connected: false, last_snapshot_age_seconds: null },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/Overwolf app isn't running/)).toBeTruthy());
+  });
+
+  it("degrades on a backend that doesn't report it", async () => {
+    mockFetchOf(mockStatus);
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/isn't reporting live game state/)).toBeTruthy());
+  });
+});
+
 describe("StatusPanel forced buy", () => {
   afterEach(() => {
     vi.restoreAllMocks();
