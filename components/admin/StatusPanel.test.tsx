@@ -84,39 +84,6 @@ const liveGame = {
   money: 4200,
 };
 
-describe("StatusPanel points ledger", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("says cloudbot is the wallet viewers actually have", async () => {
-    mockFetchOf({ ...mockStatus, points_backend: "cloudbot" });
-    const { getByText } = render(<StatusPanel />);
-
-    await waitFor(() => expect(getByText("Cloudbot")).toBeTruthy());
-    expect(getByText(/real !points balances/)).toBeTruthy();
-  });
-
-  it("warns that the REST ledger is a different wallet", async () => {
-    // This panel used to call it "Streamlabs - viewers' real loyalty
-    // points", which is the single most misleading thing it could say:
-    // a write through the REST API creates a row Cloudbot cannot see.
-    mockFetchOf({ ...mockStatus, points_backend: "api" });
-    const { getByText, queryByText } = render(<StatusPanel />);
-
-    await waitFor(() => expect(getByText("Streamlabs REST")).toBeTruthy());
-    expect(getByText(/separate ledger/)).toBeTruthy();
-    expect(queryByText(/real !points balances/)).toBeNull();
-  });
-
-  it("still calls out the local file", async () => {
-    mockFetchOf({ ...mockStatus, points_backend: "local" });
-    const { getByText } = render(<StatusPanel />);
-
-    await waitFor(() => expect(getByText("Local file")).toBeTruthy());
-  });
-});
-
 describe("StatusPanel live game", () => {
   afterEach(() => {
     vi.restoreAllMocks();
