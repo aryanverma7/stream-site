@@ -121,24 +121,42 @@ function PublicUrlBlock({ publicUrl }: { publicUrl: PublicUrlStatus | null | und
 /**
  * Which points ledger the backend is reading.
  *
- * "local" is deliberately the loud one. It is not a fault - it is the
- * stand-in that keeps the roulette usable while Streamlabs reviews this
- * app's Loyalty Points API access - but it reads zero for every viewer
- * who hasn't been granted points here, including viewers holding
- * thousands of real ones. Without a line saying so, that is
- * indistinguishable from a lookup that has quietly broken.
+ * Three states, not two, and only ONE of them is the wallet viewers
+ * actually have. Both of the others read zero for a viewer holding
+ * thousands of real points, which is indistinguishable from a lookup that
+ * has quietly broken unless the panel says so out loud.
+ *
+ * "api" is the trap. It was believed for months to be the same wallet as
+ * Cloudbot's, reached over REST instead of through chat, and it is not:
+ * a write through the REST API creates a row Cloudbot cannot see, and the
+ * REST list of the whole channel comes back empty while the Cloudbot
+ * dashboard shows every real viewer. Calling it "Streamlabs - viewers'
+ * real loyalty points", as this panel used to, is the single most
+ * misleading thing it could say.
  */
 function PointsBackendBlock({ backend }: { backend: string | undefined }) {
   if (!backend) {
     return <p className="text-xs text-[#9AA3AC]">This backend isn&apos;t reporting a points ledger.</p>;
   }
 
-  if (backend === "local") {
+  if (backend === "cloudbot") {
     return (
       <>
-        <p className="font-semibold text-[#E8B33F]">Local file</p>
+        <p className="font-semibold text-[#34f5c5]">Cloudbot</p>
         <p className="mt-1 text-xs text-[#9AA3AC]">
-          Not viewers&apos; real !points balances. Grant points below to test.
+          Viewers&apos; real !points balances, read and written through chat.
+        </p>
+      </>
+    );
+  }
+
+  if (backend === "api") {
+    return (
+      <>
+        <p className="font-semibold text-[#E8B33F]">Streamlabs REST</p>
+        <p className="mt-1 text-xs text-[#9AA3AC]">
+          A separate ledger from the one viewers see with !points - it starts empty and nothing
+          pays into it. Switch to cloudbot unless you know you want this.
         </p>
       </>
     );
@@ -146,8 +164,10 @@ function PointsBackendBlock({ backend }: { backend: string | undefined }) {
 
   return (
     <>
-      <p className="font-semibold">Streamlabs</p>
-      <p className="mt-1 text-xs text-[#9AA3AC]">Viewers&apos; real loyalty points.</p>
+      <p className="font-semibold text-[#E8B33F]">Local file</p>
+      <p className="mt-1 text-xs text-[#9AA3AC]">
+        Not viewers&apos; real !points balances. Grant points below to test.
+      </p>
     </>
   );
 }
