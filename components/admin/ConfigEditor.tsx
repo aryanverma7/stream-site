@@ -3,6 +3,60 @@
 import { useEffect, useState } from "react";
 import { useConfigEditor } from "@/lib/useConfigEditor";
 
+/**
+ * One "connect this account" row.
+ *
+ * Shared rather than written twice because Streamlabs and Spotify need
+ * exactly the same three states and the third one is the one people get
+ * stuck in: an OAuth flow started before its client id and redirect URI
+ * are saved fails at the provider with an error that names nothing useful,
+ * so the connect link only appears once the credentials are actually
+ * there, and says what is missing until then.
+ */
+function ConnectRow({
+  name,
+  connected,
+  hasCredentials,
+  href,
+  needed,
+}: {
+  name: string;
+  connected: boolean;
+  hasCredentials: boolean;
+  href: string;
+  needed: string;
+}) {
+  return (
+    <div className="mb-4 rounded border border-[#34f5c5]/10 bg-[#0F1923] px-4 py-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-[#ECE8E1]">{name}</p>
+          <p
+            className={`text-xs font-bold uppercase tracking-widest ${
+              connected ? "text-[#34f5c5]" : "text-[#9AA3AC]"
+            }`}
+          >
+            {connected ? "Connected" : "Not connected"}
+          </p>
+        </div>
+        {!connected && hasCredentials && (
+          <a
+            href={href}
+            className="rounded bg-[#34f5c5]/10 px-4 py-1.5 text-xs uppercase tracking-widest text-[#34f5c5] hover:bg-[#34f5c5]/20"
+          >
+            Connect {name}
+          </a>
+        )}
+      </div>
+      {!connected && !hasCredentials && (
+        <p className="mt-2 text-xs text-[#9AA3AC]">
+          Fill in {needed} below first, then save - the connect link appears once those are set.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ConfigEditor() {
   const { config, loading, error, saving, saveError, saveSuccess, save } = useConfigEditor();
   const [text, setText] = useState("");
@@ -43,41 +97,21 @@ export function ConfigEditor() {
         secrets file. Changes take effect immediately, no restart needed.
       </p>
 
-      {config && (() => {
-        const isConnected = Boolean(config.streamlabs_access_token);
-        const hasCredentials = Boolean(config.streamlabs_client_id);
-        return (
-          <div className="mb-4 rounded border border-[#34f5c5]/10 bg-[#0F1923] px-4 py-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[#ECE8E1]">Streamlabs</p>
-                <p
-                  className={`text-xs font-bold uppercase tracking-widest ${
-                    isConnected ? "text-[#34f5c5]" : "text-[#9AA3AC]"
-                  }`}
-                >
-                  {isConnected ? "Connected" : "Not connected"}
-                </p>
-              </div>
-              {!isConnected && hasCredentials && (
-                <a
-                  href="/auth/streamlabs/login"
-                  className="rounded bg-[#34f5c5]/10 px-4 py-1.5 text-xs uppercase tracking-widest text-[#34f5c5] hover:bg-[#34f5c5]/20"
-                >
-                  Connect Streamlabs
-                </a>
-              )}
-            </div>
-            {!isConnected && !hasCredentials && (
-              <p className="mt-2 text-xs text-[#9AA3AC]">
-                Fill in streamlabs_client_id, streamlabs_client_secret, and
-                streamlabs_redirect_uri below first, then save - the connect
-                link appears once those are set.
-              </p>
-            )}
-          </div>
-        );
-      })()}
+      {config && <ConnectRow
+        name="Streamlabs"
+        connected={Boolean(config.streamlabs_access_token)}
+        hasCredentials={Boolean(config.streamlabs_client_id)}
+        href="/auth/streamlabs/login"
+        needed="streamlabs_client_id, streamlabs_client_secret, and streamlabs_redirect_uri"
+      />}
+
+      {config && <ConnectRow
+        name="Spotify"
+        connected={Boolean(config.spotify_refresh_token)}
+        hasCredentials={Boolean(config.spotify_client_id)}
+        href="/auth/spotify/login"
+        needed="spotify_client_id, spotify_client_secret, and spotify_redirect_uri"
+      />}
 
       {error && <p className="text-sm text-[#B8323F]">Couldn&apos;t load the config.</p>}
       {parseError && <p className="mb-2 text-sm text-[#B8323F]">{parseError}</p>}

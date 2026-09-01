@@ -69,9 +69,9 @@ describe("ConfigEditor", () => {
       vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ http_port: 8765 }) }),
     );
 
-    const { getByText, queryByText } = render(<ConfigEditor />);
+    const { getByText, getAllByText, queryByText } = render(<ConfigEditor />);
 
-    await waitFor(() => expect(getByText("Not connected")).toBeTruthy());
+    await waitFor(() => expect(getAllByText("Not connected").length).toBe(2));
     expect(queryByText("Connect Streamlabs")).toBeNull();
     expect(getByText(/fill in streamlabs_client_id/i)).toBeTruthy();
   });
@@ -103,5 +103,37 @@ describe("ConfigEditor", () => {
 
     await waitFor(() => expect(getByText("Connected")).toBeTruthy());
     expect(queryByText("Connect Streamlabs")).toBeNull();
+  });
+
+  it("offers Spotify its own connect link, on the same three states", async () => {
+    global.fetch = asFetchMock(
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ spotify_client_id: "abc123" }),
+      }),
+    );
+
+    const { getByText, container } = render(<ConfigEditor />);
+
+    await waitFor(() => expect(getByText("Connect Spotify")).toBeTruthy());
+    const links = Array.from(container.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    expect(links).toContain("/auth/spotify/login");
+  });
+
+  it("counts Spotify as connected on the refresh token, not an access token", async () => {
+    // Spotify's access tokens last an hour and are never persisted - the
+    // refresh token is the durable credential, so it is the one that says
+    // whether this account is connected.
+    global.fetch = asFetchMock(
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({ spotify_client_id: "abc123", spotify_refresh_token: "refresh-abc" }),
+      }),
+    );
+
+    const { queryByText } = render(<ConfigEditor />);
+
+    await waitFor(() => expect(queryByText("Connect Spotify")).toBeNull());
   });
 });

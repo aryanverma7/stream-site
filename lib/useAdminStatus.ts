@@ -142,6 +142,20 @@ export interface GameEventsStatus {
   money: number | null;
 }
 
+export interface SpotifyStatus {
+  configured: boolean;
+  requests_enabled: boolean;
+  request_cost: number;
+  /**
+   * Whether the in-memory access token is currently valid. Not a health
+   * check - Spotify's tokens last an hour and are refreshed on demand, so
+   * this being false usually means "nobody has requested a song lately",
+   * not "broken". It only distinguishes connected-and-working from
+   * connected-once-and-since-revoked.
+   */
+  token_fresh: boolean;
+}
+
 export interface AdminStatus {
   streamerbot_connected: boolean;
   /**
@@ -160,6 +174,7 @@ export interface AdminStatus {
   // routinely runs a backend older than the built site.
   roulette?: RouletteStatus | null;
   game_events?: GameEventsStatus | null;
+  spotify?: SpotifyStatus | null;
   widget_connections: {
     total: number;
     roulette: number;

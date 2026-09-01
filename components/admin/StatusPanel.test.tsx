@@ -629,3 +629,39 @@ describe("StatusPanel credit history between buy phases", () => {
     expect(queryByText(/the newest value the window agrees on wins/i)).toBeNull();
   });
 });
+
+describe("StatusPanel Spotify", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("says song requests do nothing until it is connected", async () => {
+    mockFetchOf({
+      ...mockStatus,
+      spotify: { configured: false, requests_enabled: true, request_cost: 100, token_fresh: false },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/do nothing until then/)).toBeTruthy());
+  });
+
+  it("shows what a request costs once connected", async () => {
+    mockFetchOf({
+      ...mockStatus,
+      spotify: { configured: true, requests_enabled: true, request_cost: 150, token_fresh: true },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/!sr costs 150 points/)).toBeTruthy());
+  });
+
+  it("distinguishes connected-but-switched-off from not connected", async () => {
+    mockFetchOf({
+      ...mockStatus,
+      spotify: { configured: true, requests_enabled: false, request_cost: 100, token_fresh: true },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/switched off in config/)).toBeTruthy());
+  });
+});

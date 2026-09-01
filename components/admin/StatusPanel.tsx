@@ -7,6 +7,7 @@ import {
   type GameEventsStatus,
   type OcrAgentStatus,
   type PublicUrlStatus,
+  type SpotifyStatus,
   type RouletteStatus,
 } from "@/lib/useAdminStatus";
 
@@ -361,6 +362,42 @@ function GameEventsBlock({ game }: { game: GameEventsStatus | null | undefined }
   );
 }
 
+/**
+ * Song requests.
+ *
+ * `configured` is the only one that matters and the others are settings -
+ * without a refresh token none of them do anything, so a panel that
+ * showed "enabled, 100 points" while nothing was connected would be
+ * describing a feature that cannot run.
+ */
+function SpotifyBlock({ spotify }: { spotify: SpotifyStatus | null | undefined }) {
+  if (!spotify) {
+    return <p className="text-xs text-[#9AA3AC]">This backend isn&apos;t reporting Spotify.</p>;
+  }
+
+  if (!spotify.configured) {
+    return (
+      <>
+        <LiveBadge value={false} up="Connected" down="Not connected" />
+        <p className="mt-1 text-xs text-[#9AA3AC]">
+          Connect it from the Config tab - song requests do nothing until then.
+        </p>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <LiveBadge value={true} up="Connected" down="Not connected" />
+      <p className="mt-1 text-xs text-[#9AA3AC]">
+        {spotify.requests_enabled
+          ? `!sr costs ${spotify.request_cost} points`
+          : "Requests are switched off in config"}
+      </p>
+    </>
+  );
+}
+
 export function StatusPanel() {
   const { status, loading, error, refresh } = useAdminStatus();
 
@@ -431,6 +468,10 @@ export function StatusPanel() {
           <div>
             <p className="text-[#9AA3AC]">Live game (Overwolf)</p>
             <GameEventsBlock game={status.game_events} />
+          </div>
+          <div>
+            <p className="text-[#9AA3AC]">Spotify song requests</p>
+            <SpotifyBlock spotify={status.spotify} />
           </div>
           <div className="col-span-2">
             <p className="text-[#9AA3AC]">Public URL / Cloudflare Tunnel</p>
