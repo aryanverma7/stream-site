@@ -401,6 +401,12 @@ function SpotifyBlock({ spotify }: { spotify: SpotifyStatus | null | undefined }
           ? `!song costs ${spotify.request_cost} points`
           : "Requests are switched off in config"}
       </p>
+      {spotify.missing_scopes !== undefined && spotify.missing_scopes.length > 0 && (
+        <p className="mt-1 text-xs text-[#B8323F]">
+          The Spotify login is missing {spotify.missing_scopes.join(", ")} — reconnect it from the
+          Config tab. Song requests will be refused until you do.
+        </p>
+      )}
       {spotify.account_name && (
         <p className={`mt-1 text-xs ${free ? "text-[#B8323F]" : "text-[#9AA3AC]"}`}>
           {free

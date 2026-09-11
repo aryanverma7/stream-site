@@ -154,6 +154,14 @@ export interface SpotifyStatus {
    */
   account_name?: string | null;
   account_product?: string | null;
+  /**
+   * What the stored token is actually allowed to do, straight from
+   * Spotify. Both empty until a token has been fetched at least once -
+   * the queue endpoint's "Insufficient client scope" names a problem and
+   * not which permission, and this is the only authoritative answer.
+   */
+  granted_scopes?: string[];
+  missing_scopes?: string[];
   requests_enabled: boolean;
   request_cost: number;
   /**

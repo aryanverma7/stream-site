@@ -655,6 +655,43 @@ describe("StatusPanel Spotify", () => {
     await waitFor(() => expect(getByText(/!song costs 150 points/)).toBeTruthy());
   });
 
+  it("names the missing permission rather than leaving it to a chat error", async () => {
+    mockFetchOf({
+      ...mockStatus,
+      spotify: {
+        configured: true,
+        requests_enabled: true,
+        request_cost: 100,
+        token_fresh: true,
+        granted_scopes: ["user-read-playback-state"],
+        missing_scopes: ["user-modify-playback-state"],
+      },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/user-modify-playback-state/)).toBeTruthy());
+    expect(getByText(/reconnect it from the/)).toBeTruthy();
+  });
+
+  it("says nothing about scopes before a token has been read", async () => {
+    // Empty means "not checked yet", not "all missing" - otherwise every
+    // restart would raise a false alarm.
+    mockFetchOf({
+      ...mockStatus,
+      spotify: {
+        configured: true,
+        requests_enabled: true,
+        request_cost: 100,
+        token_fresh: false,
+        granted_scopes: [],
+        missing_scopes: [],
+      },
+    });
+    const { queryByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(queryByText(/reconnect it from the/)).toBeNull());
+  });
+
   it("names the connected account, and flags one without Premium", async () => {
     // The chat-side 403 is identical whether the account lacks Premium,
     // the token lacks a scope, or the account is not on the app's list -
