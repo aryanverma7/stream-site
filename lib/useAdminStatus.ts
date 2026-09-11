@@ -144,6 +144,16 @@ export interface GameEventsStatus {
 
 export interface SpotifyStatus {
   configured: boolean;
+  /**
+   * Which Spotify account the stored token actually belongs to, and
+   * whether it holds Premium. Null until the first successful call.
+   *
+   * This exists because "I have Premium" and "the connected account has
+   * Premium" are different statements, and the 403 the queue endpoint
+   * returns looks identical either way.
+   */
+  account_name?: string | null;
+  account_product?: string | null;
   requests_enabled: boolean;
   request_cost: number;
   /**

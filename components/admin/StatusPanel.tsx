@@ -386,14 +386,28 @@ function SpotifyBlock({ spotify }: { spotify: SpotifyStatus | null | undefined }
     );
   }
 
+  // Premium is not optional for queueing, so a connected-but-free account
+  // is a fault rather than a detail - and it is invisible from the chat
+  // error, which is the same 403 a scope problem produces.
+  const free = spotify.account_product !== undefined
+    && spotify.account_product !== null
+    && spotify.account_product !== "premium";
+
   return (
     <>
       <LiveBadge value={true} up="Connected" down="Not connected" />
       <p className="mt-1 text-xs text-[#9AA3AC]">
         {spotify.requests_enabled
-          ? `!sr costs ${spotify.request_cost} points`
+          ? `!song costs ${spotify.request_cost} points`
           : "Requests are switched off in config"}
       </p>
+      {spotify.account_name && (
+        <p className={`mt-1 text-xs ${free ? "text-[#B8323F]" : "text-[#9AA3AC]"}`}>
+          {free
+            ? `Connected as ${spotify.account_name} — this account is “${spotify.account_product}”, not Premium. Queueing will fail.`
+            : `Connected as ${spotify.account_name} (Premium)`}
+        </p>
+      )}
     </>
   );
 }

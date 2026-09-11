@@ -652,7 +652,45 @@ describe("StatusPanel Spotify", () => {
     });
     const { getByText } = render(<StatusPanel />);
 
-    await waitFor(() => expect(getByText(/!sr costs 150 points/)).toBeTruthy());
+    await waitFor(() => expect(getByText(/!song costs 150 points/)).toBeTruthy());
+  });
+
+  it("names the connected account, and flags one without Premium", async () => {
+    // The chat-side 403 is identical whether the account lacks Premium,
+    // the token lacks a scope, or the account is not on the app's list -
+    // so the panel has to answer the first one outright.
+    mockFetchOf({
+      ...mockStatus,
+      spotify: {
+        configured: true,
+        requests_enabled: true,
+        request_cost: 100,
+        token_fresh: true,
+        account_name: "SomeoneElse",
+        account_product: "free",
+      },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/not Premium/)).toBeTruthy());
+    expect(getByText(/SomeoneElse/)).toBeTruthy();
+  });
+
+  it("says so plainly when the account does have Premium", async () => {
+    mockFetchOf({
+      ...mockStatus,
+      spotify: {
+        configured: true,
+        requests_enabled: true,
+        request_cost: 100,
+        token_fresh: true,
+        account_name: "DualBladeX",
+        account_product: "premium",
+      },
+    });
+    const { getByText } = render(<StatusPanel />);
+
+    await waitFor(() => expect(getByText(/DualBladeX \(Premium\)/)).toBeTruthy());
   });
 
   it("distinguishes connected-but-switched-off from not connected", async () => {
