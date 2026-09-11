@@ -6,8 +6,9 @@ import { LogViewer } from "./LogViewer";
 import { ConfigEditor } from "./ConfigEditor";
 import { PointsTool } from "./PointsTool";
 import { AgentPicker } from "./AgentPicker";
+import { BreakControl } from "./BreakControl";
 
-type Tab = "status" | "logs" | "config" | "points" | "agent";
+type Tab = "status" | "logs" | "config" | "points" | "agent" | "break";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "status", label: "Status" },
@@ -15,13 +16,16 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "config", label: "Config" },
   { id: "points", label: "Points" },
   { id: "agent", label: "Agent" },
+  { id: "break", label: "Break" },
 ];
 
 /**
  * Per spec Section 14: config editor, points tool, log viewer, status
  * panel - all consuming the Task #4 backend. Agent was added later; it
  * sets how many credits the roulette reserves for abilities, which
- * decides which weapons it offers.
+ * decides which weapons it offers. Break drives the countdown on the
+ * "be right back" overlay, and is set before switching to that scene -
+ * once it is live it is the only thing on stream.
  */
 export function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("status");
@@ -58,6 +62,7 @@ export function AdminDashboard() {
         {activeTab === "config" && <ConfigEditor />}
         {activeTab === "points" && <PointsTool />}
         {activeTab === "agent" && <AgentPicker />}
+        {activeTab === "break" && <BreakControl />}
       </div>
     </div>
   );
