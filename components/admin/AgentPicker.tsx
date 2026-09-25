@@ -17,34 +17,34 @@ export function AgentPicker() {
   const [typed, setTyped] = useState("");
 
   return (
-    <div className="rounded border border-[#34f5c5]/20 bg-[#151F2B] p-6">
-      <h3 className="mb-4 text-sm uppercase tracking-widest text-[#ECE8E1]">Agent</h3>
+    <div className="border border-seam bg-bezel p-6">
+      <h3 className="stencil mb-4 text-4xl text-phosphor">Agent</h3>
 
-      <p className="mb-4 text-xs text-[#9AA3AC]">
+      <p className="mb-4 max-w-prose text-[13px] leading-snug text-dim">
         Sets how many credits are reserved for abilities each round, which decides
         which weapons the roulette offers. Kits range from 600 to 900 - a whole
         tier of weapon - so this is worth keeping current. Prices live in{" "}
-        <code className="text-[#34f5c5]">roulette_agent_ability_costs</code> in the
+        <code className="text-field">roulette_agent_ability_costs</code> in the
         config editor below.
       </p>
 
-      {error && <p className="mb-3 text-sm text-[#B8323F]">{error}</p>}
+      {error && <p className="mb-3 text-sm text-rec">{error}</p>}
 
-      <div className="mb-4 rounded border border-[#34f5c5]/10 bg-[#0F1923] px-4 py-3">
-        <p className="text-xs uppercase tracking-widest text-[#9AA3AC]">Playing</p>
+      <div className="mb-5">
+        <p className="text-xs uppercase tracking-widest text-dim">Playing</p>
         {loading ? (
-          <p className="text-sm text-[#9AA3AC]">Loading...</p>
+          <p className="text-sm text-dim">Loading...</p>
         ) : current ? (
-          <p className="text-sm text-[#ECE8E1]">
-            <span className="font-semibold text-[#34f5c5]">{current}</span>
+          <p className="text-sm text-phosphor">
+            <span className="font-semibold text-field">{current}</span>
             {kitCost === null ? (
-              <span className="text-[#9AA3AC]"> - no ability prices on file, using the estimate</span>
+              <span className="text-dim"> - no ability prices on file, using the estimate</span>
             ) : (
-              <span className="text-[#9AA3AC]"> - {kitCost} creds reserved for abilities</span>
+              <span className="text-dim"> - {kitCost} creds reserved for abilities</span>
             )}
           </p>
         ) : (
-          <p className="text-sm text-[#9AA3AC]">Not set - abilities are being estimated</p>
+          <p className="text-sm text-dim">Not set - abilities are being estimated</p>
         )}
       </div>
 
@@ -55,15 +55,15 @@ export function AgentPicker() {
             type="button"
             onClick={() => setAgent(agent.name)}
             disabled={saving}
-            className={`rounded px-3 py-1.5 text-xs uppercase tracking-widest disabled:opacity-40 ${
+            className={`px-3 py-1.5 text-xs uppercase tracking-widest disabled:opacity-40 ${
               agent.name === current
-                ? "bg-[#34f5c5]/20 text-[#34f5c5]"
-                : "bg-[#0F1923] text-[#9AA3AC] hover:text-[#ECE8E1]"
+                ? "bg-field text-ink"
+                : "bg-ink text-dim hover:text-phosphor"
             }`}
           >
             {agent.name}
             {agent.kit_cost !== null && (
-              <span className="ml-2 text-[#9AA3AC]">{agent.kit_cost}</span>
+              <span className={`ml-2 ${agent.name === current ? "text-ink/80" : "text-dim"}`}>{agent.kit_cost}</span>
             )}
           </button>
         ))}
@@ -74,7 +74,7 @@ export function AgentPicker() {
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
           placeholder="another agent"
-          className="flex-1 rounded border border-[#34f5c5]/20 bg-[#0F1923] px-3 py-2 text-sm text-[#ECE8E1]"
+          className="flex-1 border border-seam bg-ink px-3 py-2 text-sm text-phosphor"
         />
         <button
           type="button"
@@ -83,7 +83,7 @@ export function AgentPicker() {
             setTyped("");
           }}
           disabled={saving || !typed.trim()}
-          className="rounded bg-[#34f5c5]/10 px-4 py-2 text-xs uppercase tracking-widest text-[#34f5c5] hover:bg-[#34f5c5]/20 disabled:opacity-40"
+          className="wallpaper px-4 py-2 text-xs font-extrabold uppercase tracking-[0.08em] hover:bg-field-hot disabled:opacity-40"
         >
           {saving ? "Setting..." : "Set"}
         </button>

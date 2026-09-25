@@ -12,7 +12,7 @@
  * React build pipeline entirely, specifically so nothing here gets
  * reinterpreted or retyped on the way in.
  *
- * Exactly two additions on top of the original, both clearly marked below
+ * Three additions on top of the original, all clearly marked below
  * with "ADDED FOR DUALBLADEX" comments - everything else is untouched:
  *   1. A cleanup hook (window.__dragonCleanup), since the original assumes
  *      a permanent single-page context and never needs to stop its own
@@ -20,6 +20,12 @@
  *   2. A completion hook in sneeze() that fires only when the displayed
  *      power reached 99, letting the React side handle the admin
  *      transition without touching the core animation logic at all.
+ *   3. The room's colour: fog, floor and the hemisphere light's ground
+ *      bounce are the site's VCR blue (#7aa0ff, which the
+ *      scanline overlay darkens to about the --field token) instead of the
+ *      CodePen's maroon, so the hero sits in the Security Feed world.
+ *      These three literals must stay equal to Dragon.tsx's #world
+ *      background, or the floor's far edge shows a seam.
  */
 
 //THREEJS RELATED VARIABLES
@@ -71,7 +77,8 @@ function init() {
   powerField = document.getElementById('power');
 
   scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x652e37, 350, 500);
+  // ADDED FOR DUALBLADEX: room colour (was 0x652e37)
+  scene.fog = new THREE.Fog(0x7aa0ff, 350, 500);
 
   HEIGHT = window.innerHeight;
   WIDTH = window.innerWidth;
@@ -164,7 +171,8 @@ function handleTouchEnd(event) {
 }
 
 function createLights() {
-  light = new THREE.HemisphereLight(0xffffff, 0xb3858c, .8);
+  // ADDED FOR DUALBLADEX: ground bounce matches the room (was 0xb3858c)
+  light = new THREE.HemisphereLight(0xffffff, 0x6a86c8, .8);
 
   shadowLight = new THREE.DirectionalLight(0xffffff, .8);
   shadowLight.position.set(-100, 100, 50);
@@ -773,8 +781,9 @@ function makeCube(mat, w, h, d, posX, posY, posZ, rotX, rotY, rotZ) {
 function createFloor() {
   env = new THREE.Group();
 
+  // ADDED FOR DUALBLADEX: room colour (was 0X652e37)
   floor = new THREE.Mesh(new THREE.PlaneBufferGeometry(2000, 2000), new THREE.MeshBasicMaterial({
-    color: 0X652e37
+    color: 0x7aa0ff
   }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -36;

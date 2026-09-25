@@ -1,26 +1,167 @@
 @import "tailwindcss";
 
+/*
+ * Security Feed. One world for the public site and the admin: the stream
+ * is a camera feed, live is REC, offline is NO SIGNAL. Deliberately
+ * single-theme - it is used in a dim room beside OBS and watched at night,
+ * and a light rendition would be a different world, not the same one.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #0a0c12;
+  --bezel: #11141c;
+  --bezel-2: #181c27;
+  --seam: #2c3242;
+  --field: #6e95ff;
+  --field-hot: #8eacff;
+  --field-deep: #4a6fd9;
+  --phosphor: #eaeefa;
+  --dim: #9aa3b8;
+  --rec: #ff3b30;
+  --signal: #8be36b;
+  --amber: #ffa630;
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ink: var(--ink);
+  --color-bezel: var(--bezel);
+  --color-bezel-2: var(--bezel-2);
+  --color-seam: var(--seam);
+  --color-field: var(--field);
+  --color-field-hot: var(--field-hot);
+  --color-field-deep: var(--field-deep);
+  --color-phosphor: var(--phosphor);
+  --color-dim: var(--dim);
+  --color-rec: var(--rec);
+  --color-signal: var(--signal);
+  --color-amber: var(--amber);
+  --font-stencil: "Big Shoulders Stencil Display", "Big Shoulders Display", "Arial Narrow", sans-serif;
+  --font-sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-osd: "VT323", "Courier New", monospace;
+  --font-mono: "Martian Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--ink);
+  scrollbar-color: var(--field-deep) var(--ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--ink);
+  color: var(--phosphor);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
+}
+
+::selection {
+  background: var(--field);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--field);
+  outline-offset: 3px;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--seam); border: 2px solid var(--ink); }
+::-webkit-scrollbar-thumb:hover { background: var(--field-deep); }
+
+a { text-underline-offset: 0.2em; }
+
+/* Stencil display caps. Tracking stays positive: stencil bridges need air. */
+.stencil {
+  font-family: var(--font-stencil);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 0.88;
+  text-wrap: balance;
+}
+
+/* Control and status words: Archivo caps. VT323 is kept for what a
+   camera would burn in - feed names, timestamps, counters, clocks. */
+.label {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* On-screen-display text: CAM labels, timestamps, counters. Data only. */
+.osd {
+  font-family: var(--font-osd);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* Scanlines + vignette laid over a feed. Never takes pointer events: the
+   dragon underneath is also the admin door. */
+.crt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.22) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(0 0 0 / 0.55) 100%);
+  z-index: 5;
+}
+
+/* The field: VCR no-signal blue with faint vertical stripes, the way a
+   blue screen reads through a bad camera. */
+.wallpaper {
+  background-color: var(--field);
+  background-image:
+    repeating-linear-gradient(90deg, rgb(74 111 217 / 0.35) 0 2px, transparent 2px 28px),
+    repeating-linear-gradient(90deg, transparent 0 13px, rgb(74 111 217 / 0.18) 13px 15px, transparent 15px 28px);
+  color: var(--ink);
+}
+
+/* Hazard band used as a section seam. */
+.hazard {
+  background: repeating-linear-gradient(-45deg, var(--field) 0 14px, var(--ink) 14px 28px);
+}
+
+/* A feed switching on: a bright line that opens to the full frame. */
+@keyframes crt-on {
+  0% { clip-path: inset(49.5% 0 49.5% 0); filter: brightness(3); }
+  45% { clip-path: inset(49.5% 0 49.5% 0); filter: brightness(2); }
+  100% { clip-path: inset(0 0 0 0); filter: brightness(1); }
+}
+.crt-on { animation: crt-on 700ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes rec-blink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0.15; } }
+.rec-dot { animation: rec-blink 1.2s steps(1) infinite; }
+
+/* Stickers: the flat potato emotes, cut out with a white keyline and a real
+   soft shadow, slapped on at an angle. */
+.sticker {
+  filter:
+    drop-shadow(0 0 0 #fff) drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff)
+    drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff)
+    drop-shadow(0 10px 14px rgb(0 0 0 / 0.45));
+  user-select: none;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crt-on, .rec-dot { animation: none; }
+}
+
+/* A lost feed shows static. CSS noise, no script: the tile's state is
+   carried by its texture, not only by the word on it. */
+.noise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='.33 .33 .33 0 0 .33 .33 .33 0 0 .33 .33 .33 0 0 0 0 0 0 1'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='3' intercept='-1'/%3E%3CfeFuncG type='linear' slope='3' intercept='-1'/%3E%3CfeFuncB type='linear' slope='3' intercept='-1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  animation: static-shift 0.5s steps(5) infinite;
+}
+@keyframes static-shift {
+  0% { background-position: 0 0; }
+  100% { background-position: 97px 61px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .noise { animation: none; }
 }

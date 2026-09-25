@@ -87,48 +87,61 @@ export function Dragon() {
             Changed from the original's position:fixed to position:absolute
             (relative to the wrapping section above) so this scrolls away
             with the page instead of permanently covering the viewport. */}
-        <div id="world" style={{ position: "absolute", inset: 0, background: "#652e37", overflow: "hidden" }} />
+        <div
+          id="world"
+          style={{
+            position: "absolute",
+            inset: 0,
+            // Must equal the fog/floor colour in dragon-original.js.
+            background: "#7aa0ff",
+            overflow: "hidden",
+            filter: "contrast(1.04)",
+          }}
+        />
         <div
           id="instructions"
           style={{
             position: "absolute",
-            width: "100%",
-            bottom: "40px",
-            fontFamily: "'Open Sans', sans-serif",
-            color: "#fdde8c",
-            fontSize: ".8em",
-            fontWeight: 800,
+            zIndex: 20,
+            left: "clamp(24px, 3vw, 48px)",
+            top: "clamp(56px, 7vw, 84px)",
+            fontFamily: "var(--font-osd)",
+            color: "var(--ink)",
+            fontSize: "1.15rem",
+            letterSpacing: "0.06em",
             textTransform: "uppercase",
-            textAlign: "center",
-            lineHeight: 1.5,
+            lineHeight: 1.25,
+            maxWidth: "22rem",
             userSelect: "none",
+            pointerEvents: "none",
           }}
         >
           The longer you keep clicking, the harder he sneezes
           <br />
-          <span style={{ color: "#f89a78", fontSize: ".9em" }}>- Press and drag to turn around -</span>
+          <span style={{ color: "rgb(10 12 18 / 0.8)" }}>- Press and drag to turn around -</span>
         </div>
         <div
           id="power"
           style={{
             position: "absolute",
+            zIndex: 20,
             width: "100%",
             top: "50%",
             marginTop: "-220px",
-            fontFamily: "'Open Sans', sans-serif",
-            color: "#481f26",
-            fontSize: "4em",
-            fontWeight: 800,
-            textTransform: "uppercase",
+            fontFamily: "var(--font-osd)",
+            color: "var(--ink)",
+            fontSize: "5.5em",
             textAlign: "center",
-            lineHeight: 1.5,
+            lineHeight: 1,
+            
             userSelect: "none",
+            pointerEvents: "none",
           }}
         >
           00
         </div>
 
-        <div ref={flashRef} style={{ position: "absolute", inset: 0, zIndex: 30, background: "#fff", opacity: 0, pointerEvents: "none" }} />
+        <div ref={flashRef} style={{ position: "absolute", inset: 0, zIndex: 30, background: "var(--ink)", opacity: 0, pointerEvents: "none" }} />
       </div>
     </>
   );

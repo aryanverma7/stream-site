@@ -14,27 +14,28 @@ export function ClipsSection() {
   const [expandedClip, setExpandedClip] = useState<Clip | null>(null);
 
   return (
-    <section className="flex min-h-screen w-full flex-col items-center justify-center gap-8 bg-[#12212c] px-6 py-16 text-[#ECE8E1]">
-      <h2
-        className="text-2xl tracking-[0.2em]"
-        style={{ fontFamily: "'Chakra Petch', sans-serif", fontWeight: 700 }}
-      >
-        CLIPS
-      </h2>
+    <section className="w-full bg-ink px-4 py-16 text-phosphor sm:px-6 md:py-24">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8">
+        <h2 className="stencil text-[clamp(3rem,9vw,5.5rem)] text-field">Clips</h2>
 
-      {loading && <p className="text-sm uppercase tracking-widest text-[#9AA3AC]">Loading clips...</p>}
+        {loading && <p className="label text-xs text-dim">Loading clips...</p>}
 
-      {!loading && clips.length === 0 && (
-        <p className="text-sm text-[#9AA3AC]">No clips uploaded yet - check back soon.</p>
-      )}
+        {!loading && clips.length === 0 && (
+          <div className="flex items-center gap-4 border border-dashed border-seam p-6">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static export, local sticker */}
+            <img src="/stickers/huh.png" alt="" className="sticker w-16 rotate-[-6deg]" />
+            <p className="text-sm text-dim">No clips uploaded yet - check back soon.</p>
+          </div>
+        )}
 
-      {!loading && clips.length > 0 && (
-        <div className="flex flex-wrap justify-center gap-6">
-          {clips.map((clip) => (
-            <ClipCard key={clip.filename} clip={clip} onExpand={setExpandedClip} />
-          ))}
-        </div>
-      )}
+        {!loading && clips.length > 0 && (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {clips.map((clip) => (
+              <ClipCard key={clip.filename} clip={clip} onExpand={setExpandedClip} />
+            ))}
+          </div>
+        )}
+      </div>
 
       {expandedClip && <ClipModal clip={expandedClip} onClose={() => setExpandedClip(null)} />}
     </section>

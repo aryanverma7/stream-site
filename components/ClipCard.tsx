@@ -38,22 +38,25 @@ export function ClipCard({ clip, onExpand }: ClipCardProps) {
       onClick={() => onExpand(clip)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="group relative aspect-video w-72 overflow-hidden rounded border border-[#34f5c5]/20 bg-[#151F2B] transition-colors hover:border-[#34f5c5]/50"
+      className="group flex w-full flex-col border border-seam bg-bezel text-left transition-[transform,border-color] duration-200 ease-out hover:-translate-y-1 hover:border-field"
     >
-      <video
-        ref={videoRef}
-        src={clip.url}
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        className="h-full w-full object-cover"
-      />
-      <div className="pointer-events-none absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-transparent to-transparent p-3">
-        <p className="text-left text-sm font-semibold capitalize text-[#ECE8E1] group-hover:text-[#34f5c5]">
-          {clip.title}
-        </p>
-      </div>
+      <span className="crt relative block aspect-video overflow-hidden">
+        <video
+          ref={videoRef}
+          src={clip.url}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          className="h-full w-full object-cover"
+        />
+        <span className="label absolute left-2 top-2 z-10 flex items-center gap-1.5 bg-ink/80 px-2 py-1 text-[11px] text-phosphor opacity-0 transition-opacity group-hover:opacity-100">
+          Playing
+        </span>
+      </span>
+      <span className="px-3 py-2.5 text-sm font-bold capitalize text-phosphor group-hover:text-field">
+        {clip.title}
+      </span>
     </button>
   );
 }

@@ -6,27 +6,27 @@ export function LogViewer() {
   const { lines, loading, error, refresh } = useAdminLogs(200);
 
   return (
-    <div className="rounded border border-[#34f5c5]/20 bg-[#151F2B] p-6">
+    <div className="border border-seam bg-bezel p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm uppercase tracking-widest text-[#ECE8E1]">Backend Logs</h3>
+        <h3 className="stencil text-4xl text-phosphor">Backend Logs</h3>
         <button
           type="button"
           onClick={refresh}
           disabled={loading}
-          className="text-xs uppercase tracking-widest text-[#34f5c5]/70 hover:text-[#34f5c5] disabled:opacity-40"
+          className="label border border-seam px-3 py-1.5 text-xs text-field transition-colors hover:border-field disabled:opacity-40"
         >
           {loading ? "Refreshing..." : "Refresh"}
         </button>
       </div>
 
-      {error && <p className="text-sm text-[#B8323F]">Couldn&apos;t reach the backend - try refreshing.</p>}
+      {error && <p className="text-sm text-rec">Couldn&apos;t reach the backend - try refreshing.</p>}
 
       {!error && lines.length === 0 && !loading && (
-        <p className="text-sm text-[#9AA3AC]">No log lines yet.</p>
+        <p className="text-sm text-dim">No log lines yet.</p>
       )}
 
       {lines.length > 0 && (
-        <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs text-[#ECE8E1]/80">
+        <pre className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-all bg-ink p-4 font-mono text-[11.5px] leading-relaxed text-phosphor/85">
           {lines.join("\n")}
         </pre>
       )}

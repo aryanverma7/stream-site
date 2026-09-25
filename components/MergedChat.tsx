@@ -44,23 +44,17 @@ export function MergedChat() {
   }, [messages]);
 
   return (
-    <div
-      ref={scrollRef}
-      className="flex h-full flex-col gap-1 overflow-y-auto p-3"
-      style={{ fontFamily: "'Rajdhani', sans-serif" }}
-    >
-      {messages.length === 0 && (
-        <p className="text-sm italic text-[#9AA3AC]">Waiting for chat...</p>
-      )}
+    <div ref={scrollRef} className="absolute inset-0 flex flex-col gap-1.5 overflow-y-auto bg-ink/60 p-3">
+      {messages.length === 0 && <p className="label text-xs text-dim">Waiting for chat...</p>}
       {messages.map((msg, i) => (
-        <div key={i} className="text-sm text-[#ECE8E1]">
+        <div key={i} className="text-sm leading-snug text-phosphor">
           <span
             className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
-            style={{ backgroundColor: PLATFORM_COLORS[msg.platform] ?? "#9AA3AC" }}
+            style={{ backgroundColor: PLATFORM_COLORS[msg.platform] ?? "#9aa3b8" }}
             aria-label={msg.platform}
           />
-          <span className="font-semibold text-[#34f5c5]">{msg.username}</span>
-          <span className="mx-1">:</span>
+          <span className="font-bold text-field">{msg.username}</span>
+          <span className="mx-1 text-dim">:</span>
           <span>{msg.message}</span>
         </div>
       ))}

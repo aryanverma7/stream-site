@@ -27,13 +27,13 @@ function ConnectRow({
   needed: string;
 }) {
   return (
-    <div className="mb-4 rounded border border-[#34f5c5]/10 bg-[#0F1923] px-4 py-3">
+    <div className="mb-4 border border-seam bg-ink px-4 py-3">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-[#ECE8E1]">{name}</p>
+          <p className="text-sm text-phosphor">{name}</p>
           <p
             className={`text-xs font-bold uppercase tracking-widest ${
-              connected ? "text-[#34f5c5]" : "text-[#9AA3AC]"
+              connected ? "text-field" : "text-dim"
             }`}
           >
             {connected ? "Connected" : "Not connected"}
@@ -42,14 +42,14 @@ function ConnectRow({
         {!connected && hasCredentials && (
           <a
             href={href}
-            className="rounded bg-[#34f5c5]/10 px-4 py-1.5 text-xs uppercase tracking-widest text-[#34f5c5] hover:bg-[#34f5c5]/20"
+            className="wallpaper px-4 py-1.5 text-xs font-extrabold uppercase tracking-[0.08em] hover:bg-field-hot"
           >
             Connect {name}
           </a>
         )}
       </div>
       {!connected && !hasCredentials && (
-        <p className="mt-2 text-xs text-[#9AA3AC]">
+        <p className="mt-2 max-w-prose text-[13px] leading-snug text-dim">
           Fill in {needed} below first, then save - the connect link appears once those are set.
         </p>
       )}
@@ -79,20 +79,20 @@ export function ConfigEditor() {
   };
 
   return (
-    <div className="rounded border border-[#34f5c5]/20 bg-[#151F2B] p-6">
+    <div className="border border-seam bg-bezel p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm uppercase tracking-widest text-[#ECE8E1]">Config Editor</h3>
+        <h3 className="stencil text-4xl text-phosphor">Config Editor</h3>
         <button
           type="button"
           onClick={handleSave}
           disabled={loading || saving}
-          className="rounded bg-[#34f5c5]/10 px-4 py-1.5 text-xs uppercase tracking-widest text-[#34f5c5] hover:bg-[#34f5c5]/20 disabled:opacity-40"
+          className="wallpaper px-4 py-1.5 text-xs font-extrabold uppercase tracking-[0.08em] hover:bg-field-hot disabled:opacity-40"
         >
           {saving ? "Saving..." : "Save"}
         </button>
       </div>
 
-      <p className="mb-3 text-xs text-[#9AA3AC]">
+      <p className="mb-3 max-w-prose text-[13px] leading-snug text-dim">
         Full config as raw JSON, including secrets - this is your own personal
         secrets file. Changes take effect immediately, no restart needed.
       </p>
@@ -113,19 +113,19 @@ export function ConfigEditor() {
         needed="spotify_client_id, spotify_client_secret, and spotify_redirect_uri"
       />}
 
-      {error && <p className="text-sm text-[#B8323F]">Couldn&apos;t load the config.</p>}
-      {parseError && <p className="mb-2 text-sm text-[#B8323F]">{parseError}</p>}
-      {saveError && <p className="mb-2 text-sm text-[#B8323F]">Save failed: {saveError}</p>}
-      {saveSuccess && <p className="mb-2 text-sm text-[#34f5c5]">Saved.</p>}
+      {error && <p className="text-sm text-rec">Couldn&apos;t load the config.</p>}
+      {parseError && <p className="mb-2 text-sm text-rec">{parseError}</p>}
+      {saveError && <p className="mb-2 text-sm text-rec">Save failed: {saveError}</p>}
+      {saveSuccess && <p className="mb-2 text-sm text-field">Saved.</p>}
 
-      {loading && <p className="text-sm text-[#9AA3AC]">Loading config...</p>}
+      {loading && <p className="text-sm text-dim">Loading config...</p>}
 
       {!loading && !error && (
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           spellCheck={false}
-          className="h-96 w-full resize-y rounded border border-[#34f5c5]/10 bg-[#0F1923] p-3 font-mono text-xs text-[#ECE8E1] focus:border-[#34f5c5]/40 focus:outline-none"
+          className="h-[60vh] w-full resize-y border border-seam bg-ink p-4 font-mono text-[12px] leading-relaxed text-phosphor focus:border-field focus:outline-none"
         />
       )}
     </div>

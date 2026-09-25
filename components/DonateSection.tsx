@@ -9,25 +9,34 @@
  */
 export function DonateSection() {
   return (
-    <section className="flex h-[60vh] w-full flex-col items-center justify-center gap-6 bg-[#0F1923] px-6 text-center text-[#ECE8E1]">
-      <h2
-        className="text-2xl tracking-[0.2em]"
-        style={{ fontFamily: "'Chakra Petch', sans-serif", fontWeight: 700 }}
-      >
-        SUPPORT THE STREAM
-      </h2>
-      <p className="max-w-md text-sm text-[#9AA3AC]">
-        Donations go directly through Streamlabs — you&apos;ll be taken to their
-        secure page to complete it.
-      </p>
-      <a
-        href="https://streamlabs.com/dualbladex"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded border border-[#34f5c5]/40 bg-[#34f5c5]/10 px-8 py-3 text-sm font-semibold uppercase tracking-widest text-[#34f5c5] transition-colors hover:bg-[#34f5c5]/20"
-      >
-        Donate on Streamlabs
-      </a>
+    <section className="w-full">
+      <div className="hazard h-3" aria-hidden />
+      <div className="wallpaper relative overflow-hidden px-4 py-20 sm:px-6 md:py-28">
+        <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-6">
+          <h2 className="stencil max-w-3xl text-[clamp(3.25rem,10vw,6rem)] text-ink">Support the stream</h2>
+          <p className="max-w-md text-base font-medium text-ink/85">
+            Donations go directly through Streamlabs — you&apos;ll be taken to their
+            secure page to complete it.
+          </p>
+          <div>
+            <a
+              href="https://streamlabs.com/dualbladex"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-3 bg-ink px-7 py-4 text-sm font-extrabold uppercase tracking-[0.08em] text-field shadow-[0_10px_24px_rgb(10_12_18_/_0.35)] transition-[transform,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:bg-bezel-2"
+            >
+              Donate on Streamlabs
+            </a>
+          </div>
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element -- static export, local sticker */}
+        <img
+          src="/stickers/love.png"
+          alt=""
+          className="sticker absolute -bottom-6 right-[4%] w-40 rotate-[12deg] sm:w-56 md:right-[10%] md:w-72"
+        />
+      </div>
+      <div className="hazard h-3" aria-hidden />
     </section>
   );
 }
