@@ -22,7 +22,7 @@ const TABS: { id: Tab; label: string; hint: string }[] = [
   { id: "agent", label: "Agent", hint: "Ability reserve" },
   { id: "points", label: "Points", hint: "Balance, grant" },
   { id: "logs", label: "Logs", hint: "Backend output" },
-  { id: "config", label: "Config", hint: "Raw JSON, accounts" },
+  { id: "config", label: "Config", hint: "Settings, accounts" },
 ];
 
 function useClock(): string {
@@ -52,9 +52,19 @@ export function AdminDashboard() {
           <h1 className="stencil text-3xl">DualBladeX</h1>
           <span className="osd hidden text-xl sm:inline">Control room</span>
         </div>
-        <p className="osd flex items-center gap-2 text-xl tabular-nums">
-          {clock || " "}
-        </p>
+        <div className="flex items-center gap-4">
+          <p className="osd flex items-center gap-2 text-xl tabular-nums">
+            {clock || " "}
+          </p>
+          <form method="post" action="/auth/logout">
+            <button
+              type="submit"
+              className="border border-seam px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-dim hover:text-phosphor focus-visible:outline focus-visible:outline-2 focus-visible:outline-field"
+            >
+              Log out
+            </button>
+          </form>
+        </div>
       </header>
 
       <div className="flex flex-1 flex-col lg:flex-row">

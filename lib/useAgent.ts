@@ -58,6 +58,7 @@ export function useAgent(): {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing mount-time load/sync; restructuring would change behavior
     void load();
   }, [load]);
 
