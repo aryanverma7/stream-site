@@ -13,6 +13,7 @@ function pad(n: number): string {
 function useClock(): string | null {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing mount-time load/sync; restructuring would change behavior
     setNow(new Date());
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);

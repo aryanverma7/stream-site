@@ -27,6 +27,14 @@ describe("AdminDashboard", () => {
     await waitFor(() => expect(getByText("System Status")).toBeTruthy());
   });
 
+  it("has a Log out form that posts to /auth/logout", () => {
+    global.fetch = asFetchMock(vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }));
+    const { getByText } = render(<AdminDashboard />);
+    const form = getByText("Log out").closest("form")!;
+    expect(form.getAttribute("method")).toBe("post");
+    expect(form.getAttribute("action")).toBe("/auth/logout");
+  });
+
   it("switches to the Logs tab when clicked", async () => {
     global.fetch = asFetchMock(
       vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ lines: [] }) }),
@@ -43,10 +51,10 @@ describe("AdminDashboard", () => {
       vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ http_port: 8765 }) }),
     );
 
-    const { getByText } = render(<AdminDashboard />);
+    const { getByText, getByRole } = render(<AdminDashboard />);
     fireEvent.click(getByText("Config"));
 
-    await waitFor(() => expect(getByText("Config Editor")).toBeTruthy());
+    await waitFor(() => expect(getByRole("navigation", { name: "Settings sections" })).toBeTruthy());
   });
 
   it("switches to the Points tab and shows the real points tool", () => {

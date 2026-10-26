@@ -42,6 +42,7 @@ export function useBreakTimer() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing mount-time load/sync; restructuring would change behavior
     refresh();
     const id = setInterval(refresh, 1000);
     return () => clearInterval(id);

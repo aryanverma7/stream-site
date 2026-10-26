@@ -13,6 +13,7 @@ export function TwitchEmbed({ channel }: { channel: string }) {
   const [parent, setParent] = useState<string | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing mount-time load/sync; restructuring would change behavior
     setParent(window.location.hostname);
   }, []);
 
