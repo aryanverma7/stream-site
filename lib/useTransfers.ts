@@ -45,6 +45,15 @@ export interface Transfer {
   speed: number | null;
   state: TransferState;
   message: string | null;
+  /** "after this upload ≈ 20.0 GB left (20%)", from the pre-upload space check; null when unknown or unlimited. */
+  spaceNote?: string | null;
+}
+
+/** A toast about Drive space; the page shows it for a few seconds. */
+export interface SpaceNotice {
+  id: number;
+  text: string;
+  warn: boolean;
 }
 
 const keyOf = (tapeId: number, f: { name: string; size: number; lastModified: number }) => `${tapeId}:${f.name}:${f.size}:${f.lastModified}`;
@@ -70,6 +79,32 @@ function save(list: Stored[]) {
 /** Changes (or with null, forgets) the stored entry for `key`. */
 function patchStored(key: string, patch: Partial<Stored> | null) {
   save(load().flatMap((s) => (keyOf(s.tapeId, s) !== key ? [s] : patch ? [{ ...s, ...patch }] : [])));
+}
+
+const notices: SpaceNotice[] = [];
+let noticeSnapshot: SpaceNotice[] = [];
+let noticeId = 0;
+const noticeListeners = new Set<() => void>();
+
+function setNotices(next: SpaceNotice[]) {
+  notices.splice(0, notices.length, ...next);
+  noticeSnapshot = [...notices];
+  noticeListeners.forEach((l) => l());
+}
+
+export function useSpaceNotices(): SpaceNotice[] {
+  return useSyncExternalStore(
+    (l) => {
+      noticeListeners.add(l);
+      return () => noticeListeners.delete(l);
+    },
+    () => noticeSnapshot,
+    () => [],
+  );
+}
+
+export function dismissNotice(id: number) {
+  setNotices(notices.filter((n) => n.id !== id));
 }
 
 const live = new Map<string, Transfer>();
@@ -122,6 +157,17 @@ export function useTransfers(): Transfer[] {
 const NO_LONGER_WAITING = "This version is no longer waiting for an upload — drop the file again to upload it as a new version.";
 
 const gb = (bytes: number) => `${(bytes / 1e9).toFixed(1)} GB`;
+
+const pctOf = (part: number, whole: number) => Math.round((part / whole) * 100);
+
+/** Free space before a new upload; null when the check itself failed (the server's 507 still guards). */
+async function driveSpace(): Promise<{ limit: number | null; free: number | null } | null> {
+  try {
+    return await editorApi<{ limit: number | null; free: number | null }>("/drive/space");
+  } catch {
+    return null;
+  }
+}
 
 function describe(e: unknown): string {
   if (e instanceof EditorApiError && e.status === 507 && "needed" in e.data && "free" in e.data) {
@@ -185,6 +231,22 @@ export async function startUpload(
 
   try {
     if (!entry) {
+      const space = await driveSpace();
+      if (signal.aborted) return;
+      if (space) {
+        const { limit, free } = space;
+        if (free === null || limit === null || limit <= 0) {
+          setNotices([...notices, { id: ++noticeId, text: "Drive has unlimited space", warn: false }]);
+        } else if (file.size > free) {
+          update(key, { state: "failed", message: `Not enough space on Drive: this file needs ${gb(file.size)}, only ${gb(free)} free.` });
+          return;
+        } else {
+          const after = free - file.size;
+          const note = `after this upload ≈ ${gb(after)} left (${pctOf(after, limit)}%)`;
+          setNotices([...notices, { id: ++noticeId, text: `Drive had ${gb(free)} free · ${note}`, warn: after < limit * 0.1 || after < 10e9 }]);
+          update(key, { spaceNote: note });
+        }
+      }
       const r = await editorApi<{ iteration_id: number; version: number; upload_url: string }>(`/tapes/${tapeId}/iterations`, {
         method: "POST",
         body: { filename: file.name, size: file.size, mime },

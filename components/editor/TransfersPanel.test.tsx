@@ -2,16 +2,18 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, fireEvent, within } from "@testing-library/react";
 import type { Transfer } from "@/lib/useTransfers";
 
-const store = vi.hoisted(() => ({ list: [] as Transfer[] }));
+const store = vi.hoisted(() => ({ list: [] as Transfer[], notices: [] as { id: number; text: string; warn: boolean }[] }));
 vi.mock("@/lib/useTransfers", () => ({
   useTransfers: () => store.list,
+  useSpaceNotices: () => store.notices,
+  dismissNotice: vi.fn(),
   refreshStored: vi.fn(async () => {}),
   cancelTransfer: vi.fn(),
   dismissTransfer: vi.fn(),
 }));
 
 import { TransfersPanel } from "./TransfersPanel";
-import { cancelTransfer, dismissTransfer, refreshStored } from "@/lib/useTransfers";
+import { cancelTransfer, dismissNotice, dismissTransfer, refreshStored } from "@/lib/useTransfers";
 
 const MB = 1e6;
 const t = (over: Partial<Transfer>): Transfer => ({
@@ -24,7 +26,33 @@ const beforeUnloadBlocked = () => {
 };
 
 describe("TransfersPanel", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store.notices = [];
+  });
+
+  it("shows a space notice as a polite status toast that closes by button and by itself after 8s", () => {
+    vi.useFakeTimers();
+    store.list = [];
+    store.notices = [{ id: 4, text: "Drive had 50.0 GB free · after this upload ≈ 20.0 GB left (20%)", warn: false }];
+    const { getByRole } = render(<TransfersPanel />);
+    const toast = getByRole("status");
+    expect(toast.getAttribute("aria-live")).toBe("polite");
+    expect(toast.textContent).toContain("≈ 20.0 GB left (20%)");
+    fireEvent.click(within(toast).getByLabelText("Close notice"));
+    expect(dismissNotice).toHaveBeenCalledWith(4);
+    vi.advanceTimersByTime(8000);
+    expect(dismissNotice).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it("styles a low-space notice amber and shows the row's after-upload note", () => {
+    store.list = [t({ spaceNote: "after this upload ≈ 2.0 GB left (2%)" })];
+    store.notices = [{ id: 1, text: "low", warn: true }];
+    const { getByRole, getByText } = render(<TransfersPanel />);
+    expect(getByRole("status").className).toContain("text-amber");
+    expect(getByText("after this upload ≈ 2.0 GB left (2%)")).toBeTruthy();
+  });
 
   it("renders nothing with no transfers, and checks stored ones with the server on mount", () => {
     store.list = [];

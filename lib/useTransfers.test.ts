@@ -184,6 +184,56 @@ describe("useTransfers", () => {
     expect(stored()).toEqual([]);
   });
 
+  describe("drive space check", () => {
+    const create = { "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" }, "POST /iterations/7/complete": { id: 7, status: "ready" }, "PUT /iterations/7/media": { id: 7 } };
+    const run = async (space: unknown) => {
+      const mod = await fresh();
+      const { api } = backend({ ...create, "/drive/space": space });
+      const t = renderHook(() => ({ transfers: mod.useTransfers(), notices: mod.useSpaceNotices() }));
+      await act(() => mod.startUpload(target, file()));
+      return { api, ...t };
+    };
+
+    it("tells the streamer what was free and what is left, as a percentage of the limit", async () => {
+      const { api, result } = await run({ limit: 100e9, usage: 50e9, free: 50e9 });
+      expect(calls(api, "GET", "/drive/space")).toHaveLength(1);
+      expect(result.current.notices).toMatchObject([{ text: "Drive had 50.0 GB free · after this upload ≈ 50.0 GB left (50%)", warn: false }]);
+      expect(result.current.transfers[0].spaceNote).toBe("after this upload ≈ 50.0 GB left (50%)");
+    });
+
+    it("warns when under 10% of the limit is left, or under 10 GB", async () => {
+      expect((await run({ limit: 100e9, usage: 91e9, free: 9e9 })).result.current.notices[0].warn).toBe(true);
+      expect((await run({ limit: 50e9, usage: 41e9, free: 9e9 })).result.current.notices[0].warn).toBe(true);
+      expect((await run({ limit: 1000e9, usage: 800e9, free: 200e9 })).result.current.notices[0].warn).toBe(false);
+    });
+
+    it("refuses a file bigger than the free space, without creating a version", async () => {
+      const { api, result } = await run({ limit: 100e9, usage: 100e9 - 10_000_000, free: 10_000_000 });
+      expect(result.current.transfers[0]).toMatchObject({ state: "failed", message: "Not enough space on Drive: this file needs 0.0 GB, only 0.0 GB free." });
+      expect(calls(api, "POST", "/tapes/5/iterations")).toEqual([]);
+    });
+
+    it("says so when the Drive is unlimited", async () => {
+      const { result } = await run({ limit: null, usage: 5, free: null });
+      expect(result.current.notices).toMatchObject([{ text: "Drive has unlimited space", warn: false }]);
+      expect(result.current.transfers[0].state).toBe("done");
+    });
+
+    it("starts anyway, with no notice, when the space call fails", async () => {
+      const { result } = await run({ status: 502, body: { error: "Drive problem" } });
+      expect(result.current.notices).toEqual([]);
+      expect(result.current.transfers[0].state).toBe("done");
+    });
+
+    it("does not ask again when resuming a stored upload", async () => {
+      localStorage.setItem("editor.uploads", JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/s1", sent: 0 }]));
+      const mod = await fresh();
+      const { api } = backend({ ...create, "/drive/space": { limit: 1, usage: 0, free: 1 } });
+      await act(() => mod.startUpload(target, file()));
+      expect(calls(api, "GET", "/drive/space")).toEqual([]);
+    });
+  });
+
   it("still finishes the upload when the checks cannot be measured", async () => {
     const mod = await fresh();
     const checks = await import("./mediaChecks");

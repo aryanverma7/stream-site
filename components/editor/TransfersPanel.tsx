@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { routeHash } from "@/lib/useHashRoute";
-import { cancelTransfer, dismissTransfer, refreshStored, useTransfers, type Transfer } from "@/lib/useTransfers";
+import { cancelTransfer, dismissNotice, dismissTransfer, refreshStored, useSpaceNotices, useTransfers, type SpaceNotice, type Transfer } from "@/lib/useTransfers";
 
 const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field";
 
@@ -27,6 +27,27 @@ function stateText(t: Transfer, pct: number): string {
   }
 }
 
+const NOTICE_MS = 8000;
+
+function Toast({ n }: { n: SpaceNotice }) {
+  useEffect(() => {
+    const t = setTimeout(() => dismissNotice(n.id), NOTICE_MS);
+    return () => clearTimeout(t);
+  }, [n.id]);
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`toast-in flex items-start gap-3 border bg-bezel p-3 text-xs ${n.warn ? "border-amber text-amber" : "border-seam text-phosphor"}`}
+    >
+      <p className="min-w-0 flex-1">{n.text}</p>
+      <button type="button" aria-label="Close notice" onClick={() => dismissNotice(n.id)} className={btn}>
+        ×
+      </button>
+    </div>
+  );
+}
+
 /**
  * Every upload in a corner: this tab's, and the unfinished ones a closed
  * browser left in localStorage (checked with the server on mount, so one
@@ -36,6 +57,7 @@ function stateText(t: Transfer, pct: number): string {
  */
 export function TransfersPanel() {
   const transfers = useTransfers();
+  const notices = useSpaceNotices();
   useEffect(() => {
     void refreshStored();
   }, []);
@@ -51,8 +73,17 @@ export function TransfersPanel() {
     return () => window.removeEventListener("beforeunload", ask);
   }, [sending]);
 
-  if (!transfers.length) return null;
+  const toasts = notices.length > 0 && (
+    <div className="fixed right-3 top-3 z-50 w-[min(24rem,calc(100vw-1.5rem))] space-y-2">
+      {notices.map((n) => (
+        <Toast key={n.id} n={n} />
+      ))}
+    </div>
+  );
+  if (!transfers.length) return toasts || null;
   return (
+    <>
+    {toasts}
     <aside
       aria-label="Transfers"
       className="fixed bottom-3 right-3 z-40 max-h-[60vh] w-[min(24rem,calc(100vw-1.5rem))] space-y-2 overflow-y-auto border border-seam bg-bezel p-3 text-phosphor"
@@ -84,6 +115,7 @@ export function TransfersPanel() {
               <p className={`text-xs ${t.state === "failed" ? "text-rec" : t.state === "done" ? "text-signal" : "text-dim"}`}>
                 {stateText(t, pct)}
               </p>
+              {t.spaceNote && <p className="text-xs text-dim">{t.spaceNote}</p>}
               {t.message && t.state !== "failed" && <p className="text-xs text-amber">{t.message}</p>}
               {t.state === "paused" && (
                 <a href={routeHash({ view: "tape", projectId: t.projectId, tapeId: t.tapeId })} className="text-xs text-phosphor underline">
@@ -95,5 +127,6 @@ export function TransfersPanel() {
         })}
       </ul>
     </aside>
+    </>
   );
 }
