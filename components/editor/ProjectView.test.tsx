@@ -17,7 +17,7 @@ describe("ProjectView", () => {
 
   it("sorts newest first by default, by open comments or name on request, and filters by status", async () => {
     editorBackend({ "/projects/12": PROJECT, "/deletions": { pending: [] } });
-    const { findByText, getByLabelText, container } = render(<ProjectView projectId={12} role="editor" />);
+    const { findByText, getByLabelText, container } = render(<ProjectView projectId={12} role="editor" username="cutter" />);
     await findByText("Alpha");
     expect(names(container)).toEqual(["Charlie", "Alpha", "Bravo"]);
 
@@ -31,7 +31,7 @@ describe("ProjectView", () => {
 
   it("creates a tape by name, and hides Delete project from the editor", async () => {
     const fetchMock = editorBackend({ "/projects/12": PROJECT, "/deletions": { pending: [] }, "POST /projects/12/tapes": { id: 9 } });
-    const { findByLabelText, getByRole, queryByRole } = render(<ProjectView projectId={12} role="editor" />);
+    const { findByLabelText, getByRole, queryByRole } = render(<ProjectView projectId={12} role="editor" username="cutter" />);
     fireEvent.change(await findByLabelText("New tape name"), { target: { value: "Ace clutch" } });
     fireEvent.click(getByRole("button", { name: "New tape" }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([, i]) => i?.method === "POST")).toBe(true));
@@ -43,9 +43,9 @@ describe("ProjectView", () => {
   it("disables New tape while the project's delete is pending, and shows it with Undo", async () => {
     editorBackend({
       "/projects/12": PROJECT,
-      "/deletions": { pending: [{ id: 4, kind: "project", target_id: 12, label: "Ranked grind", requested_by: "aryan", delete_at: Date.now() / 1000 + 1800, status: "pending" }] },
+      "/deletions": { pending: [{ id: 4, kind: "project", target_id: 12, label: "Ranked grind", requested_by: "aryan", delete_at: 1, remaining_seconds: 1800, status: "pending" }] },
     });
-    const { findByText, getByLabelText, getByRole, queryByRole } = render(<ProjectView projectId={12} role="admin" />);
+    const { findByText, getByLabelText, getByRole, queryByRole } = render(<ProjectView projectId={12} role="admin" username="aryan" />);
     await findByText("Deleting in 30 min");
     fireEvent.change(getByLabelText("New tape name"), { target: { value: "x" } });
     expect((getByRole("button", { name: "New tape" }) as HTMLButtonElement).disabled).toBe(true);

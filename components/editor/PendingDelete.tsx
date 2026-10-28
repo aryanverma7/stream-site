@@ -5,18 +5,28 @@ import { minutesLeft, type DeleteRequest } from "@/lib/useDeletions";
 
 /**
  * A delete in its undo hour, shown wherever its target is. The countdown
- * moves with the deletions poll (every 30 s), which is finer than a minute.
+ * moves with the deletions poll (every 30 s), which is finer than a minute,
+ * and counts the server's remaining time, never the Mac Mini's clock.
  */
-export function PendingDelete({ request, onUndo }: { request: DeleteRequest; onUndo: (id: number) => Promise<void> }) {
+export function PendingDelete({
+  request,
+  onUndo,
+  me,
+}: {
+  request: DeleteRequest;
+  onUndo: (id: number) => Promise<void>;
+  /** Undo is offered only where the server allows it: the streamer, or whoever asked. */
+  me: { username: string; role: "admin" | "editor" };
+}) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const mins = minutesLeft(request.delete_at);
+  const mins = minutesLeft(request.ends_at_ms);
   return (
     <span role="status" className="inline-flex flex-wrap items-center gap-2 border border-rec px-2 py-1 text-xs text-rec">
       <span className="label">
         {request.status === "running" || mins === 0 ? "Deleting now" : `Deleting in ${mins} min`}
       </span>
-      {request.status === "pending" && (
+      {request.status === "pending" && (me.role === "admin" || request.requested_by === me.username) && (
         <button
           type="button"
           disabled={busy}

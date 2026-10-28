@@ -15,9 +15,11 @@ const card = "flex flex-wrap items-center gap-3 border border-seam bg-bezel px-4
 const duration = (s: number | null) => (s === null ? "" : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`);
 
 /** Every project: VODs newest first, then clips oldest first with Combine / Uncombine. */
-export function ProjectsView({ role }: { role: "admin" | "editor" }) {
+export function ProjectsView({ role, username }: { role: "admin" | "editor"; username: string }) {
   const { vods, clips, reels, error, refresh } = useProjects();
-  const deletions = useDeletions();
+  // An Undo (or any delete appearing or finishing) changes the target too: refetch it.
+  const deletions = useDeletions(() => refresh());
+  const me = { username, role };
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [driveUrls, setDriveUrls] = useState<Record<number, string | null>>({});
@@ -83,7 +85,7 @@ export function ProjectsView({ role }: { role: "admin" | "editor" }) {
                 {p.has_new && <span className="label bg-field px-1.5 text-[11px] text-ink">New</span>}
                 <span className="label text-[11px] text-dim">VOD {p.vod_status}</span>
                 <span className="text-xs text-dim">{p.tape_count === 1 ? "1 tape" : `${p.tape_count} tapes`}</span>
-                {pending && <PendingDelete request={pending} onUndo={deletions.undo} />}
+                {pending && <PendingDelete request={pending} onUndo={deletions.undo} me={me} />}
                 <span className="ml-auto flex flex-wrap items-center gap-2">
                   {ready && (
                     <button type="button" disabled={!!pending} onClick={() => download(p)} className={btn}>
@@ -139,7 +141,7 @@ export function ProjectsView({ role }: { role: "admin" | "editor" }) {
                 <span className="osd text-lg text-dim">{duration(c.duration_s)}</span>
                 {c.has_new && <span className="label bg-field px-1.5 text-[11px] text-ink">New</span>}
                 {reel && <StatusLabel status={reel.status} />}
-                {pending && <PendingDelete request={pending} onUndo={deletions.undo} />}
+                {pending && <PendingDelete request={pending} onUndo={deletions.undo} me={me} />}
                 {combined && (
                   <span className="ml-auto flex items-center gap-2 text-xs text-dim">
                     used in

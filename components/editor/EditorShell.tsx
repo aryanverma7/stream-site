@@ -27,11 +27,11 @@ function isTyping(e: KeyboardEvent): boolean {
 function RouteView({ route, me }: { route: Route; me: EditorMe }) {
   switch (route.view) {
     case "projects":
-      return <ProjectsView role={me.role} />;
+      return <ProjectsView role={me.role} username={me.username} />;
     case "project":
-      return <ProjectView projectId={route.projectId} role={me.role} />;
+      return <ProjectView projectId={route.projectId} role={me.role} username={me.username} />;
     case "tape":
-      return <TapeView projectId={route.projectId} tapeId={route.tapeId} role={me.role} />;
+      return <TapeView projectId={route.projectId} tapeId={route.tapeId} role={me.role} username={me.username} />;
     case "iteration":
       return <IterationDetails iterationId={route.iterationId} />;
   }

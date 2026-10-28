@@ -51,9 +51,10 @@ export function useProjects(): ProjectsData & { error: string | null; refresh: (
       const clips = projects
         .filter((p) => p.kind === "clip")
         .sort((a, b) => a.created_at - b.created_at || a.id - b.id);
-      const reads = await Promise.all(clips.map((c) => editorApi<{ tapes: Tape[] }>(`/projects/${c.id}`)));
+      // A clip deleted between the two reads just has no reel shown; it must not empty the list.
+      const reads = await Promise.allSettled(clips.map((c) => editorApi<{ tapes: Tape[] }>(`/projects/${c.id}`)));
       const reels: Record<number, Tape> = {};
-      for (const t of reads.flatMap((r) => r.tapes)) reels[t.id] = t;
+      for (const r of reads) if (r.status === "fulfilled") for (const t of r.value.tapes) reels[t.id] = t;
       setData({ vods: projects.filter((p) => p.kind !== "clip"), clips, reels });
       setError(null);
     } catch (e) {

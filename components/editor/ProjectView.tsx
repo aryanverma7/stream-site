@@ -14,9 +14,11 @@ const field = "border border-seam bg-ink px-2 py-1.5 text-sm text-phosphor";
 type Sort = "newest" | "comments" | "name";
 
 /** One project's tapes, filterable by status and sortable; New tape; the streamer's project delete. */
-export function ProjectView({ projectId, role }: { projectId: number; role: "admin" | "editor" }) {
+export function ProjectView({ projectId, role, username }: { projectId: number; role: "admin" | "editor"; username: string }) {
   const { project, tapes, error, refresh } = useProject(projectId);
-  const deletions = useDeletions();
+  // An Undo (or any delete appearing or finishing) changes the target too: refetch it.
+  const deletions = useDeletions(() => refresh());
+  const me = { username, role };
   const [filter, setFilter] = useState<TapeStatus | "all">("all");
   const [sort, setSort] = useState<Sort>("newest");
   const [newName, setNewName] = useState("");
@@ -66,7 +68,7 @@ export function ProjectView({ projectId, role }: { projectId: number; role: "adm
     <section className="space-y-5">
       {heading}
       <div className="flex flex-wrap items-center gap-3">
-        {projectDelete && <PendingDelete request={projectDelete} onUndo={deletions.undo} />}
+        {projectDelete && <PendingDelete request={projectDelete} onUndo={deletions.undo} me={me} />}
         {role === "admin" && !projectDelete && (
           <button type="button" onClick={() => setDeleting(true)} className={`${btn} ml-auto border-rec text-rec`}>
             Delete project
@@ -124,7 +126,7 @@ export function ProjectView({ projectId, role }: { projectId: number; role: "adm
                 {t.has_new && <span className="label bg-field px-1.5 text-[11px] text-ink">New</span>}
                 <span className="osd text-lg text-dim">{t.latest_version ? `v${t.latest_version}` : "no versions"}</span>
                 <span className="text-xs text-dim">{t.open_comments ?? 0} open</span>
-                {filesDelete && <PendingDelete request={filesDelete} onUndo={deletions.undo} />}
+                {filesDelete && <PendingDelete request={filesDelete} onUndo={deletions.undo} me={me} />}
               </li>
             );
           })}

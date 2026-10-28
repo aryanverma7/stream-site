@@ -15,9 +15,11 @@ const btn = "label border border-seam px-3 py-2 text-xs text-phosphor hover:bord
 const field = "w-full border border-seam bg-ink px-3 py-2 text-sm text-phosphor";
 
 /** A tape: its name, notes and status, its versions newest first, and the Final download. */
-export function TapeView({ projectId, tapeId, role }: { projectId: number; tapeId: number; role: "admin" | "editor" }) {
+export function TapeView({ projectId, tapeId, role, username }: { projectId: number; tapeId: number; role: "admin" | "editor"; username: string }) {
   const { tape, iterations, error, refresh, update } = useTape(tapeId);
-  const deletions = useDeletions();
+  // An Undo (or any delete appearing or finishing) changes the target too: refetch it.
+  const deletions = useDeletions(() => refresh());
+  const me = { username, role };
   const [actionError, setActionError] = useState<string | null>(null);
   // null = not being edited, so the field shows the server's value.
   const [name, setName] = useState<string | null>(null);
@@ -75,8 +77,8 @@ export function TapeView({ projectId, tapeId, role }: { projectId: number; tapeI
     <section className="space-y-5">
       {heading}
       <div className="flex flex-wrap items-center gap-3">
-        {filesDelete && <PendingDelete request={filesDelete} onUndo={deletions.undo} />}
-        {projectDelete && <PendingDelete request={projectDelete} onUndo={deletions.undo} />}
+        {filesDelete && <PendingDelete request={filesDelete} onUndo={deletions.undo} me={me} />}
+        {projectDelete && <PendingDelete request={projectDelete} onUndo={deletions.undo} me={me} />}
       </div>
       {actionError && (
         <p role="alert" className="text-rec">
