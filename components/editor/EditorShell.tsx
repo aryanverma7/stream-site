@@ -9,6 +9,11 @@ import { ProjectsView } from "./ProjectsView";
 import { ProjectView } from "./ProjectView";
 import { TapeView } from "./TapeView";
 import { IterationDetails } from "./IterationCard";
+import { Bell } from "./Bell";
+import { HomeView } from "./HomeView";
+import { FixListView } from "./FixListView";
+import { TodoView } from "./TodoView";
+import { StorageView } from "./StorageView";
 
 const DELETED = "That was deleted or never existed";
 
@@ -20,10 +25,7 @@ function isTyping(e: KeyboardEvent): boolean {
   return e.isComposing || !!t?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t?.tagName ?? "");
 }
 
-/**
- * What each route shows. Home, Fix list, To-do and Storage are
- * placeholders until Task 5 replaces them.
- */
+/** What each route shows. */
 function RouteView({ route, me }: { route: Route; me: EditorMe }) {
   switch (route.view) {
     case "projects":
@@ -34,26 +36,21 @@ function RouteView({ route, me }: { route: Route; me: EditorMe }) {
       return <TapeView projectId={route.projectId} tapeId={route.tapeId} role={me.role} username={me.username} />;
     case "iteration":
       return <IterationDetails iterationId={route.iterationId} />;
+    case "home":
+      return <HomeView />;
+    case "fixes":
+      return <FixListView />;
+    case "todo":
+      return <TodoView />;
+    case "storage":
+      return me.role === "admin" ? (
+        <StorageView username={me.username} />
+      ) : (
+        <h2 tabIndex={-1} className="text-rec">
+          Only the streamer can do this.
+        </h2>
+      );
   }
-  if (route.view === "storage" && me.role !== "admin") {
-    return (
-      <h2 tabIndex={-1} className="text-rec">
-        Only the streamer can do this.
-      </h2>
-    );
-  }
-  const title = {
-    projects: "Projects",
-    home: "Home",
-    fixes: "Fix list",
-    todo: "To-do",
-    storage: "Storage",
-  }[route.view];
-  return (
-    <h2 tabIndex={-1} className="stencil text-4xl">
-      {title}
-    </h2>
-  );
 }
 
 /**
@@ -61,14 +58,14 @@ function RouteView({ route, me }: { route: Route; me: EditorMe }) {
  * current hash. One page for both roles; `me.role` only decides what is
  * shown, and the server refuses streamer-only actions regardless.
  *
- * `bell` (Task 5) sits in the top bar; `transfers` (Task 4) is rendered
- * after the view and positions itself.
+ * The bell sits in the top bar once we know who is signed in; `transfers`
+ * is rendered after the view and positions itself.
  *
  * Every view leads with a heading carrying tabIndex={-1}: focus moves to
  * it on each navigation, so a keyboard or screen-reader user lands on the
  * new view instead of on the link they just left.
  */
-export function EditorShell({ bell, transfers }: { bell?: ReactNode; transfers?: ReactNode }) {
+export function EditorShell({ transfers }: { transfers?: ReactNode }) {
   const { route, go, up } = useHashRoute();
   const { me, error } = useEditorMe();
   // The notice belongs to the parent it moved you to: shown once you
@@ -134,7 +131,7 @@ export function EditorShell({ bell, transfers }: { bell?: ReactNode; transfers?:
           <span className="osd hidden text-xl sm:inline">Editor</span>
         </div>
         <div className="flex items-center gap-4">
-          {bell}
+          {me && <Bell role={me.role} />}
           <form method="post" action="/auth/logout">
             <button
               type="submit"

@@ -109,12 +109,20 @@ describe("EditorShell", () => {
     expect(window.location.hash).toBe("#/p/12");
   });
 
-  it("renders the bell and Transfers slots", async () => {
+  it("renders the bell and the Transfers slot", async () => {
     window.location.hash = "#/";
-    backend({ "/me": ADMIN });
-    const { findByText, getByText } = render(<EditorShell bell={<span>BELL</span>} transfers={<span>XFER</span>} />);
-    expect(await findByText("BELL")).toBeTruthy();
+    backend({ "/me": ADMIN, "/notifications": { items: [], unseen: 2 } });
+    const { findByRole, getByText } = render(<EditorShell transfers={<span>XFER</span>} />);
+    expect(await findByRole("button", { name: "Notifications (2 unseen)" })).toBeTruthy();
     expect(getByText("XFER")).toBeTruthy();
+  });
+
+  it("never asks the editor's browser for /storage", async () => {
+    window.location.hash = "#/storage";
+    backend({ "/me": EDITOR });
+    const { findByText } = render(<EditorShell />);
+    await findByText("Only the streamer can do this.");
+    expect(vi.mocked(global.fetch).mock.calls.some(([u]) => String(u).includes("/storage"))).toBe(false);
   });
 
   it("shows the deleted notice once, not on every later visit to that parent", async () => {

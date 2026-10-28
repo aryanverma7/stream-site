@@ -54,3 +54,21 @@ export async function editorApi<T>(
 export function driveDownload(fileId: string): void {
   window.location.assign(`https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download`);
 }
+
+/**
+ * The VOD Download button: records the click server-side first (an
+ * editor's click is what lets them delete the VOD), then downloads.
+ * Returns the Drive page link the backend answers with.
+ */
+export async function downloadVod(projectId: number, fileId: string): Promise<string | null> {
+  const link = await editorApi<{ drive_url: string | null }>(`/projects/${projectId}/download`, { method: "POST" });
+  driveDownload(fileId);
+  return link.drive_url;
+}
+
+/** A time position or duration: 03:42, or 1:03:42 past the hour. */
+export function clock(s: number): string {
+  const t = Math.floor(s);
+  const mmss = `${String(Math.floor((t % 3600) / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  return t >= 3600 ? `${Math.floor(t / 3600)}:${mmss}` : mmss;
+}

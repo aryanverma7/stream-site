@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { driveDownload, editorApi } from "@/lib/editorApi";
+import { downloadVod, editorApi } from "@/lib/editorApi";
 import { routeHash } from "@/lib/useHashRoute";
 import { useProjects, type Project } from "@/lib/useProjects";
 import { useDeletions } from "@/lib/useDeletions";
@@ -34,12 +34,10 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
     }
   }
 
-  // Records the editor's click server-side (what lets them delete the VOD), then downloads.
   const download = (p: Project) =>
     run(async () => {
-      const link = await editorApi<{ drive_url: string | null }>(`/projects/${p.id}/download`, { method: "POST" });
-      setDriveUrls((u) => ({ ...u, [p.id]: link.drive_url }));
-      driveDownload(p.vod_file_id!);
+      const driveUrl = await downloadVod(p.id, p.vod_file_id!);
+      setDriveUrls((u) => ({ ...u, [p.id]: driveUrl }));
       await refresh();
     });
 
