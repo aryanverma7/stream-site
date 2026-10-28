@@ -71,3 +71,11 @@ describe("AdminDashboard", () => {
     expect(getByText("Grant Points (testing)")).toBeTruthy();
   });
 });
+
+describe("AdminDashboard editor link", () => {
+  it("links to the editor app", () => {
+    global.fetch = asFetchMock(vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }));
+    const { getByRole } = render(<AdminDashboard />);
+    expect(getByRole("link", { name: "Editor app" }).getAttribute("href")).toBe("/editor");
+  });
+});

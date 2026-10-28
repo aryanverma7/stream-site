@@ -1,0 +1,347 @@
+"use client";
+
+import { useSyncExternalStore } from "react";
+import { editorApi, EditorApiError } from "./editorApi";
+import { resumableUpload, SessionExpired, sleep } from "./resumableUpload";
+import { grade, measureMedia, thumbnail } from "./mediaChecks";
+
+/**
+ * Every version upload this tab knows about. Uploads live here, not in the
+ * tape view, so leaving the tape does not stop one; and each unfinished
+ * one is remembered in localStorage, so a closed browser can pick it up
+ * again from Google's offset when the same file is dropped on that tape.
+ *
+ * The stored session URL can only put bytes into that one Drive file; it
+ * is kept for exactly that and deleted on completion or cancel, never shown
+ * or logged.
+ */
+const KEY = "editor.uploads";
+// ponytail: no cross-tab lock. Tabs share these entries but not live state,
+// so two tabs dropping the same file at once both send into one session.
+// Add a BroadcastChannel/Web Locks claim per key if that ever happens.
+
+interface Stored {
+  tapeId: number;
+  projectId: number;
+  name: string;
+  size: number;
+  lastModified: number;
+  iterationId: number;
+  version: number;
+  uploadUrl: string;
+  sent: number;
+}
+
+export type TransferState = "uploading" | "offline" | "retrying" | "waiting" | "checking" | "paused" | "done" | "failed";
+export interface Transfer {
+  key: string;
+  tapeId: number;
+  projectId: number;
+  name: string;
+  size: number;
+  version: number | null;
+  sent: number;
+  /** Bytes per second over the last chunk; null until two chunks have gone. */
+  speed: number | null;
+  state: TransferState;
+  message: string | null;
+  /** "after this upload ≈ 20.0 GB left (20%)", from the pre-upload space check; null when unknown or unlimited. */
+  spaceNote?: string | null;
+}
+
+/** A toast about Drive space; the page shows it for a few seconds. */
+export interface SpaceNotice {
+  id: number;
+  text: string;
+  warn: boolean;
+}
+
+const keyOf = (tapeId: number, f: { name: string; size: number; lastModified: number }) => `${tapeId}:${f.name}:${f.size}:${f.lastModified}`;
+
+function load(): Stored[] {
+  try {
+    const list = JSON.parse(localStorage.getItem(KEY) ?? "[]");
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function save(list: Stored[]) {
+  try {
+    if (list.length) localStorage.setItem(KEY, JSON.stringify(list));
+    else localStorage.removeItem(KEY);
+  } catch {
+    // Storage blocked: the upload still runs, it just cannot be resumed after a close.
+  }
+}
+
+/** Changes (or with null, forgets) the stored entry for `key`. */
+function patchStored(key: string, patch: Partial<Stored> | null) {
+  save(load().flatMap((s) => (keyOf(s.tapeId, s) !== key ? [s] : patch ? [{ ...s, ...patch }] : [])));
+}
+
+const notices: SpaceNotice[] = [];
+let noticeSnapshot: SpaceNotice[] = [];
+let noticeId = 0;
+const noticeListeners = new Set<() => void>();
+
+function setNotices(next: SpaceNotice[]) {
+  notices.splice(0, notices.length, ...next);
+  noticeSnapshot = [...notices];
+  noticeListeners.forEach((l) => l());
+}
+
+export function useSpaceNotices(): SpaceNotice[] {
+  return useSyncExternalStore(
+    (l) => {
+      noticeListeners.add(l);
+      return () => noticeListeners.delete(l);
+    },
+    () => noticeSnapshot,
+    () => [],
+  );
+}
+
+export function dismissNotice(id: number) {
+  setNotices(notices.filter((n) => n.id !== id));
+}
+
+const live = new Map<string, Transfer>();
+const controllers = new Map<string, AbortController>();
+const listeners = new Set<() => void>();
+let snapshot: Transfer[] | null = null;
+const EMPTY: Transfer[] = [];
+
+function emit() {
+  snapshot = null;
+  listeners.forEach((l) => l());
+}
+
+function update(key: string, patch: Partial<Transfer>) {
+  const t = live.get(key);
+  if (t) live.set(key, { ...t, ...patch });
+  emit();
+}
+
+function getSnapshot(): Transfer[] {
+  snapshot ??= [
+    ...live.values(),
+    ...load()
+      .filter((s) => !live.has(keyOf(s.tapeId, s)))
+      .map((s): Transfer => ({
+        key: keyOf(s.tapeId, s),
+        tapeId: s.tapeId,
+        projectId: s.projectId,
+        name: s.name,
+        size: s.size,
+        version: s.version,
+        sent: s.sent,
+        speed: null,
+        state: "paused",
+        message: null,
+      })),
+  ];
+  return snapshot;
+}
+
+function subscribe(l: () => void) {
+  listeners.add(l);
+  return () => listeners.delete(l);
+}
+
+export function useTransfers(): Transfer[] {
+  return useSyncExternalStore(subscribe, getSnapshot, () => EMPTY);
+}
+
+const NO_LONGER_WAITING = "This version is no longer waiting for an upload — drop the file again to upload it as a new version.";
+
+const gb = (bytes: number) => `${(bytes / 1e9).toFixed(1)} GB`;
+
+const pctOf = (part: number, whole: number) => Math.round((part / whole) * 100);
+
+/** Free space before a new upload; null when the check itself failed (the server's 507 still guards). */
+async function driveSpace(): Promise<{ limit: number | null; free: number | null } | null> {
+  try {
+    return await editorApi<{ limit: number | null; free: number | null }>("/drive/space");
+  } catch {
+    return null;
+  }
+}
+
+function describe(e: unknown): string {
+  if (e instanceof EditorApiError && e.status === 507 && "needed" in e.data && "free" in e.data) {
+    return `Drive is too full: needs ${gb(Number(e.data.needed))}, ${gb(Number(e.data.free))} free`;
+  }
+  if (e instanceof TypeError) return "Couldn't reach the Mac Mini - try again";
+  return e instanceof Error ? e.message : "Upload failed";
+}
+
+/** Mac Mini down or Drive hiccuping: keep asking, since the bytes are already safe on Google. */
+async function completeWhenReachable(key: string, iterationId: number, fileId: string, signal: AbortSignal) {
+  for (let n = 0; ; n++) {
+    try {
+      return await editorApi(`/iterations/${iterationId}/complete`, { method: "POST", body: { file_id: fileId } });
+    } catch (e) {
+      if (e instanceof EditorApiError && e.status < 500) throw e;
+      update(key, { state: "waiting" });
+      await sleep(Math.min(5 * 2 ** n, 300) * 1000, signal);
+    }
+  }
+}
+
+/**
+ * Uploads `file` as a new version of the tape - or, when this exact file
+ * (name, size, last modified) is already stored as unfinished there,
+ * continues that version instead of creating another. Never throws: every
+ * failure becomes the transfer's state and message.
+ */
+export async function startUpload(
+  target: { tapeId: number; projectId: number; kind: "tape" | "reel" },
+  file: File,
+  onDone?: () => void,
+): Promise<void> {
+  const { tapeId, projectId } = target;
+  const key = keyOf(tapeId, file);
+  if (controllers.has(key)) return;
+  const ctl = new AbortController();
+  controllers.set(key, ctl);
+  const signal = ctl.signal;
+  const mime = file.type || "application/octet-stream";
+  let entry = load().find((s) => keyOf(s.tapeId, s) === key);
+  live.set(key, {
+    key, tapeId, projectId, name: file.name, size: file.size,
+    version: entry?.version ?? null, sent: entry?.sent ?? 0, speed: null, state: "uploading", message: null,
+  });
+  emit();
+
+  let last: { t: number; sent: number } | null = null;
+  const send = (url: string) =>
+    resumableUpload(file, url, {
+      signal,
+      onProgress: (sent) => {
+        const now = Date.now();
+        const speed = last && now > last.t && sent > last.sent ? ((sent - last.sent) * 1000) / (now - last.t) : (live.get(key)?.speed ?? null);
+        last = { t: now, sent };
+        patchStored(key, { sent });
+        update(key, { sent, speed, state: "uploading" });
+      },
+      onPause: (reason) => update(key, { state: reason ?? "uploading", speed: null }),
+    });
+
+  try {
+    if (!entry) {
+      const space = await driveSpace();
+      if (signal.aborted) return;
+      if (space) {
+        const { limit, free } = space;
+        if (free === null || limit === null || limit <= 0) {
+          setNotices([...notices, { id: ++noticeId, text: "Drive has unlimited space", warn: false }]);
+        } else if (file.size > free) {
+          update(key, { state: "failed", message: `Not enough space on Drive: this file needs ${gb(file.size)}, only ${gb(free)} free.` });
+          return;
+        } else {
+          const after = free - file.size;
+          const note = `after this upload ≈ ${gb(after)} left (${pctOf(after, limit)}%)`;
+          setNotices([...notices, { id: ++noticeId, text: `Drive had ${gb(free)} free · ${note}`, warn: after < limit * 0.1 || after < 10e9 }]);
+          update(key, { spaceNote: note });
+        }
+      }
+      const r = await editorApi<{ iteration_id: number; version: number; upload_url: string }>(`/tapes/${tapeId}/iterations`, {
+        method: "POST",
+        body: { filename: file.name, size: file.size, mime },
+      });
+      // Cancelled while the version was being created: never write its session URL back.
+      if (signal.aborted) return abandon(r.iteration_id);
+      entry = {
+        tapeId, projectId, name: file.name, size: file.size, lastModified: file.lastModified,
+        iterationId: r.iteration_id, version: r.version, uploadUrl: r.upload_url, sent: 0,
+      };
+      save([...load(), entry]);
+      update(key, { version: r.version });
+    }
+    const id = entry.iterationId;
+    let uploaded: { id: string };
+    try {
+      uploaded = await send(entry.uploadUrl);
+    } catch (e) {
+      if (!(e instanceof SessionExpired)) throw e;
+      update(key, { sent: 0, message: "Google's upload session had expired, so this version is being sent again from the start" });
+      let upload_url: string;
+      try {
+        ({ upload_url } = await editorApi<{ upload_url: string }>(`/iterations/${id}/session`, { method: "POST", body: { mime } }));
+      } catch (err) {
+        if (err instanceof EditorApiError && err.status === 409) {
+          patchStored(key, null);
+          throw new Error(NO_LONGER_WAITING);
+        }
+        throw err;
+      }
+      if (signal.aborted) return;
+      patchStored(key, { uploadUrl: upload_url, sent: 0 });
+      last = null;
+      uploaded = await send(upload_url);
+    }
+    await completeWhenReachable(key, id, uploaded.id, signal);
+    patchStored(key, null);
+    update(key, { state: "checking", speed: null, message: null });
+
+    // Best effort: an unreadable file still gets its version, with "unknown" checks and no thumbnail.
+    const measured = await measureMedia(file).catch(() => null);
+    const thumb = await thumbnail(file).catch(() => null);
+    const checks = grade(measured ?? { width: null, height: null, duration_s: null, fps: null, bitrate_mbps: null }, target.kind);
+    await editorApi(`/iterations/${id}/media`, { method: "PUT", body: { checks, thumbnail_b64: thumb } }).catch(() => {});
+    update(key, { state: "done" });
+    onDone?.();
+  } catch (e) {
+    if (!signal.aborted) update(key, { state: "failed", speed: null, message: describe(e) });
+  } finally {
+    if (controllers.get(key) === ctl) controllers.delete(key);
+  }
+}
+
+/**
+ * Best effort, never awaited: a cancelled version left `uploading` blocks its
+ * tape's and project's deletes until reconcile abandons it after 8 days. A
+ * raw fetch, not editorApi, so an expired session cannot navigate to login
+ * mid-cancel; on any failure that 8-day backstop still applies.
+ */
+function abandon(iterationId: number) {
+  fetch(`/api/editor/iterations/${iterationId}/abandon`, { method: "POST", credentials: "same-origin" }).catch(() => {});
+}
+
+/** Stops sending, forgets the upload and abandons its version; dropping the file again revives it. */
+export function cancelTransfer(key: string) {
+  const entry = load().find((s) => keyOf(s.tapeId, s) === key);
+  if (entry) abandon(entry.iterationId);
+  controllers.get(key)?.abort();
+  controllers.delete(key);
+  live.delete(key);
+  patchStored(key, null);
+  emit();
+}
+
+/** Clears a finished or failed row; an unfinished stored upload behind it shows again as paused. */
+export function dismissTransfer(key: string) {
+  live.delete(key);
+  emit();
+}
+
+/**
+ * Drops stored entries whose version is no longer waiting for bytes - the
+ * server's reconcile job finished it, or it was deleted - so the panel
+ * stops asking for a file nobody needs to send.
+ */
+export async function refreshStored() {
+  for (const s of load()) {
+    const key = keyOf(s.tapeId, s);
+    if (live.has(key)) continue;
+    try {
+      const { iteration } = await editorApi<{ iteration: { status: string } }>(`/iterations/${s.iterationId}`);
+      if (iteration.status !== "uploading" && iteration.status !== "abandoned") patchStored(key, null);
+    } catch (e) {
+      if (e instanceof EditorApiError && e.status === 404) patchStored(key, null);
+    }
+  }
+  emit();
+}
