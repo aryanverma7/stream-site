@@ -4,7 +4,6 @@ import {
   STATUS_POLL_INTERVAL_MS,
   useAdminStatus,
   type CreditPrediction,
-  type GameEventsStatus,
   type OcrAgentStatus,
   type PublicUrlStatus,
   type SpotifyStatus,
@@ -314,78 +313,6 @@ function RouletteBlock({ roulette }: { roulette: RouletteStatus | null | undefin
 }
 
 /**
- * Live game state from the Overwolf app, and the reason it is rendered
- * beside the OCR reading rather than instead of it: this is the pipeline
- * that could delete `credit_ocr.py`, and the only way to earn that is to
- * be right next to the number it would replace for a few real sessions.
- *
- * The two credit figures are NOT the same quantity and the panel says so
- * rather than inviting a silent comparison - Valorant's "min next round"
- * is a projection, Overwolf's `money` is the current balance, and they
- * agree only during a buy phase.
- */
-function GameEventsBlock({ game }: { game: GameEventsStatus | null | undefined }) {
-  if (!game) {
-    return <p className="text-xs text-dim">This backend isn&apos;t reporting live game state.</p>;
-  }
-
-  if (!game.connected) {
-    return (
-      <>
-        <LiveBadge value={false} up="Reporting" down="Not running" />
-        <p className="mt-1.5 text-[13px] leading-snug text-dim">
-          {game.last_snapshot_age_seconds === null
-            ? "Nothing heard since the backend started - the Overwolf app isn't running on the gaming PC, or its secret doesn't match."
-            : `Last snapshot ${formatAge(game.last_snapshot_age_seconds)}, past the ${game.snapshot_timeout_seconds}s cutoff.`}
-        </p>
-      </>
-    );
-  }
-
-  if (!game.game_running) {
-    return (
-      <>
-        <LiveBadge value={true} up="Reporting" down="Not running" />
-        <p className="mt-1.5 text-[13px] leading-snug text-dim">Overwolf is up, Valorant isn&apos;t running.</p>
-      </>
-    );
-  }
-
-  const score = game.score;
-  return (
-    <>
-      <LiveBadge value={true} up="Reporting" down="Not running" />
-      <p className="mt-1.5 text-[13px] leading-snug text-phosphor">
-        {game.round_phase ? (
-          <>
-            <span className="osd text-lg text-field">{game.round_phase}</span>
-            {game.round_number ? ` · round ${game.round_number}` : ""}
-            {score && score.won !== null ? ` · ${score.won}–${score.lost}` : ""}
-          </>
-        ) : (
-          "In the menus - no round in progress."
-        )}
-      </p>
-      <p className="mt-1.5 text-[13px] leading-snug text-dim">
-        {game.money !== null
-          ? `${CREDS}${game.money} in hand right now`
-          : "No credits reported"}
-        {game.agent ? ` · ${game.agent}` : ""}
-        {game.map ? ` · ${game.map}` : ""}
-      </p>
-      {/*
-        Said out loud, because two credit numbers on one panel that differ
-        by a thousand look like a bug unless somebody explains that they
-        are answers to different questions.
-      */}
-      <p className="mt-1.5 text-[13px] leading-snug text-dim">
-        Current balance, not the &quot;min next round&quot; figure below - the two only agree during a buy phase.
-      </p>
-    </>
-  );
-}
-
-/**
  * Song requests.
  *
  * `configured` is the only one that matters and the others are settings -
@@ -454,7 +381,7 @@ interface Feed {
  * Every system on the wall, with a state the summary can count. The rules
  * mirror what each block below already says in words: a socket that is
  * open but unsubscribed or refused is not "up", a free Spotify account is
- * a fault, and the parked Overwolf app not running is "off", not "down".
+ * a fault.
  */
 function buildFeeds(status: AdminStatus): Feed[] {
   const sb: FeedState = !status.streamerbot_connected
@@ -468,9 +395,6 @@ function buildFeeds(status: AdminStatus): Feed[] {
 
   const obs: FeedState =
     status.obs_websocket_connected === null ? "unknown" : status.obs_websocket_connected ? "up" : "down";
-
-  const game = status.game_events;
-  const gameState: FeedState = !game ? "unknown" : !game.connected ? "off" : "up";
 
   const sp = status.spotify;
   const spFree =
@@ -510,7 +434,6 @@ function buildFeeds(status: AdminStatus): Feed[] {
     { name: "OCR agent (gaming PC)", state: ocrState, body: <OcrAgentBlock agent={status.ocr_agent} /> },
     { name: "OBS WebSocket", state: obs, body: <StatusBadge value={status.obs_websocket_connected} /> },
     { name: "Spotify song requests", state: spState, body: <SpotifyBlock spotify={status.spotify} /> },
-    { name: "Live game (Overwolf)", state: gameState, body: <GameEventsBlock game={status.game_events} /> },
   ];
 }
 
