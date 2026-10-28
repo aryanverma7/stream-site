@@ -18,34 +18,34 @@ class Retry extends Error {}
 /** setTimeout as a promise that rejects when `signal` aborts. */
 export const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
-    const t = setTimeout(resolve, ms);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(t);
-        reject(signal.reason);
-      },
-      { once: true },
-    );
+    const abort = () => {
+      clearTimeout(t);
+      reject(signal!.reason);
+    };
+    const t = setTimeout(() => {
+      signal?.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", abort, { once: true });
   });
 
 function untilOnline(signal?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     const on = () => {
-      window.removeEventListener("online", on);
+      signal?.removeEventListener("abort", abort);
       resolve();
     };
-    window.addEventListener("online", on);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        window.removeEventListener("online", on);
-        reject(signal.reason);
-      },
-      { once: true },
-    );
+    const abort = () => {
+      window.removeEventListener("online", on);
+      reject(signal!.reason);
+    };
+    window.addEventListener("online", on, { once: true });
+    signal?.addEventListener("abort", abort, { once: true });
   });
 }
+
+export const STALLED = "Google isn't reporting upload progress in this browser; try Chrome, or try again later";
+const MAX_STALLS = 3;
 
 /** 308's `Range: bytes=0-N` means Google holds N+1 bytes; no Range means none. */
 const heldBytes = (res: Response) => {
@@ -58,7 +58,10 @@ const heldBytes = (res: Response) => {
  * is - so the same call is both a fresh upload and a resume. Network
  * errors and 5xx retry with min(5 * 2^n, 300) s of backoff, and wait for
  * `online` first while the browser is offline; every retry re-asks the
- * offset, since a failed PUT may have landed partly.
+ * offset, since a failed PUT may have landed partly. A chunk Google
+ * answers 308 to without holding more bytes (an unreadable Range header
+ * reads as 0) is a stall; three in a row give up rather than resend the
+ * same chunk forever.
  */
 export async function resumableUpload(
   file: Blob,
@@ -75,6 +78,7 @@ export async function resumableUpload(
   const total = file.size;
   let offset: number | null = null; // null: ask Google first
   let failures = 0;
+  let stalls = 0;
   for (;;) {
     signal?.throwIfAborted();
     try {
@@ -92,7 +96,13 @@ export async function resumableUpload(
       if (res.status === 404 || res.status === 410) throw new SessionExpired();
       if (res.status === 429 || res.status >= 500) throw new Retry();
       if (res.status !== 308) throw new Error(`Google refused the upload (${res.status})`);
-      offset = heldBytes(res);
+      const held = heldBytes(res);
+      if (offset !== null && held <= offset) {
+        if (++stalls >= MAX_STALLS) throw new Error(STALLED);
+      } else if (offset !== null) {
+        stalls = 0;
+      }
+      offset = held;
       if (failures) opts.onPause?.(null);
       failures = 0;
       opts.onProgress?.(offset, total);

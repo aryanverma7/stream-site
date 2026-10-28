@@ -189,4 +189,41 @@ describe("useTransfers", () => {
     expect(stored().map((s: { iterationId: number }) => s.iterationId)).toEqual([2, 3]);
     expect(result.current.map((t) => t.name)).toEqual(["f2.mp4", "f3.mp4"]);
   });
+
+  it("a cancel while the version is being created never stores it", async () => {
+    const mod = await fresh();
+    let answer!: (v: unknown) => void;
+    const { api } = backend({});
+    global.fetch = vi.fn((url: string, init?: RequestInit) =>
+      url === "/api/editor/tapes/5/iterations"
+        ? new Promise((r) => (answer = r))
+        : api(url, init),
+    ) as unknown as typeof fetch;
+    const { result } = renderHook(() => mod.useTransfers());
+    const done = mod.startUpload(target, file());
+    await waitFor(() => expect(result.current).toHaveLength(1));
+    act(() => mod.cancelTransfer(result.current[0].key));
+    answer({ ok: true, status: 200, json: async () => ({ iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" }) });
+    await act(() => done);
+    expect(stored()).toEqual([]);
+    expect(result.current).toEqual([]);
+  });
+
+  it("forgets a stored version the server no longer takes uploads for (409 from /session)", async () => {
+    const mod = await fresh();
+    localStorage.setItem(
+      "editor.uploads",
+      JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0 }]),
+    );
+    backend({ "POST /iterations/7/session": { status: 409, body: { error: "This version is not uploading" } } }, { expired: ["https://upload.example/old"] });
+    const { result } = renderHook(() => mod.useTransfers());
+    await act(() => mod.startUpload(target, file()));
+    expect(stored()).toEqual([]);
+    expect(result.current[0]).toMatchObject({
+      state: "failed",
+      message: "This version is no longer waiting for an upload — drop the file again to upload it as a new version.",
+    });
+    act(() => mod.dismissTransfer(result.current[0].key));
+    expect(result.current).toEqual([]);
+  });
 });

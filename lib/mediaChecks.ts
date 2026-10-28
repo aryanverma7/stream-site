@@ -130,6 +130,12 @@ async function measureFps(v: HTMLVideoElement): Promise<number | null> {
   return fpsFrom(times);
 }
 
+/** `p`, or null once `ms` pass first; the timer is cleared either way. */
+function capped<T>(p: Promise<T | null>, ms: number): Promise<T | null> {
+  let t: ReturnType<typeof setTimeout>;
+  return Promise.race([p, new Promise<null>((r) => (t = setTimeout(() => r(null), ms)))]).finally(() => clearTimeout(t));
+}
+
 export function measureMedia(file: File): Promise<Measure> {
   return withVideo(file, async (v) => {
     const d = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : null;
@@ -141,7 +147,7 @@ export function measureMedia(file: File): Promise<Measure> {
       fps:
         d === null || !v.videoWidth
           ? null
-          : await Promise.race([measureFps(v).catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 10000))]),
+          : await capped(measureFps(v).catch(() => null), 10000),
       bitrate_mbps: d === null ? null : round1((file.size * 8) / d / 1e6),
     };
   });

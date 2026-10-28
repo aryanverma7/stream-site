@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { CHUNK, resumableUpload, SessionExpired } from "./resumableUpload";
+import { CHUNK, resumableUpload, SessionExpired, STALLED } from "./resumableUpload";
 
 const MiB = 1024 * 1024;
 const URL = "https://upload.example/session?upload_id=X";
@@ -114,5 +114,26 @@ describe("resumableUpload", () => {
     const ctl = new AbortController();
     ctl.abort();
     await expect(resumableUpload(new Blob(["0123456789"]), URL, { signal: ctl.signal })).rejects.toHaveProperty("name", "AbortError");
+  });
+
+  it("gives up after three chunks Google answers without holding more bytes, instead of resending forever", async () => {
+    const fetchMock = vi.fn(async () => ({ status: 308, headers: new Headers(), json: async () => ({}) }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+    await expect(resumableUpload(new Blob([new Uint8Array(20 * MiB)]), URL, {})).rejects.toThrow(STALLED);
+    expect(fetchMock).toHaveBeenCalledTimes(4); // the offset query, then three stalled chunks
+  });
+
+  it("a chunk that advances resets the stall count", async () => {
+    const total = 4 * CHUNK;
+    let have = 0;
+    let n = 0;
+    global.fetch = vi.fn(async (_u: string, init?: RequestInit) => {
+      const m = (init?.headers as Record<string, string>)["Content-Range"].match(/^bytes (\d+)-(\d+)\//);
+      // Every other chunk is dropped: two stalls never come three in a row.
+      if (m && n++ % 2 === 1) have = Number(m[2]) + 1;
+      if (have === total) return { status: 200, headers: new Headers(), json: async () => ({ id: "FILE1" }) };
+      return { status: 308, headers: new Headers(have ? { Range: `bytes=0-${have - 1}` } : {}), json: async () => ({}) };
+    }) as unknown as typeof fetch;
+    expect(await resumableUpload(new Blob([new Uint8Array(total)]), URL, {})).toEqual({ id: "FILE1" });
   });
 });

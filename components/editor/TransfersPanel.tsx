@@ -59,7 +59,7 @@ export function TransfersPanel() {
       <h2 className="label text-xs text-dim">Transfers</h2>
       <ul className="space-y-3">
         {transfers.map((t) => {
-          const pct = Math.floor((t.sent / t.size) * 100);
+          const pct = t.size > 0 ? Math.floor((t.sent / t.size) * 100) : 0;
           const finished = t.state === "done" || t.state === "failed";
           return (
             <li key={t.key} className="space-y-1">

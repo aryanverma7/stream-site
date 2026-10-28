@@ -16,6 +16,9 @@ import { grade, measureMedia, thumbnail } from "./mediaChecks";
  * or logged.
  */
 const KEY = "editor.uploads";
+// ponytail: no cross-tab lock. Tabs share these entries but not live state,
+// so two tabs dropping the same file at once both send into one session.
+// Add a BroadcastChannel/Web Locks claim per key if that ever happens.
 
 interface Stored {
   tapeId: number;
@@ -116,6 +119,8 @@ export function useTransfers(): Transfer[] {
   return useSyncExternalStore(subscribe, getSnapshot, () => EMPTY);
 }
 
+const NO_LONGER_WAITING = "This version is no longer waiting for an upload — drop the file again to upload it as a new version.";
+
 const gb = (bytes: number) => `${(bytes / 1e9).toFixed(1)} GB`;
 
 function describe(e: unknown): string {
@@ -184,6 +189,8 @@ export async function startUpload(
         method: "POST",
         body: { filename: file.name, size: file.size, mime },
       });
+      // Cancelled while the version was being created: never write its session URL back.
+      if (signal.aborted) return;
       entry = {
         tapeId, projectId, name: file.name, size: file.size, lastModified: file.lastModified,
         iterationId: r.iteration_id, version: r.version, uploadUrl: r.upload_url, sent: 0,
@@ -198,7 +205,17 @@ export async function startUpload(
     } catch (e) {
       if (!(e instanceof SessionExpired)) throw e;
       update(key, { sent: 0, message: "Google's upload session had expired, so this version is being sent again from the start" });
-      const { upload_url } = await editorApi<{ upload_url: string }>(`/iterations/${id}/session`, { method: "POST", body: { mime } });
+      let upload_url: string;
+      try {
+        ({ upload_url } = await editorApi<{ upload_url: string }>(`/iterations/${id}/session`, { method: "POST", body: { mime } }));
+      } catch (err) {
+        if (err instanceof EditorApiError && err.status === 409) {
+          patchStored(key, null);
+          throw new Error(NO_LONGER_WAITING);
+        }
+        throw err;
+      }
+      if (signal.aborted) return;
       patchStored(key, { uploadUrl: upload_url, sent: 0 });
       last = null;
       uploaded = await send(upload_url);
@@ -217,7 +234,7 @@ export async function startUpload(
   } catch (e) {
     if (!signal.aborted) update(key, { state: "failed", speed: null, message: describe(e) });
   } finally {
-    controllers.delete(key);
+    if (controllers.get(key) === ctl) controllers.delete(key);
   }
 }
 

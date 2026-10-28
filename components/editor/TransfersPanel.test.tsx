@@ -74,4 +74,10 @@ describe("TransfersPanel", () => {
     fireEvent.click(within(panel).getByRole("button", { name: "Dismiss jett.mp4" }));
     expect(dismissTransfer).toHaveBeenCalledWith("k");
   });
+
+  it("shows 0%, not NaN, for an empty file", () => {
+    store.list = [t({ size: 0, sent: 0 })];
+    const { getByText } = render(<TransfersPanel />);
+    expect(getByText("0%")).toBeTruthy();
+  });
 });
