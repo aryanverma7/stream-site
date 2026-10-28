@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useStorage, type StorageFile } from "@/lib/useStorage";
-import { useProjects, type Project } from "@/lib/useProjects";
 import { useDeletions, type DeleteKind } from "@/lib/useDeletions";
 import { routeHash } from "@/lib/useHashRoute";
 import { PendingDelete } from "./PendingDelete";
@@ -14,23 +13,16 @@ const panel = "space-y-2 border border-seam bg-bezel p-4";
 
 export const size = (b: number | null) => (b === null ? "?" : b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${(b / 1e6).toFixed(1)} MB`);
 const when = (t: number | null) => (t === null ? "never" : new Date(t * 1000).toLocaleString());
-// storage_view labels an iteration "<tape name> v<version>"; the tape's name is what a delete confirms.
-const tapeName = (f: StorageFile) => f.label.replace(/ v\d+$/, "");
 
 type Deleting = { kind: DeleteKind; targetId: number; label: string; title: string };
 
 /** The streamer's view of everything on Drive, the clock gate and the Discord outbox. */
 export function StorageView({ username }: { username: string }) {
   const { storage, drive, error, refresh, resetClock } = useStorage();
-  const projects = useProjects();
-  const deletions = useDeletions(() => {
-    refresh();
-    projects.refresh();
-  });
+  const deletions = useDeletions(() => refresh());
   const me = { username, role: "admin" as const };
   const [deleting, setDeleting] = useState<Deleting | null>(null);
 
-  const byId = new Map<number, Project>([...projects.vods, ...projects.clips].map((p) => [p.id, p]));
   const groups = new Map<number, StorageFile[]>();
   for (const f of storage?.files ?? []) groups.set(f.project_id, [...(groups.get(f.project_id) ?? []), f]);
 
@@ -52,9 +44,9 @@ export function StorageView({ username }: { username: string }) {
       <h2 tabIndex={-1} className="stencil text-4xl">
         Storage
       </h2>
-      {error && (
+      {(error || storage?.drive_error) && (
         <p role="alert" className="text-rec">
-          {error}
+          {error ?? storage?.drive_error}
         </p>
       )}
 
@@ -79,7 +71,7 @@ export function StorageView({ username }: { username: string }) {
         <div className={panel}>
           <h3 className="label text-sm text-dim">Google Drive</h3>
           <p>{drive === null ? "…" : !drive.connected ? "Not connected" : drive.error ?? (drive.layout ? "Connected" : "Connected, folders not set up")}</p>
-          {storage && (
+          {storage?.quota && (
             <p className="text-sm text-dim">
               {size(storage.quota.usage)} used
               {storage.quota.limit !== null && ` of ${size(storage.quota.limit)} · ${size(storage.quota.free)} free`}
@@ -113,12 +105,12 @@ export function StorageView({ username }: { username: string }) {
         </div>
       )}
 
-      {storage && (
+      {storage?.files && (
         <div className="space-y-2">
           <h3 className="label text-sm text-dim">App files</h3>
           {groups.size === 0 && <p className="text-sm text-dim">No files on Drive.</p>}
           {[...groups].map(([pid, files]) => {
-            const p = byId.get(pid);
+            const name = files[0].project_name;
             const vod = files.find((f) => f.kind === "vod");
             const tapes = new Map<number, StorageFile[]>();
             for (const f of files) if (f.tape_id !== null) tapes.set(f.tape_id, [...(tapes.get(f.tape_id) ?? []), f]);
@@ -126,31 +118,31 @@ export function StorageView({ username }: { username: string }) {
               <div key={pid} className={panel}>
                 <div className="flex flex-wrap items-center gap-3">
                   <a href={routeHash({ view: "project", projectId: pid })} className="font-bold hover:underline">
-                    {p?.name ?? `Project ${pid}`}
+                    {name}
                   </a>
                   <span className="text-xs text-dim">{size(files.reduce((n, f) => n + (f.size ?? 0), 0))}</span>
-                  {p && <span className="ml-auto">{deleteEntry("project", pid, p.name, `Delete ${p.name}`, "Delete project")}</span>}
+                  <span className="ml-auto">{deleteEntry("project", pid, name, `Delete ${name}`, "Delete project")}</span>
                 </div>
                 {vod && (
                   <div className="flex flex-wrap items-center gap-3 text-sm">
                     <span>VOD</span>
                     <span className="text-xs text-dim">{size(vod.size)}</span>
-                    {p && (vod.status === "ready" || deletions.find("vod", pid)) && (
-                      <span className="ml-auto">{deleteEntry("vod", pid, p.vod_filename, `Delete ${p.name}'s VOD`, "Delete VOD")}</span>
+                    {vod.vod_filename && (vod.status === "ready" || deletions.find("vod", pid)) && (
+                      <span className="ml-auto">{deleteEntry("vod", pid, vod.vod_filename, `Delete ${name}'s VOD`, "Delete VOD")}</span>
                     )}
                   </div>
                 )}
                 {[...tapes].map(([tid, tfiles]) => {
-                  const name = tapeName(tfiles[0]);
+                  const tape = tfiles[0].tape_name ?? "";
                   return (
                     <div key={tid} className="flex flex-wrap items-center gap-3 text-sm">
                       <a href={routeHash({ view: "tape", projectId: pid, tapeId: tid })} className="hover:underline">
-                        {name}
+                        {tape}
                       </a>
                       <span className="text-xs text-dim">
-                        {tfiles.map((f) => `${f.label.slice(name.length + 1)} ${size(f.size)}`).join(" · ")}
+                        {tfiles.map((f) => `${f.label.slice(tape.length + 1)} ${size(f.size)}`).join(" · ")}
                       </span>
-                      <span className="ml-auto">{deleteEntry("tape_files", tid, name, `Delete ${name}'s files`, "Delete files")}</span>
+                      <span className="ml-auto">{deleteEntry("tape_files", tid, tape, `Delete ${tape}'s files`, "Delete files")}</span>
                     </div>
                   );
                 })}

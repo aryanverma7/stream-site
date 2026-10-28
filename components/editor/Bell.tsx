@@ -23,6 +23,8 @@ export function Bell({ role }: { role: "admin" | "editor" }) {
   const [open, setOpen] = useState(false);
 
   // Esc closes the panel and goes no further, like a dialog: it must not also zoom out.
+  // On document, not window: a dialog above the panel (the popup, a delete)
+  // catches Esc on window first and stops it, so one Esc closes only the topmost.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -31,10 +33,12 @@ export function Bell({ role }: { role: "admin" | "editor" }) {
       e.stopPropagation();
       setOpen(false);
     };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
   }, [open]);
 
+  // The feed is the newest 50 (no after=, by plan): with more unseen than that,
+  // opening still marks every one of them seen, the older ones unshown.
   const toggle = () => {
     if (!open && bell.unseen > 0 && bell.items.length > 0) bell.markSeen(bell.items[0].id).catch(() => {});
     setOpen(!open);

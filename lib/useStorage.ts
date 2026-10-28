@@ -10,12 +10,21 @@ export interface StorageFile {
   project_id: number;
   tape_id: number | null;
   status: "ready" | "deleting";
+  /** The names a delete is confirmed against. */
+  project_name: string;
+  tape_name: string | null;
+  vod_filename: string | null;
 }
 
-/** GET /storage (admin): Drive quota, every app file, the scheduler and the Discord outbox. */
+/**
+ * GET /storage (admin): Drive quota, every app file, the scheduler and the
+ * Discord outbox. While Drive is down quota and files are null and
+ * drive_error says why; the scheduler and Discord blocks are still there.
+ */
 export interface StorageData {
-  quota: { limit: number | null; usage: number; free: number | null };
-  files: StorageFile[];
+  quota: { limit: number | null; usage: number; free: number | null } | null;
+  files: StorageFile[] | null;
+  drive_error?: string;
   scheduler: { sane: boolean; last_seen: number | null; paused_since: number | null };
   discord: { enabled: boolean; pending: number; sending: number; dropped: number; last_error: string | null; last_sent_at: number | null };
 }
@@ -27,11 +36,7 @@ export interface DriveStatus {
   error?: string;
 }
 
-/**
- * The Storage page's two reads. /storage needs Drive (it 503s with
- * "connect Drive" when it is not), so /drive/status rides alongside to say
- * which; either failing leaves the other on screen.
- */
+/** The Storage page's two reads; either failing leaves the other on screen. */
 export function useStorage(): {
   storage: StorageData | null;
   drive: DriveStatus | null;

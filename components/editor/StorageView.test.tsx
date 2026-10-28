@@ -6,21 +6,19 @@ import { editorBackend } from "@/lib/testUtils";
 const STORAGE = (paused: number | null = null) => ({
   quota: { limit: 15e9, usage: 6e9, free: 9e9 },
   files: [
-    { kind: "vod", label: "Ranked — VOD", size: 4e9, project_id: 12, tape_id: null, status: "ready" },
-    { kind: "iteration", label: "Jett dash v1", size: 5e8, project_id: 12, tape_id: 5, status: "ready" },
-    { kind: "iteration", label: "Jett dash v2", size: 6e8, project_id: 12, tape_id: 5, status: "ready" },
+    { kind: "vod", label: "Ranked — VOD", size: 4e9, project_id: 12, tape_id: null, status: "ready", project_name: "Ranked", vod_filename: "ranked.mp4", tape_name: null },
+    { kind: "iteration", label: "Jett dash v1", size: 5e8, project_id: 12, tape_id: 5, status: "ready", project_name: "Ranked", vod_filename: null, tape_name: "Jett dash" },
+    { kind: "iteration", label: "Jett dash v2", size: 6e8, project_id: 12, tape_id: 5, status: "ready", project_name: "Ranked", vod_filename: null, tape_name: "Jett dash" },
   ],
   pending_deletes: [],
   scheduler: { sane: paused === null, last_seen: 100, paused_since: paused },
   discord: { enabled: true, pending: 2, sending: 0, dropped: 0, last_error: "Discord said 403", last_sent_at: null },
 });
-const PROJECTS = { projects: [{ id: 12, name: "Ranked", kind: "vod", vod_filename: "ranked.mp4", vod_status: "ready", created_at: 1 }] };
 
 function base(extra: Record<string, unknown> = {}) {
   return editorBackend({
     "/storage": STORAGE(),
     "/drive/status": { connected: true, layout: true },
-    "/projects": PROJECTS,
     "/deletions": { pending: [] },
     ...extra,
   });
@@ -87,6 +85,20 @@ describe("StorageView", () => {
     expect(await findAllByText("Deleting in 10 min")).toHaveLength(2);
     expect(getAllByRole("button", { name: "Undo" })).toHaveLength(2);
     expect(queryByRole("button", { name: "Delete files" })).toBeNull();
+  });
+
+  it("keeps the clock reset and the Discord block while Drive is down", async () => {
+    const fetchMock = base({
+      "/storage": { ...STORAGE(1_700_000_000), quota: null, files: null, drive_error: "Google Drive isn't connected - connect it from the dashboard." },
+      "/drive/status": { connected: false, layout: false },
+    });
+    const { findByText, getByRole, getByText, queryByText } = render(<StorageView username="aryan" />);
+    expect(await findByText("Google Drive isn't connected - connect it from the dashboard.")).toBeTruthy();
+    expect(getByRole("button", { name: "Trust the clock again" })).toBeTruthy();
+    expect(getByText("Last error: Discord said 403")).toBeTruthy();
+    expect(getByText("Not connected")).toBeTruthy();
+    expect(queryByText("App files")).toBeNull();
+    expect(fetchMock.mock.calls.some(([u]) => u === "/api/editor/projects")).toBe(false);
   });
 
   it("still shows the Drive state when /storage fails", async () => {

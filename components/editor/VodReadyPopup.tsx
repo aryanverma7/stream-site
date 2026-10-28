@@ -6,24 +6,42 @@ import { routeHash } from "@/lib/useHashRoute";
 
 /**
  * The editor's "new uploads are ready" dialog: once per page load, from the
- * bell's first answer. The newest `unseen` items are the unseen ones (the
- * marker is one high-water id), and of those only vod_ready counts.
- * Dismiss marks seen up to the newest of them.
+ * bell's first answer. The newest `unseen` items are the unseen ones, and
+ * of those only vod_ready counts.
+ *
+ * The seen marker is one high-water id, so Dismiss may only move it past
+ * the oldest unseen items that are all vod_ready: marking up to a newer one
+ * would also mark an unseen comment between them seen, and it would vanish
+ * from the bell unread. Returns that id, or null when the oldest unseen is
+ * something else.
  */
+export function dismissUpTo(items: BellItem[], unseen: number): number | null {
+  let upTo: number | null = null;
+  for (const i of items.slice(0, unseen).reverse()) {
+    if (i.kind !== "vod_ready") break;
+    upTo = i.id;
+  }
+  return upTo;
+}
+
 export function VodReadyPopup({ bell }: { bell: ReturnType<typeof useBell> }) {
   const [ready, setReady] = useState<BellItem[] | null>(null);
+  const [upTo, setUpTo] = useState<number | null>(null);
 
   // Decided once, on the first load; later polls never reopen it.
   if (bell.loaded && ready === null) {
     setReady(bell.items.slice(0, bell.unseen).filter((i) => i.kind === "vod_ready" && i.project_id !== null));
+    setUpTo(dismissUpTo(bell.items, bell.unseen));
   }
 
   const open = !!ready && ready.length > 0;
   const dismiss = () => {
-    if (ready?.length) bell.markSeen(ready[0].id).catch(() => {});
+    if (upTo !== null) bell.markSeen(upTo).catch(() => {});
     setReady([]);
   };
 
+  // On window in the capture phase, which runs before the bell's listener on
+  // document: stopping it here means one Esc closes only this dialog.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {

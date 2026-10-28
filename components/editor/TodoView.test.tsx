@@ -35,6 +35,16 @@ describe("TodoView", () => {
     expect(fetchMock.mock.calls.filter(([, i]) => i?.method === "PATCH").map(([, i]) => i!.body)).toEqual(['{"done":true}', '{"text":"Export v2"}']);
   });
 
+  it("keeps an edit open with its text when the server refuses it", async () => {
+    editorBackend({ "/todos": { todos: [{ id: 1, text: "Export", done: false }] }, "PATCH /todos/1": { status: 500, body: { error: "database is locked" } } });
+    const { findByRole, getByLabelText, getByRole } = render(<TodoView />);
+    fireEvent.click(await findByRole("button", { name: "Edit Export" }));
+    fireEvent.change(getByLabelText("To-do text"), { target: { value: "Export v2" } });
+    fireEvent.click(getByRole("button", { name: "Save" }));
+    expect((await findByRole("alert")).textContent).toBe("database is locked");
+    expect((getByLabelText("To-do text") as HTMLInputElement).value).toBe("Export v2");
+  });
+
   it("keeps the typed text when the server refuses it", async () => {
     editorBackend({ "/todos": { todos: [] }, "POST /todos": { status: 400, body: { error: "A to-do needs some text" } } });
     const { getByLabelText, getByRole, findByRole } = render(<TodoView />);

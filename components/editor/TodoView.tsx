@@ -12,10 +12,10 @@ function TodoRow({ todo, todos }: { todo: Todo; todos: ReturnType<typeof useTodo
     return (
       <form
         className="flex gap-2"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          if (editing.trim() && editing !== todo.text) todos.update(todo.id, { text: editing });
-          setEditing(null);
+          // A refused edit stays open with what was typed; the error shows above the list.
+          if (!editing.trim() || editing === todo.text || (await todos.update(todo.id, { text: editing }))) setEditing(null);
         }}
       >
         <input autoFocus aria-label="To-do text" value={editing} onChange={(e) => setEditing(e.target.value)} className={field} />
