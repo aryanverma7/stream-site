@@ -43,3 +43,12 @@ export async function editorApi<T>(
   }
   return data as T;
 }
+
+/**
+ * Starts the browser download of a Drive file from Google's direct link.
+ * A download navigation leaves the page where it is, and the bytes go
+ * Google -> browser, never through the Mac Mini.
+ */
+export function driveDownload(fileId: string): void {
+  window.location.assign(`https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download`);
+}

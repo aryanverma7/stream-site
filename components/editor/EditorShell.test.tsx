@@ -182,7 +182,7 @@ describe("EditorShell", () => {
     act(() => {
       window.location.hash = "#/p/12";
     });
-    const heading = await findByRole("heading", { name: "Project" });
+    const heading = await findByRole("heading", { name: "Ranked grind" });
     await waitFor(() => expect(document.activeElement).toBe(heading));
   });
 

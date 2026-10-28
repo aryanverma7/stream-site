@@ -5,6 +5,10 @@ import { routeHash, useHashRoute, type Route } from "@/lib/useHashRoute";
 import { useEditorMe, type EditorMe } from "@/lib/useEditorMe";
 import { useCrumbNames } from "@/lib/useCrumbNames";
 import { Breadcrumb } from "./Breadcrumb";
+import { ProjectsView } from "./ProjectsView";
+import { ProjectView } from "./ProjectView";
+import { TapeView } from "./TapeView";
+import { IterationDetails } from "./IterationCard";
 
 const DELETED = "That was deleted or never existed";
 
@@ -17,10 +21,20 @@ function isTyping(e: KeyboardEvent): boolean {
 }
 
 /**
- * What each route shows. Placeholders until Task 3 (projects, tapes,
- * versions) and Task 5 (Home, Fix list, To-do, Storage) replace them.
+ * What each route shows. Home, Fix list, To-do and Storage are
+ * placeholders until Task 5 replaces them.
  */
 function RouteView({ route, me }: { route: Route; me: EditorMe }) {
+  switch (route.view) {
+    case "projects":
+      return <ProjectsView role={me.role} />;
+    case "project":
+      return <ProjectView projectId={route.projectId} role={me.role} />;
+    case "tape":
+      return <TapeView projectId={route.projectId} tapeId={route.tapeId} role={me.role} />;
+    case "iteration":
+      return <IterationDetails iterationId={route.iterationId} />;
+  }
   if (route.view === "storage" && me.role !== "admin") {
     return (
       <h2 tabIndex={-1} className="text-rec">
@@ -34,9 +48,6 @@ function RouteView({ route, me }: { route: Route; me: EditorMe }) {
     fixes: "Fix list",
     todo: "To-do",
     storage: "Storage",
-    project: "Project",
-    tape: "Tape",
-    iteration: "Version",
   }[route.view];
   return (
     <h2 tabIndex={-1} className="stencil text-4xl">
