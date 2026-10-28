@@ -7,6 +7,8 @@ export class EditorApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** The rest of the error body, e.g. a 507's `needed` and `free` bytes. */
+    public data: Record<string, unknown> = {},
   ) {
     super(message);
     this.name = "EditorApiError";
@@ -39,7 +41,7 @@ export async function editorApi<T>(
   }
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new EditorApiError(res.status, data?.error || `Request failed (${res.status})`);
+    throw new EditorApiError(res.status, data?.error || `Request failed (${res.status})`, data && typeof data === "object" ? data : {});
   }
   return data as T;
 }

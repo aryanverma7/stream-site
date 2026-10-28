@@ -152,7 +152,7 @@ export function TapeView({ projectId, tapeId, role, username }: { projectId: num
         </button>
       )}
 
-      <UploadDrop tapeId={tapeId} disabled={locked} onUploaded={refresh} />
+      <UploadDrop tapeId={tapeId} projectId={projectId} kind={tape.kind} disabled={locked} onUploaded={refresh} />
 
       {newestFirst.length === 0 ? (
         <p className="text-sm text-dim">No versions yet.</p>
