@@ -17,7 +17,7 @@ import { AddSetting, BUTTON, FieldInput, INPUT } from "./SettingsField";
 /**
  * One "connect this account" row.
  *
- * Shared rather than written twice because Streamlabs and Spotify need
+ * Shared because Streamlabs, Spotify and Google Drive need
  * exactly the same three states and the third one is the one people get
  * stuck in: an OAuth flow started before its client id and redirect URI
  * are saved fails at the provider with an error that names nothing useful,
@@ -108,6 +108,14 @@ export function ConfigEditor() {
         hasCredentials={Boolean(config.spotify_client_id)}
         href="/auth/spotify/login"
         needed="spotify_client_id, spotify_client_secret, and spotify_redirect_uri"
+      />}
+
+      {config && <ConnectRow
+        name="Google Drive"
+        connected={Boolean(config.gdrive_refresh_token)}
+        hasCredentials={Boolean(config.gdrive_client_id)}
+        href="/auth/gdrive/login"
+        needed="gdrive_client_id, gdrive_client_secret, and gdrive_redirect_uri (see GDRIVE_SETUP.md)"
       />}
 
       {error && <p className="text-sm text-rec">Couldn&apos;t load the config.</p>}

@@ -262,7 +262,7 @@ describe("ConfigEditor", () => {
   it("shows a setup hint (not a broken link) when Streamlabs credentials aren't configured yet", async () => {
     mockBackend({ config: { http_port: 8765 } });
     const { getByText, getAllByText, queryByText } = render(<ConfigEditor />);
-    await waitFor(() => expect(getAllByText("Not connected").length).toBe(2));
+    await waitFor(() => expect(getAllByText("Not connected").length).toBe(3));
     expect(queryByText("Connect Streamlabs")).toBeNull();
     expect(getByText(/fill in streamlabs_client_id/i)).toBeTruthy();
   });
@@ -294,9 +294,24 @@ describe("ConfigEditor", () => {
     // Spotify's access tokens last an hour and are never persisted - the
     // refresh token is the durable credential.
     mockBackend({ config: { spotify_client_id: "abc123", spotify_refresh_token: SECRET_MASK } });
-    const { getByText, queryByText } = render(<ConfigEditor />);
-    // Streamlabs (no credentials) is the only "Not connected" row.
-    await waitFor(() => expect(getByText("Not connected")).toBeTruthy());
+    const { getAllByText, queryByText } = render(<ConfigEditor />);
+    // Streamlabs and Google Drive (no credentials) are the "Not connected" rows.
+    await waitFor(() => expect(getAllByText("Not connected")).toHaveLength(2));
     expect(queryByText("Connect Spotify")).toBeNull();
+  });
+
+  it("offers Google Drive its connect link once the client id is saved", async () => {
+    mockBackend({ config: { gdrive_client_id: "g123" } });
+    const { getByText, container } = render(<ConfigEditor />);
+    await waitFor(() => expect(getByText("Connect Google Drive")).toBeTruthy());
+    const links = Array.from(container.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    expect(links).toContain("/auth/gdrive/login");
+  });
+
+  it("counts Google Drive as connected on its refresh token", async () => {
+    mockBackend({ config: { gdrive_client_id: "g123", gdrive_refresh_token: SECRET_MASK } });
+    const { queryByText, getAllByText } = render(<ConfigEditor />);
+    await waitFor(() => expect(getAllByText("Connected").length).toBeGreaterThan(0));
+    expect(queryByText("Connect Google Drive")).toBeNull();
   });
 });
