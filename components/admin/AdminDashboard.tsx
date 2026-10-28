@@ -53,6 +53,9 @@ export function AdminDashboard() {
           <span className="osd hidden text-xl sm:inline">Control room</span>
         </div>
         <div className="flex items-center gap-4">
+          <a href="/editor" className="text-xs font-bold uppercase tracking-widest hover:underline">
+            Editor app
+          </a>
           <p className="osd flex items-center gap-2 text-xl tabular-nums">
             {clock || " "}
           </p>
