@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { render, fireEvent, waitFor } from "@testing-library/react";
+import { render, fireEvent, waitFor, act } from "@testing-library/react";
 import { EditorShell } from "./EditorShell";
 import { asFetchMock } from "@/lib/testUtils";
 
@@ -115,5 +115,85 @@ describe("EditorShell", () => {
     const { findByText, getByText } = render(<EditorShell bell={<span>BELL</span>} transfers={<span>XFER</span>} />);
     expect(await findByText("BELL")).toBeTruthy();
     expect(getByText("XFER")).toBeTruthy();
+  });
+
+  it("shows the deleted notice once, not on every later visit to that parent", async () => {
+    window.location.hash = "#/p/12/t/5";
+    backend({ "/me": ADMIN, "/projects/12": PROJECT, "/tapes/6": { ...TAPE, tape: { ...TAPE.tape, id: 6 } } });
+    const { findByText, queryByText, findByRole } = render(<EditorShell />);
+    expect(await findByText("That was deleted or never existed")).toBeTruthy();
+    expect(window.location.hash).toBe("#/p/12");
+
+    act(() => {
+      window.location.hash = "#/p/12/t/6";
+    });
+    await findByRole("heading", { name: "Tape" });
+    await waitFor(() => expect(queryByText("That was deleted or never existed")).toBeNull());
+
+    act(() => {
+      window.location.hash = "#/p/12";
+    });
+    await findByRole("heading", { name: "Project" });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(queryByText("That was deleted or never existed")).toBeNull();
+  });
+
+  it("announces the notice through a status region that is always there", async () => {
+    window.location.hash = "#/";
+    backend({ "/me": ADMIN });
+    const { getByRole } = render(<EditorShell />);
+    expect(getByRole("status").textContent).toBe("");
+  });
+
+  it("leaves Esc to a text field, a select, an editable area and an IME", async () => {
+    window.location.hash = "#/p/12";
+    backend({ "/me": ADMIN, "/projects/12": PROJECT });
+    const { findByRole, getByLabelText } = render(
+      <EditorShell
+        transfers={
+          <>
+            <input aria-label="in" />
+            <textarea aria-label="ta" />
+            <select aria-label="sel" />
+            <div aria-label="ce" contentEditable suppressContentEditableWarning />
+          </>
+        }
+      />,
+    );
+    await findByRole("link", { name: "Ranked grind" });
+
+    for (const label of ["in", "ta", "sel", "ce"]) {
+      const el = getByLabelText(label);
+      // jsdom does not implement isContentEditable.
+      if (label === "ce") Object.defineProperty(el, "isContentEditable", { value: true });
+      fireEvent.keyDown(el, { key: "Escape" });
+    }
+    fireEvent.keyDown(window, { key: "Escape", isComposing: true });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(window.location.hash).toBe("#/p/12");
+  });
+
+  it("moves focus to the new view's heading on navigation", async () => {
+    window.location.hash = "#/";
+    backend({ "/me": ADMIN, "/projects/12": PROJECT });
+    const { findByRole } = render(<EditorShell />);
+    await waitFor(async () => expect(document.activeElement).toBe(await findByRole("heading", { name: "Projects" })));
+
+    act(() => {
+      window.location.hash = "#/p/12";
+    });
+    const heading = await findByRole("heading", { name: "Project" });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+  });
+
+  it("marks only the last crumb as the current page; the section link is just current", async () => {
+    window.location.hash = "#/p/12";
+    backend({ "/me": ADMIN, "/projects/12": PROJECT });
+    const { findByRole, getByRole, container } = render(<EditorShell />);
+    await findByRole("link", { name: "Ranked grind" });
+
+    expect(container.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+    expect(getByRole("link", { name: "Ranked grind" }).getAttribute("aria-current")).toBe("page");
+    expect(getByRole("link", { name: "Projects" }).getAttribute("aria-current")).toBe("true");
   });
 });

@@ -23,9 +23,15 @@ export function parseHash(hash: string): Route {
   const m = hash.match(NESTED);
   if (!m) return { view: "projects" };
   const [projectId, tapeId, iterationId] = [m[1], m[2], m[3]].map(Number);
+  // An id the backend could never have issued is a bad link, not a lookup.
+  const bad = (id: number) => !(Number.isSafeInteger(id) && id > 0);
+  if (bad(projectId) || (m[2] !== undefined && bad(tapeId)) || (m[3] !== undefined && bad(iterationId))) {
+    return { view: "projects" };
+  }
+  const seekS = Number(m[4]);
   if (m[2] === undefined) return { view: "project", projectId };
   if (m[3] === undefined) return { view: "tape", projectId, tapeId };
-  return { view: "iteration", projectId, tapeId, iterationId, ...(m[4] !== undefined && { seekS: Number(m[4]) }) };
+  return { view: "iteration", projectId, tapeId, iterationId, ...(Number.isFinite(seekS) && seekS >= 0 && { seekS }) };
 }
 
 export function routeHash(route: Route): string {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { routeHash, useHashRoute, type Route } from "@/lib/useHashRoute";
 import { useEditorMe, type EditorMe } from "@/lib/useEditorMe";
 import { useCrumbNames } from "@/lib/useCrumbNames";
@@ -10,13 +10,23 @@ const DELETED = "That was deleted or never existed";
 
 const depth = (r: Route) => ({ project: 1, tape: 2, iteration: 3 })[r.view as string] ?? 0;
 
+/** Typing in a field: Esc there belongs to the field (or the IME), not to the zoom. */
+function isTyping(e: KeyboardEvent): boolean {
+  const t = e.target as HTMLElement | null;
+  return e.isComposing || !!t?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t?.tagName ?? "");
+}
+
 /**
  * What each route shows. Placeholders until Task 3 (projects, tapes,
  * versions) and Task 5 (Home, Fix list, To-do, Storage) replace them.
  */
 function RouteView({ route, me }: { route: Route; me: EditorMe }) {
   if (route.view === "storage" && me.role !== "admin") {
-    return <p className="text-rec">Only the streamer can do this.</p>;
+    return (
+      <h2 tabIndex={-1} className="text-rec">
+        Only the streamer can do this.
+      </h2>
+    );
   }
   const title = {
     projects: "Projects",
@@ -28,7 +38,11 @@ function RouteView({ route, me }: { route: Route; me: EditorMe }) {
     tape: "Tape",
     iteration: "Version",
   }[route.view];
-  return <h2 className="stencil text-4xl">{title}</h2>;
+  return (
+    <h2 tabIndex={-1} className="stencil text-4xl">
+      {title}
+    </h2>
+  );
 }
 
 /**
@@ -38,17 +52,22 @@ function RouteView({ route, me }: { route: Route; me: EditorMe }) {
  *
  * `bell` (Task 5) sits in the top bar; `transfers` (Task 4) is rendered
  * after the view and positions itself.
+ *
+ * Every view leads with a heading carrying tabIndex={-1}: focus moves to
+ * it on each navigation, so a keyboard or screen-reader user lands on the
+ * new view instead of on the link they just left.
  */
 export function EditorShell({ bell, transfers }: { bell?: ReactNode; transfers?: ReactNode }) {
   const { route, go, up } = useHashRoute();
   const { me, error } = useEditorMe();
-  // The notice belongs to the hash it was raised on, so the next
-  // navigation clears it without anyone having to.
-  const [notice, setNotice] = useState<{ hash: string; text: string } | null>(null);
+  // The notice belongs to the parent it moved you to: shown once you
+  // arrive there, gone as soon as you leave, so a later visit to that
+  // parent does not repeat it.
+  const [notice, setNotice] = useState<{ hash: string; text: string; arrived: boolean } | null>(null);
 
   const onMissing = useCallback(
     (parent: Route) => {
-      setNotice({ hash: routeHash(parent), text: DELETED });
+      setNotice({ hash: routeHash(parent), text: DELETED, arrived: false });
       go(parent, true);
     },
     [go],
@@ -61,6 +80,16 @@ export function EditorShell({ bell, transfers }: { bell?: ReactNode; transfers?:
   const [zoom, setZoom] = useState({ depth: d, dir: "zoom-in" });
   if (zoom.depth !== d) setZoom({ depth: d, dir: d > zoom.depth ? "zoom-in" : "zoom-out" });
 
+  const hash = routeHash(route);
+  const viewKey = hash.split("@")[0];
+  if (notice && !notice.arrived && notice.hash === hash) setNotice({ ...notice, arrived: true });
+  if (notice?.arrived && notice.hash !== hash) setNotice(null);
+
+  const viewRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    viewRef.current?.querySelector<HTMLElement>("h2")?.focus();
+  }, [viewKey, me]);
+
   // An empty hash is a first visit: the editor's work starts on Home.
   useEffect(() => {
     if (me?.role === "editor" && (window.location.hash === "" || window.location.hash === "#")) {
@@ -72,7 +101,7 @@ export function EditorShell({ bell, transfers }: { bell?: ReactNode; transfers?:
   // closing it never also leaves the tape behind it.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !e.defaultPrevented) up();
+      if (e.key === "Escape" && !e.defaultPrevented && !isTyping(e)) up();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -86,8 +115,6 @@ export function EditorShell({ bell, transfers }: { bell?: ReactNode; transfers?:
     ...(me?.role === "admin" ? [{ label: "Storage", to: { view: "storage" } as Route }] : []),
   ];
   const inProjects = ["projects", "project", "tape", "iteration"].includes(route.view);
-  const hash = routeHash(route);
-
   return (
     <div className="flex min-h-screen flex-col bg-ink text-phosphor">
       <header className="wallpaper flex flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
@@ -116,7 +143,7 @@ export function EditorShell({ bell, transfers }: { bell?: ReactNode; transfers?:
               <a
                 key={s.label}
                 href={routeHash(s.to)}
-                aria-current={active ? "page" : undefined}
+                aria-current={active ? "true" : undefined}
                 className={`shrink-0 px-3 py-2 text-sm font-bold uppercase tracking-[0.08em] ${
                   active ? "bg-field text-ink" : "text-phosphor hover:bg-bezel-2"
                 }`}
@@ -140,17 +167,16 @@ export function EditorShell({ bell, transfers }: { bell?: ReactNode; transfers?:
 
       <main className="min-w-0 flex-1 overflow-hidden px-3 py-5 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl space-y-4">
+          {/* Always mounted, so the notice is announced when its text appears. */}
+          <p role="status" className={notice?.arrived ? "border border-amber px-3 py-2 text-amber" : "sr-only"}>
+            {notice?.arrived ? notice.text : ""}
+          </p>
           {error && <p className="text-rec">{error}</p>}
           {!me && !error && <p className="osd text-xl text-dim">Loading…</p>}
           {me && (
             <>
               {inProjects && <Breadcrumb route={route} names={names} />}
-              {notice?.hash === hash && (
-                <p role="status" className="border border-amber px-3 py-2 text-amber">
-                  {notice.text}
-                </p>
-              )}
-              <div key={hash.split("@")[0]} className={zoom.dir}>
+              <div key={viewKey} ref={viewRef} className={zoom.dir}>
                 <RouteView route={route} me={me} />
               </div>
             </>

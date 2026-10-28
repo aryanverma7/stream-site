@@ -20,10 +20,17 @@ describe("parseHash / routeHash", () => {
     expect(routeHash(route)).toBe(hash);
   });
 
-  it.each(["", "#", "#/nope", "#/p/x", "#/p/12/t", "#/p/12/v/3", "#/p/12/t/5/v/3@abc", "#/constructor"])(
+  it.each(["", "#", "#/nope", "#/p/x", "#/p/12/t", "#/p/12/v/3", "#/p/12/t/5/v/3@abc", "#/constructor", "#/p/0",
+    "#/p/12/t/0", "#/p/12/t/5/v/0", "#/p/99999999999999999999"])(
     "%j falls back to projects",
     (hash) => expect(parseHash(hash)).toEqual({ view: "projects" }),
   );
+});
+
+it("drops a seek that is not a finite number of seconds", () => {
+  expect(parseHash(`#/p/12/t/5/v/3@${"9".repeat(400)}`)).toEqual({
+    view: "iteration", projectId: 12, tapeId: 5, iterationId: 3,
+  });
 });
 
 describe("parentRoute", () => {
