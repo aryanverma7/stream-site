@@ -1,18 +1,47 @@
 "use client";
 
 import { useState } from "react";
-import { downloadVod, editorApi } from "@/lib/editorApi";
+import { duration, editorApi, recordDownload } from "@/lib/editorApi";
 import { routeHash } from "@/lib/useHashRoute";
 import { useProjects, type Project } from "@/lib/useProjects";
-import { useDeletions } from "@/lib/useDeletions";
+import { useDeletions, type DeleteRequest } from "@/lib/useDeletions";
 import { StatusLabel } from "./StatusLabel";
 import { PendingDelete } from "./PendingDelete";
 import { DeleteDialog } from "./DeleteDialog";
+import { DownloadLink, OpenInDrive } from "./DriveLinks";
 
 const btn = "label border border-seam px-3 py-1.5 text-xs text-phosphor hover:border-field disabled:opacity-40";
 const card = "flex flex-wrap items-center gap-3 border border-seam bg-bezel px-4 py-3";
 
-const duration = (s: number | null) => (s === null ? "" : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`);
+/**
+ * Download, Open in Drive and Delete for a project's own file: a VOD, or a
+ * clip's source (spec: clips are downloaded and deleted one by one, with the
+ * normal two-step). The editor may delete only after his own Download click
+ * (server-enforced); a live delete disables Download and hides Delete.
+ */
+function FileActions({ p, pending, role, onDownload, onDelete }: {
+  p: Project;
+  pending: DeleteRequest | undefined;
+  role: "admin" | "editor";
+  onDownload: () => void;
+  onDelete: () => void;
+}) {
+  if (p.vod_status !== "ready" || !p.vod_file_id) return null;
+  const clip = p.kind === "clip";
+  return (
+    <>
+      <DownloadLink fileId={p.vod_file_id} disabled={!!pending} onClick={onDownload} className={btn}>
+        {clip ? "Download clip" : "Download VOD"}
+      </DownloadLink>
+      <OpenInDrive fileId={p.vod_file_id} />
+      {!pending && (role === "admin" || p.download_clicked_at !== null) && (
+        <button type="button" onClick={onDelete} className={`${btn} border-rec text-rec`}>
+          {clip ? "Delete clip file" : "Delete VOD"}
+        </button>
+      )}
+    </>
+  );
+}
 
 /** Every project: VODs newest first, then clips oldest first with Combine / Uncombine. */
 export function ProjectsView({ role, username }: { role: "admin" | "editor"; username: string }) {
@@ -22,7 +51,6 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
   const me = { username, role };
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
-  const [driveUrls, setDriveUrls] = useState<Record<number, string | null>>({});
   const [deleting, setDeleting] = useState<Project | null>(null);
 
   async function run(action: () => Promise<unknown>) {
@@ -34,12 +62,8 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
     }
   }
 
-  const download = (p: Project) =>
-    run(async () => {
-      const driveUrl = await downloadVod(p.id, p.vod_file_id!);
-      setDriveUrls((u) => ({ ...u, [p.id]: driveUrl }));
-      await refresh();
-    });
+  // Not awaited: the link opens on this same click. The refresh shows the editor's Delete once recorded.
+  const download = (p: Project) => void recordDownload(p.id).then(refresh);
 
   const rename = (p: Project) => {
     const name = window.prompt("New name", p.name)?.trim();
@@ -50,7 +74,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
     const name = window.prompt("Name for the combined reel")?.trim();
     if (!name) return;
     run(async () => {
-      await editorApi("/clips/combine", { method: "POST", body: { project_ids: selected, name } });
+      await editorApi("/clips/combine", { method: "POST", body: { project_ids: selected.filter((id) => !deletions.find("project", id)), name } });
       setSelected([]);
       await refresh();
     });
@@ -73,7 +97,6 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
         <ul className="grid gap-2">
           {vods.map((p) => {
             const pending = deletions.find("vod", p.id) ?? deletions.find("project", p.id);
-            const ready = p.vod_status === "ready" && !!p.vod_file_id;
             return (
               <li key={p.id} className={card}>
                 <span className="osd text-lg text-dim">{p.stream_date}</span>
@@ -85,26 +108,12 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
                 <span className="text-xs text-dim">{p.tape_count === 1 ? "1 tape" : `${p.tape_count} tapes`}</span>
                 {pending && <PendingDelete request={pending} onUndo={deletions.undo} me={me} />}
                 <span className="ml-auto flex flex-wrap items-center gap-2">
-                  {ready && (
-                    <button type="button" disabled={!!pending} onClick={() => download(p)} className={btn}>
-                      Download VOD
-                    </button>
-                  )}
-                  {driveUrls[p.id] && (
-                    <a href={driveUrls[p.id]!} target="_blank" rel="noopener noreferrer" className="text-xs text-dim hover:text-phosphor">
-                      Open in Drive ↗
-                    </a>
-                  )}
                   {role === "admin" && (
                     <button type="button" onClick={() => rename(p)} className={btn}>
                       Rename
                     </button>
                   )}
-                  {ready && !pending && (role === "admin" || p.download_clicked_at !== null) && (
-                    <button type="button" onClick={() => setDeleting(p)} className={`${btn} border-rec text-rec`}>
-                      Delete VOD
-                    </button>
-                  )}
+                  <FileActions p={p} pending={pending} role={role} onDownload={() => download(p)} onDelete={() => setDeleting(p)} />
                 </span>
               </li>
             );
@@ -124,36 +133,43 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
           {clips.map((c) => {
             const reel = c.reel_tape_id === null ? undefined : reels[c.reel_tape_id];
             const combined = !!reel && reel.source_project_ids.length >= 2;
-            const pending = deletions.find("project", c.id);
+            const limbo = deletions.find("project", c.id);
+            const pending = deletions.find("vod", c.id) ?? limbo;
+            // The server refuses both while any clip involved is being deleted.
+            const reelLocked = !!reel && reel.source_project_ids.some((id) => deletions.find("project", id));
             return (
               <li key={c.id} className={card}>
                 <input
                   type="checkbox"
                   aria-label={`Select ${c.name}`}
-                  checked={selected.includes(c.id)}
+                  disabled={!!limbo}
+                  checked={selected.includes(c.id) && !limbo}
                   onChange={(e) => setSelected((s) => (e.target.checked ? [...s, c.id] : s.filter((id) => id !== c.id)))}
                 />
                 <a href={routeHash({ view: "project", projectId: c.id })} className="font-bold hover:underline">
                   {c.name}
                 </a>
-                <span className="osd text-lg text-dim">{duration(c.duration_s)}</span>
+                <span className="osd text-lg text-dim">{c.duration_s === null ? "" : duration(c.duration_s)}</span>
                 {c.has_new && <span className="label bg-field px-1.5 text-[11px] text-ink">New</span>}
                 {reel && <StatusLabel status={reel.status} />}
                 {pending && <PendingDelete request={pending} onUndo={deletions.undo} me={me} />}
-                {combined && (
-                  <span className="ml-auto flex items-center gap-2 text-xs text-dim">
-                    used in
-                    <a href={routeHash({ view: "tape", projectId: reel.project_id, tapeId: reel.id })} className="text-phosphor hover:underline">
-                      {reel.name}
-                    </a>
-                    {/* The reel lives in its first clip's project: one Uncombine, on that card. */}
-                    {reel.project_id === c.id && (
-                      <button type="button" onClick={() => run(() => editorApi(`/tapes/${reel.id}/uncombine`, { method: "POST" }).then(refresh))} className={btn}>
-                        Uncombine
-                      </button>
-                    )}
-                  </span>
-                )}
+                <span className="ml-auto flex flex-wrap items-center gap-2">
+                  {combined && (
+                    <span className="flex items-center gap-2 text-xs text-dim">
+                      used in
+                      <a href={routeHash({ view: "tape", projectId: reel.project_id, tapeId: reel.id })} className="text-phosphor hover:underline">
+                        {reel.name}
+                      </a>
+                      {/* The reel lives in its first clip's project: one Uncombine, on that card. */}
+                      {reel.project_id === c.id && !reelLocked && (
+                        <button type="button" onClick={() => run(() => editorApi(`/tapes/${reel.id}/uncombine`, { method: "POST" }).then(refresh))} className={btn}>
+                          Uncombine
+                        </button>
+                      )}
+                    </span>
+                  )}
+                  <FileActions p={c} pending={pending} role={role} onDownload={() => download(c)} onDelete={() => setDeleting(c)} />
+                </span>
               </li>
             );
           })}
@@ -165,7 +181,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
           kind="vod"
           targetId={deleting.id}
           label={deleting.vod_filename}
-          title={`Delete ${deleting.name}'s VOD`}
+          title={deleting.kind === "clip" ? `Delete ${deleting.name}'s clip file` : `Delete ${deleting.name}'s VOD`}
           onClose={() => setDeleting(null)}
           onDone={() => {
             setDeleting(null);

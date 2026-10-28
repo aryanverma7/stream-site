@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { fpsFrom, grade, jpegUnder, THUMBNAIL_MAX_BYTES, type Measure } from "./mediaChecks";
+import { describe, expect, it, vi, afterEach } from "vitest";
+import { fpsFrom, grade, jpegUnder, measureMedia, THUMBNAIL_MAX_BYTES, type Measure } from "./mediaChecks";
 
 const m = (over: Partial<Measure> = {}): Measure => ({ width: 1920, height: 1080, duration_s: 90, fps: 60, bitrate_mbps: 55, ...over });
 
@@ -97,5 +97,31 @@ describe("jpegUnder", () => {
   it("gives up (no thumbnail) rather than send one over the limit", async () => {
     const { c } = canvas(() => 300_000);
     expect(await jpegUnder(c)).toBeNull();
+  });
+});
+
+describe("measureMedia", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  /** A <video> whose metadata loads with these properties (jsdom has no decoder). */
+  function fakeVideo(props: { duration: number; videoWidth: number; videoHeight: number }) {
+    URL.createObjectURL = vi.fn(() => "blob:x");
+    URL.revokeObjectURL = vi.fn();
+    const make = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = make(tag);
+      if (tag !== "video") return el;
+      for (const [k, v] of Object.entries(props)) Object.defineProperty(el, k, { value: v });
+      (el as HTMLVideoElement).pause = () => {};
+      Object.defineProperty(el, "src", { set: () => setTimeout(() => el.dispatchEvent(new Event("loadedmetadata"))) });
+      return el;
+    });
+  }
+
+  it("gives no bitrate for a file with no decodable video track (audio only), so it grades unknown", async () => {
+    fakeVideo({ duration: 90, videoWidth: 0, videoHeight: 0 });
+    const got = await measureMedia(new File([new Uint8Array(1000)], "a.mp4"));
+    expect(got).toEqual({ width: null, height: null, duration_s: 90, fps: null, bitrate_mbps: null });
+    expect(grade(got, "tape").bitrate.state).toBe("unknown");
   });
 });

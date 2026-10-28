@@ -31,7 +31,8 @@ function stateText(t: Transfer, pct: number): string {
  * Every upload in a corner: this tab's, and the unfinished ones a closed
  * browser left in localStorage (checked with the server on mount, so one
  * the reconcile job already finished disappears). The page asks before
- * closing only while bytes are actually being sent.
+ * closing while bytes are being sent or the file is being checked (closing
+ * then would lose the checks and thumbnail).
  */
 export function TransfersPanel() {
   const transfers = useTransfers();
@@ -39,7 +40,7 @@ export function TransfersPanel() {
     void refreshStored();
   }, []);
 
-  const sending = transfers.some((t) => t.state === "uploading");
+  const sending = transfers.some((t) => t.state === "uploading" || t.state === "checking");
   useEffect(() => {
     if (!sending) return;
     const ask = (e: BeforeUnloadEvent) => {

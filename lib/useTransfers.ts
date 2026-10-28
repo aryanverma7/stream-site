@@ -190,7 +190,7 @@ export async function startUpload(
         body: { filename: file.name, size: file.size, mime },
       });
       // Cancelled while the version was being created: never write its session URL back.
-      if (signal.aborted) return;
+      if (signal.aborted) return abandon(r.iteration_id);
       entry = {
         tapeId, projectId, name: file.name, size: file.size, lastModified: file.lastModified,
         iterationId: r.iteration_id, version: r.version, uploadUrl: r.upload_url, sent: 0,
@@ -238,8 +238,20 @@ export async function startUpload(
   }
 }
 
-/** Stops sending and forgets the upload. The version stays `uploading`; the server abandons it after 8 days. */
+/**
+ * Best effort, never awaited: a cancelled version left `uploading` blocks its
+ * tape's and project's deletes until reconcile abandons it after 8 days. A
+ * raw fetch, not editorApi, so an expired session cannot navigate to login
+ * mid-cancel; on any failure that 8-day backstop still applies.
+ */
+function abandon(iterationId: number) {
+  fetch(`/api/editor/iterations/${iterationId}/abandon`, { method: "POST", credentials: "same-origin" }).catch(() => {});
+}
+
+/** Stops sending, forgets the upload and abandons its version; dropping the file again revives it. */
 export function cancelTransfer(key: string) {
+  const entry = load().find((s) => keyOf(s.tapeId, s) === key);
+  if (entry) abandon(entry.iterationId);
   controllers.get(key)?.abort();
   controllers.delete(key);
   live.delete(key);

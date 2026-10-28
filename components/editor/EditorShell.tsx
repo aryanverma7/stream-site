@@ -37,7 +37,7 @@ function RouteView({ route, me }: { route: Route; me: EditorMe }) {
     case "iteration":
       return <IterationDetails iterationId={route.iterationId} />;
     case "home":
-      return <HomeView />;
+      return <HomeView role={me.role} username={me.username} />;
     case "fixes":
       return <FixListView />;
     case "todo":

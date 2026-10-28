@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { downloadVod } from "@/lib/editorApi";
+import { recordDownload } from "@/lib/editorApi";
 import { routeHash } from "@/lib/useHashRoute";
 import { useHome, type HomeData } from "@/lib/useHome";
+import { useDeletions } from "@/lib/useDeletions";
 import { StatusLabel } from "./StatusLabel";
 import { DeleteDialog } from "./DeleteDialog";
+import { PendingDelete } from "./PendingDelete";
+import { DownloadLink, OpenInDrive } from "./DriveLinks";
 
 const btn = "label border border-seam px-3 py-1.5 text-xs text-phosphor hover:border-field disabled:opacity-40";
 const card = "flex flex-wrap items-center gap-3 border border-seam bg-bezel px-4 py-3";
@@ -24,31 +27,21 @@ function ProjectLink({ p }: { p: HomeProject }) {
 }
 
 /** What is waiting on someone: VODs to download, downloaded VODs to delete, tapes with open comments. */
-export function HomeView() {
+export function HomeView({ role, username }: { role: "admin" | "editor"; username: string }) {
   const { home, error, refresh } = useHome();
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [driveUrls, setDriveUrls] = useState<Record<number, string | null>>({});
+  // The streamer can schedule a VOD delete before anyone downloads it; it shows here too.
+  const deletions = useDeletions(() => refresh());
+  const me = { username, role };
   const [deleting, setDeleting] = useState<HomeProject | null>(null);
-
-  const download = async (p: HomeProject) => {
-    setActionError(null);
-    try {
-      const driveUrl = await downloadVod(p.id, p.vod_file_id!);
-      setDriveUrls((u) => ({ ...u, [p.id]: driveUrl }));
-      await refresh();
-    } catch (e) {
-      setActionError((e as Error).message);
-    }
-  };
 
   return (
     <section className="space-y-6">
       <h2 tabIndex={-1} className="stencil text-4xl">
         Home
       </h2>
-      {(error || actionError) && (
+      {error && (
         <p role="alert" className="text-rec">
-          {actionError ?? error}
+          {error}
         </p>
       )}
       {home && (
@@ -57,23 +50,24 @@ export function HomeView() {
             <h3 className="label text-sm text-dim">Ready to download</h3>
             {home.vods_ready.length === 0 && <p className="text-sm text-dim">Nothing new.</p>}
             <ul className="grid gap-2">
-              {home.vods_ready.map((p) => (
-                <li key={p.id} className={card}>
-                  <ProjectLink p={p} />
-                  <span className="ml-auto flex items-center gap-2">
-                    {driveUrls[p.id] && (
-                      <a href={driveUrls[p.id]!} target="_blank" rel="noopener noreferrer" className="text-xs text-dim hover:text-phosphor">
-                        Open in Drive ↗
-                      </a>
-                    )}
+              {home.vods_ready.map((p) => {
+                const pending = deletions.find("vod", p.id);
+                return (
+                  <li key={p.id} className={card}>
+                    <ProjectLink p={p} />
+                    {pending && <PendingDelete request={pending} onUndo={deletions.undo} me={me} />}
                     {p.vod_file_id && (
-                      <button type="button" onClick={() => download(p)} className={btn}>
-                        Download VOD
-                      </button>
+                      <span className="ml-auto flex items-center gap-2">
+                        <OpenInDrive fileId={p.vod_file_id} />
+                        {/* Not awaited: the link opens on this same click. */}
+                        <DownloadLink fileId={p.vod_file_id} disabled={!!pending} onClick={() => void recordDownload(p.id).then(refresh)} className={btn}>
+                          Download VOD
+                        </DownloadLink>
+                      </span>
                     )}
-                  </span>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
@@ -122,6 +116,7 @@ export function HomeView() {
           onClose={() => setDeleting(null)}
           onDone={() => {
             setDeleting(null);
+            deletions.refresh();
             refresh();
           }}
         />

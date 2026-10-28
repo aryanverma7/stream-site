@@ -16,7 +16,6 @@ function base(status: string, extra: Record<string, unknown> = {}) {
     "/tapes/5": { tape: tape(status), iterations: [iteration(1, 1), iteration(2, 2)] },
     "/iterations/1": { comments: [] },
     "/iterations/2": { comments: [{ resolved: true }, { resolved: false }, { resolved: true }] },
-    "/iterations/2/media-link": { url: "x", access_token: "SECRET", expires_in: 3000, drive_url: "https://drive.google.com/file/d/FILE_2/view" },
     "/deletions": { pending: [] },
     "PATCH /tapes/5": (body: unknown) => tape((body as { status?: string }).status ?? status),
     ...extra,
@@ -48,7 +47,7 @@ describe("TapeView", () => {
   it("shows the editor a Final tape as a label, with no way out of it", async () => {
     base("final");
     const { findByRole, queryByRole, queryAllByText } = render(<TapeView projectId={12} tapeId={5} role="editor" username="cutter" />);
-    await findByRole("button", { name: "Download Final" });
+    await findByRole("link", { name: "Download Final" });
     expect(queryByRole("combobox", { name: "Status" })).toBeNull();
     expect(queryAllByText("Final").length).toBeGreaterThan(0);
     expect(queryByRole("button", { name: "Delete files" })).toBeNull();
@@ -65,7 +64,7 @@ describe("TapeView", () => {
     expect(fetchMock.mock.calls.some(([, i]) => i?.method === "PATCH")).toBe(false);
 
     fireEvent.change(statusSelect(getAllByRole), { target: { value: "final" } });
-    await findByRole("button", { name: "Download Final" });
+    await findByRole("link", { name: "Download Final" });
     const patch = fetchMock.mock.calls.find(([, i]) => i?.method === "PATCH")!;
     expect(JSON.parse(String(patch[1]!.body))).toEqual({ status: "final" });
   });
@@ -78,15 +77,15 @@ describe("TapeView", () => {
     expect((await findByRole("alert")).textContent).toBe("Only the streamer can do this.");
   });
 
-  it("downloads the Final from Google's direct link for the latest version, with Drive beside it", async () => {
-    base("final");
-    const assign = vi.fn();
-    vi.spyOn(window, "location", "get").mockReturnValue({ ...window.location, assign });
-    const { findByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
-    fireEvent.click(await findByRole("button", { name: "Download Final" }));
-    expect(assign).toHaveBeenCalledWith("https://drive.usercontent.google.com/download?id=FILE_2&export=download");
-    expect((await findByRole("link", { name: /Open in Drive/ })).getAttribute("target")).toBe("_blank");
-    expect(document.body.innerHTML).not.toContain("SECRET");
+  it("downloads the Final from a new-tab link for the latest version, with Drive beside it, and no media-link", async () => {
+    const fetchMock = base("final");
+    const { findByRole, getByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
+    const link = await findByRole("link", { name: "Download Final" });
+    expect(link.getAttribute("href")).toBe("https://drive.usercontent.google.com/download?id=FILE_2&export=download");
+    expect([link.getAttribute("target"), link.getAttribute("rel")]).toEqual(["_blank", "noopener noreferrer"]);
+    const drive = getByRole("link", { name: /Open in Drive/ });
+    expect(drive.getAttribute("href")).toBe("https://drive.google.com/file/d/FILE_2/view");
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes("media-link"))).toBe(false);
   });
 
   it("lets the streamer start over on the latest version after a confirm", async () => {
@@ -127,10 +126,11 @@ describe("TapeView", () => {
     expect(await findByText("Deleting in 60 min")).toBeTruthy();
     // Every version is "deleting", so there is no Final to download meanwhile.
     expect(queryByRole("button", { name: "Download Final" })).toBeNull();
+    expect(queryByRole("link", { name: "Download Final" })).toBeNull();
     expect(queryByRole("button", { name: "Delete files" })).toBeNull();
 
     fireEvent.click(getByRole("button", { name: "Undo" }));
-    expect(await findByRole("button", { name: "Download Final" })).toBeTruthy();
+    expect(await findByRole("link", { name: "Download Final" })).toBeTruthy();
     expect(queryByRole("button", { name: "Undo" })).toBeNull();
   });
 

@@ -6,7 +6,7 @@ import type { Tape } from "./useProject";
 
 /** The checks Task 4 measures; any of them may be missing or malformed. */
 export type CheckState = "pass" | "warn" | "fail" | "unknown";
-export type Checks = Partial<Record<"resolution" | "fps" | "bitrate", { state?: CheckState; value?: unknown }>>;
+export type Checks = Partial<Record<"resolution" | "fps" | "bitrate", { state?: CheckState; value?: unknown }>> & { duration_s?: unknown };
 
 /** An iteration (a "version") as GET /tapes/{id} lists it. */
 export interface Iteration {

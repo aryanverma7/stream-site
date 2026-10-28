@@ -57,13 +57,19 @@ describe("TransfersPanel", () => {
     ["offline", "62% - paused, offline"],
     ["retrying", "62% - connection trouble, retrying"],
     ["waiting", "Sent - waiting for the Mac Mini"],
-    ["checking", "Checking the file"],
     ["done", "Done"],
   ] as const)("labels %s and does not prompt on close", (state, text) => {
     store.list = [t({ state })];
     const { getByText } = render(<TransfersPanel />);
     expect(getByText(text)).toBeTruthy();
     expect(beforeUnloadBlocked()).toBe(false);
+  });
+
+  it("asks before the page is closed while the file is being checked (checks and thumbnail not sent yet)", () => {
+    store.list = [t({ state: "checking" })];
+    const { getByText } = render(<TransfersPanel />);
+    expect(getByText("Checking the file")).toBeTruthy();
+    expect(beforeUnloadBlocked()).toBe(true);
   });
 
   it("shows a failure's message and lets it be dismissed", () => {

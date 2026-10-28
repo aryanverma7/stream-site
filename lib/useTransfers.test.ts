@@ -148,6 +148,33 @@ describe("useTransfers", () => {
     expect(result.current).toEqual([]);
   });
 
+  it("cancel tells the server the version is abandoned, so it stops blocking deletes", async () => {
+    const mod = await fresh();
+    const { api } = backend(
+      { "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" }, "POST /iterations/7/abandon": { id: 7, status: "abandoned" } },
+      { hold: 8 * MiB },
+    );
+    const { result } = renderHook(() => mod.useTransfers());
+    const done = mod.startUpload(target, file());
+    await waitFor(() => expect(stored()[0]?.sent).toBe(8 * MiB));
+    act(() => mod.cancelTransfer(result.current[0].key));
+    await done;
+    await waitFor(() => expect(calls(api, "POST", "/iterations/7/abandon")).toHaveLength(1));
+  });
+
+  it("a failed abandon never undoes the cancel", async () => {
+    const mod = await fresh();
+    backend({ "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" }, "POST /iterations/7/abandon": { status: 409, body: { error: "This version is not uploading" } } }, { hold: 8 * MiB });
+    const { result } = renderHook(() => mod.useTransfers());
+    const done = mod.startUpload(target, file());
+    await waitFor(() => expect(stored()[0]?.sent).toBe(8 * MiB));
+    act(() => mod.cancelTransfer(result.current[0].key));
+    await done;
+    await new Promise((r) => setTimeout(r, 0));
+    expect(stored()).toEqual([]);
+    expect(result.current).toEqual([]);
+  });
+
   it("explains a Drive that is too full in GB", async () => {
     const mod = await fresh();
     backend({ "POST /tapes/5/iterations": { status: 507, body: { error: "Drive is too full for this file", needed: 20_970_000_000, free: 4_000_000_000 } } });
@@ -207,6 +234,8 @@ describe("useTransfers", () => {
     await act(() => done);
     expect(stored()).toEqual([]);
     expect(result.current).toEqual([]);
+    // The version it created anyway is abandoned rather than left blocking deletes.
+    expect(api.mock.calls.some(([u, i]) => u === "/api/editor/iterations/7/abandon" && i?.method === "POST")).toBe(true);
   });
 
   it("forgets a stored version the server no longer takes uploads for (409 from /session)", async () => {

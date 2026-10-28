@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { driveDownload, editorApi } from "@/lib/editorApi";
+import { useState } from "react";
+import { editorApi } from "@/lib/editorApi";
 import { useTape } from "@/lib/useTape";
 import { useDeletions } from "@/lib/useDeletions";
 import type { TapeStatus } from "@/lib/useProject";
@@ -10,6 +10,7 @@ import { IterationCard } from "./IterationCard";
 import { PendingDelete } from "./PendingDelete";
 import { DeleteDialog } from "./DeleteDialog";
 import { UploadDrop } from "./UploadDrop";
+import { DownloadLink, OpenInDrive } from "./DriveLinks";
 
 const btn = "label border border-seam px-3 py-2 text-xs text-phosphor hover:border-field disabled:opacity-40";
 const field = "w-full border border-seam bg-ink px-3 py-2 text-sm text-phosphor";
@@ -25,7 +26,6 @@ export function TapeView({ projectId, tapeId, role, username }: { projectId: num
   const [name, setName] = useState<string | null>(null);
   const [notes, setNotes] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [driveUrl, setDriveUrl] = useState<string | null>(null);
 
   const isAdmin = role === "admin";
   const newestFirst = [...iterations].reverse();
@@ -34,19 +34,6 @@ export function TapeView({ projectId, tapeId, role, username }: { projectId: num
   const filesDelete = deletions.find("tape_files", tapeId);
   const projectDelete = deletions.find("project", projectId);
   const locked = !!(filesDelete || projectDelete);
-
-  // The Drive link for the Final download; media-link's token is never kept.
-  const latestId = isFinal ? latest?.id : undefined;
-  useEffect(() => {
-    if (latestId === undefined) return;
-    let live = true;
-    editorApi<{ drive_url: string | null }>(`/iterations/${latestId}/media-link`)
-      .then((r) => live && setDriveUrl(r.drive_url))
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [latestId]);
 
   async function run(action: () => Promise<unknown>) {
     setActionError(null);
@@ -123,14 +110,10 @@ export function TapeView({ projectId, tapeId, role, username }: { projectId: num
       {isFinal && latest?.drive_file_id && !tape.files_deleted_at && (
         <div className="flex flex-wrap items-center gap-3 border border-signal bg-bezel p-4">
           <span className="label text-sm text-signal">Final: v{latest.version}</span>
-          <button type="button" disabled={locked} onClick={() => driveDownload(latest.drive_file_id!)} className={btn}>
+          <DownloadLink fileId={latest.drive_file_id} disabled={locked} className={btn}>
             Download Final
-          </button>
-          {driveUrl && (
-            <a href={driveUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-dim hover:text-phosphor">
-              Open in Drive ↗
-            </a>
-          )}
+          </DownloadLink>
+          <OpenInDrive fileId={latest.drive_file_id} />
           {isAdmin && !locked && (
             <button type="button" onClick={() => setDeleting(true)} className={`${btn} ml-auto border-rec text-rec`}>
               Delete files

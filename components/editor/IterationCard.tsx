@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { driveDownload, editorApi } from "@/lib/editorApi";
+import { duration, editorApi } from "@/lib/editorApi";
 import { routeHash } from "@/lib/useHashRoute";
 import type { Checks, CheckState, Iteration } from "@/lib/useTape";
 import type { Tape, TapeStatus } from "@/lib/useProject";
 import { StatusSelect } from "./StatusLabel";
+import { DownloadLink, OpenInDrive } from "./DriveLinks";
 
 const CHECKS = [
   ["resolution", "Resolution"],
@@ -40,6 +41,12 @@ export function CheckBadges({ checks }: { checks: Checks | null }) {
       })}
     </span>
   );
+}
+
+/** The measured length (spec: duration is shown, not checked); nothing when it was not measured. */
+function Duration({ checks }: { checks: Checks | null }) {
+  const s = checks && typeof checks === "object" ? checks.duration_s : null;
+  return typeof s === "number" && Number.isFinite(s) && s > 0 ? <span className="osd text-lg text-dim">{duration(s)}</span> : null;
 }
 
 export function Thumbnail({ iteration }: { iteration: Iteration }) {
@@ -99,6 +106,7 @@ export function IterationCard({
       <div className="space-y-2 p-3">
         <div className="flex items-baseline justify-between gap-2">
           <h4 className="osd text-2xl">v{iteration.version}</h4>
+          <Duration checks={iteration.checks} />
           {!ready && <span className="label text-[11px] text-amber">{iteration.status}</span>}
           <button type="button" aria-expanded={open} aria-label={`v${iteration.version} menu`} onClick={() => setOpen(!open)} className={btn}>
             ⋯
@@ -114,9 +122,9 @@ export function IterationCard({
           )}
           <StatusSelect name={tape.name} status={tape.status} role={role} onChange={onStatus} />
           {ready && iteration.drive_file_id && (
-            <button type="button" disabled={locked} onClick={() => driveDownload(iteration.drive_file_id!)} className={btn}>
+            <DownloadLink fileId={iteration.drive_file_id} disabled={locked} className={btn}>
               Download
-            </button>
+            </DownloadLink>
           )}
         </div>
       </div>
@@ -126,26 +134,16 @@ export function IterationCard({
 
 /**
  * The version route until Plan 5B's player: details, Download and Open in
- * Drive. The Drive link comes from media-link; its access token is dropped
- * on the floor, never kept.
+ * Drive, both built from the file id (no media-link, so no token in the page).
  */
 export function IterationDetails({ iterationId }: { iterationId: number }) {
   const [it, setIt] = useState<Iteration | null>(null);
-  const [driveUrl, setDriveUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
     editorApi<{ iteration: Iteration }>(`/iterations/${iterationId}`)
-      .then(({ iteration }) => {
-        if (!live) return;
-        setIt(iteration);
-        if (iteration.status === "ready") {
-          return editorApi<{ drive_url: string | null }>(`/iterations/${iterationId}/media-link`).then(
-            (r) => live && setDriveUrl(r.drive_url),
-          );
-        }
-      })
+      .then(({ iteration }) => live && setIt(iteration))
       .catch((e: Error) => live && setError(e.message));
     return () => {
       live = false;
@@ -166,19 +164,16 @@ export function IterationDetails({ iterationId }: { iterationId: number }) {
             <p className="text-dim">
               {it.uploaded_at ? `Uploaded ${new Date(it.uploaded_at * 1000).toLocaleString()}` : `Upload ${it.status}`}
             </p>
+            <Duration checks={it.checks} />
             <CheckBadges checks={it.checks} />
-            <div className="flex flex-wrap items-center gap-3">
-              {it.status === "ready" && it.drive_file_id && (
-                <button type="button" onClick={() => driveDownload(it.drive_file_id!)} className={btn}>
+            {it.status === "ready" && it.drive_file_id && (
+              <div className="flex flex-wrap items-center gap-3">
+                <DownloadLink fileId={it.drive_file_id} className={btn}>
                   Download
-                </button>
-              )}
-              {driveUrl && (
-                <a href={driveUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-dim hover:text-phosphor">
-                  Open in Drive ↗
-                </a>
-              )}
-            </div>
+                </DownloadLink>
+                <OpenInDrive fileId={it.drive_file_id} />
+              </div>
+            )}
           </div>
         </div>
       )}

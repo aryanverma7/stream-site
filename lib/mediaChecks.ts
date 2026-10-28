@@ -148,7 +148,8 @@ export function measureMedia(file: File): Promise<Measure> {
         d === null || !v.videoWidth
           ? null
           : await capped(measureFps(v).catch(() => null), 10000),
-      bitrate_mbps: d === null ? null : round1((file.size * 8) / d / 1e6),
+      // No decodable picture: the size/duration would grade the audio (or nothing) as video bitrate.
+      bitrate_mbps: d === null || !v.videoWidth ? null : round1((file.size * 8) / d / 1e6),
     };
   });
 }

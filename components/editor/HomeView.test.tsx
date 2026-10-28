@@ -18,31 +18,43 @@ describe("HomeView", () => {
 
   it("renders each bucket with its action", async () => {
     editorBackend({ "/home": HOME });
-    const { findByRole, getByRole, getByText } = render(<HomeView />);
-    expect(await findByRole("button", { name: "Download VOD" })).toBeTruthy();
+    const { findByRole, getByRole, getByText } = render(<HomeView role="editor" username="cutter" />);
+    expect(await findByRole("link", { name: "Download VOD" })).toBeTruthy();
     expect(getByRole("button", { name: "Confirm delete" })).toBeTruthy();
     expect(getByRole("link", { name: "Jett dash" }).getAttribute("href")).toBe("#/p/3/t/5");
     expect(getByText("v2 · 3 open comments")).toBeTruthy();
   });
 
-  it("downloads through the shared flow: records the click, then Google's direct link", async () => {
-    const fetchMock = editorBackend({ "/home": HOME, "POST /projects/1/download": { drive_url: "https://drive.google.com/file/d/FILE_1/view" } });
-    const assign = vi.fn();
-    vi.spyOn(window, "location", "get").mockReturnValue({ ...window.location, assign });
-    const { findByRole } = render(<HomeView />);
-    fireEvent.click(await findByRole("button", { name: "Download VOD" }));
-    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://drive.usercontent.google.com/download?id=FILE_1&export=download"));
-    expect(fetchMock.mock.calls.some(([u, i]) => u === "/api/editor/projects/1/download" && i?.method === "POST")).toBe(true);
+  it("downloads from a real new-tab link to Google, recording the click without waiting for it", async () => {
+    const fetchMock = editorBackend({ "/home": HOME, "POST /projects/1/download": { drive_url: "x" } });
+    const { findByRole, getByRole } = render(<HomeView role="editor" username="cutter" />);
+    const link = await findByRole("link", { name: "Download VOD" });
+    expect(link.getAttribute("href")).toBe("https://drive.usercontent.google.com/download?id=FILE_1&export=download");
+    expect(link.getAttribute("target")).toBe("_blank");
+    fireEvent.click(link);
+    expect(fetchMock.mock.calls.some(([u, i]) => u === "/api/editor/projects/1/download" && i?.method === "POST" && i.keepalive)).toBe(true);
+    expect(getByRole("link", { name: /Open in Drive/ }).getAttribute("href")).toBe("https://drive.google.com/file/d/FILE_1/view");
+  });
+
+  it("shows a live VOD delete on a ready VOD, and disables its Download", async () => {
+    editorBackend({
+      "/home": HOME,
+      "/deletions": { pending: [{ id: 3, kind: "vod", target_id: 1, label: "s1.mp4", requested_by: "aryan", delete_at: 1, remaining_seconds: 600, status: "pending" }] },
+    });
+    const { findByText, getByRole, queryByRole } = render(<HomeView role="editor" username="cutter" />);
+    await findByText("Deleting in 10 min");
+    expect((getByRole("button", { name: "Download VOD" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(queryByRole("link", { name: "Download VOD" })).toBeNull();
   });
 
   it("Confirm delete opens the dialog against the VOD's file name", async () => {
     const fetchMock = editorBackend({ "/home": HOME, "POST /deletions": { request_id: 1 } });
-    const { findByRole, getByLabelText, getByRole } = render(<HomeView />);
+    const { findByRole, getByLabelText, getByRole } = render(<HomeView role="editor" username="cutter" />);
     fireEvent.click(await findByRole("button", { name: "Confirm delete" }));
     fireEvent.change(getByLabelText("Type the name to confirm"), { target: { value: "s2.mp4" } });
     fireEvent.click(getByRole("button", { name: "Delete in an hour" }));
     await waitFor(() => {
-      const call = fetchMock.mock.calls.find(([u]) => u === "/api/editor/deletions")!;
+      const call = fetchMock.mock.calls.find(([u, i]) => u === "/api/editor/deletions" && i?.method === "POST")!;
       expect(JSON.parse(String(call[1]!.body))).toEqual({ kind: "vod", target_id: 2, confirm: "s2.mp4" });
     });
   });
