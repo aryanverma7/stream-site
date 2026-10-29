@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { useMediaFile } from "./useMediaFile";
 import { CHUNK_BYTES, dirName } from "./opfsMedia";
-import { asFetchMock, fakeDir, fakeStorage } from "./testUtils";
+import { asFetchMock, editorBackend, fakeDir, fakeStorage } from "./testUtils";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -45,5 +45,16 @@ describe("useMediaFile", () => {
     const { result } = renderHook(() => useMediaFile({ id: 1, drive_file_id: "NEW", size: 10 }, 7, null));
     await waitFor(() => expect(result.current.state).toBe("complete"));
     expect([...root.dirs.keys()]).toEqual(["it-7-1-NEW"]);
+  });
+
+  it("getLink stamps the absolute expiry when fetched and keeps it while cached", async () => {
+    setup();
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    editorBackend({ "/iterations/1/media-link": { url: "u", access_token: "t", expires_in: 3600 } });
+    const { result } = renderHook(() => useMediaFile({ id: 1, drive_file_id: "F", size: 0 }, 7, null));
+    await waitFor(() => expect(result.current.state).toBe("complete"));
+    expect((await result.current.getLink()).expires_at).toBe(1_000_000 + 3_600_000);
+    now.mockReturnValue(2_000_000);
+    expect((await result.current.getLink()).expires_at).toBe(1_000_000 + 3_600_000);
   });
 });

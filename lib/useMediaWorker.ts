@@ -24,7 +24,9 @@ export function useMediaWorker() {
   const infos = useRef(new Map<number, MediaInfo>());
 
   const send = useCallback(async (iterationId: number, info: MediaInfo, fresh: boolean) => {
-    const link = await info.getLink(fresh);
+    const got = await info.getLink(fresh);
+    // a cached link's expires_in is its lifetime when fetched, not what is left
+    const link = { ...got, expires_at: got.expires_at ?? Date.now() + got.expires_in * 1000 };
     const { projectId, fileId, size, mime } = info;
     navigator.serviceWorker?.controller?.postMessage({ type: "media", iterationId, projectId, fileId, size, mime, link });
   }, []);

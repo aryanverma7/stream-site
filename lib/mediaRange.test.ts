@@ -51,3 +51,13 @@ describe("planRange", () => {
     expect(range.planRange(100, 199, [true])).toEqual([{ source: "disk", chunk: 0, from: 100, to: 199 }]);
   });
 });
+
+describe("linkFresh", () => {
+  it("is fresh until a minute before the absolute expiry", () => {
+    const l = { url: "u", access_token: "t", expires_in: 3600, expires_at: 100_000 };
+    expect(range.linkFresh(l, 39_999)).toBe(true);
+    expect(range.linkFresh(l, 40_000)).toBe(false);
+    expect(range.linkFresh({ url: "u", access_token: "t", expires_in: 3600 }, 0)).toBe(false);
+    expect(range.linkFresh(null, 0)).toBe(false);
+  });
+});

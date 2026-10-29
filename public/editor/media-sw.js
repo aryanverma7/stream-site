@@ -9,7 +9,7 @@
 importScripts("/editor/media-range.js");
 
 var LINK_WAIT_MS = 15000;
-var media = new Map(); // iterationId (string) -> {projectId, fileId, size, mime, link, at}
+var media = new Map(); // iterationId (string) -> {projectId, fileId, size, mime, link}
 var waiting = new Map(); // iterationId -> [resolve]
 
 self.addEventListener("install", function () {
@@ -23,13 +23,13 @@ self.addEventListener("message", function (e) {
   var d = e.data;
   if (!d || d.type !== "media") return;
   var id = String(d.iterationId);
-  media.set(id, { projectId: d.projectId, fileId: d.fileId, size: d.size, mime: d.mime, link: d.link, at: Date.now() });
+  media.set(id, { projectId: d.projectId, fileId: d.fileId, size: d.size, mime: d.mime, link: d.link });
   (waiting.get(id) || []).forEach(function (resolve) { resolve(); });
   waiting.delete(id);
 });
 
 function fresh(m) {
-  return m && m.link && Date.now() - m.at < (m.link.expires_in - 60) * 1000;
+  return !!m && linkFresh(m.link, Date.now());
 }
 
 /** The version's info with a usable token, asking the page when needed; null after 15 s. */

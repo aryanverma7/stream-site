@@ -34,7 +34,8 @@ export class NotEnoughStorage extends FatalMediaError {
   }
 }
 
-export type MediaLink = { url: string; access_token: string; expires_in: number };
+/** `expires_at` (ms epoch) is stamped by useMediaFile when the link is fetched; expires_in is its lifetime then. */
+export type MediaLink = { url: string; access_token: string; expires_in: number; expires_at?: number };
 
 /** When each version directory was last opened (ms), written by useMediaFile. */
 export const opened = new Map<string, number>();

@@ -50,6 +50,11 @@ function planRange(start, end, present) {
   return pieces;
 }
 
+/** A link is usable until a minute before its absolute expires_at (ms epoch). */
+function linkFresh(link, now) {
+  return !!link && typeof link.expires_at === "number" && now < link.expires_at - 60000;
+}
+
 if (typeof module !== "undefined") {
-  module.exports = { CHUNK_BYTES: CHUNK_BYTES, chunkName: chunkName, dirName: dirName, chunkLength: chunkLength, parseRange: parseRange, planRange: planRange };
+  module.exports = { CHUNK_BYTES: CHUNK_BYTES, chunkName: chunkName, dirName: dirName, chunkLength: chunkLength, parseRange: parseRange, planRange: planRange, linkFresh: linkFresh };
 }

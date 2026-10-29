@@ -31,8 +31,10 @@ export function useMediaFile(iteration: Iteration | null, projectId: number, com
     async (fresh = false) => {
       const c = cache.current;
       if (!fresh && c && (Date.now() - c.at) / 1000 < c.link.expires_in - 60) return c.link;
+      const at = Date.now();
       const link = await editorApi<MediaLink>(`/iterations/${id}/media-link`);
-      cache.current = { link, at: Date.now() };
+      link.expires_at = at + link.expires_in * 1000;
+      cache.current = { link, at };
       return link;
     },
     [id],
