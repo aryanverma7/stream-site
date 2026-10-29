@@ -110,6 +110,38 @@ describe("TapeView", () => {
     expect(JSON.parse(String(patch[1]!.body))).toEqual({ notes: "Trim the intro" });
   });
 
+  it("saves a second after typing stops (injected clock) and once more only if changed on blur", async () => {
+    const fetchMock = base("cutting", { "PATCH /tapes/5": (b: unknown) => tape("cutting", b as object) });
+    const timers: { fn: () => void; live: boolean }[] = [];
+    const delay = (fn: () => void) => {
+      const t = { fn, live: true };
+      timers.push(t);
+      return () => void (t.live = false);
+    };
+    const fire = () => timers.filter((t) => t.live).forEach((t) => ((t.live = false), t.fn()));
+    const patches = () => fetchMock.mock.calls.filter(([, i]) => i?.method === "PATCH").map(([, i]) => JSON.parse(String(i!.body)));
+    const { findByLabelText } = render(<TapeView projectId={12} tapeId={5} role="editor" username="cutter" delay={delay} />);
+    const notes = await findByLabelText("Notes");
+    fireEvent.change(notes, { target: { value: "Trim" } });
+    fireEvent.change(notes, { target: { value: "Trim the intro" } });
+    expect(patches()).toEqual([]);
+    fire();
+    await waitFor(() => expect(patches()).toEqual([{ notes: "Trim the intro" }]));
+    fireEvent.blur(notes);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(patches()).toHaveLength(1);
+  });
+
+  it("saves an edited name when the tape is left mid-edit", async () => {
+    const fetchMock = base("cutting", { "PATCH /tapes/5": (b: unknown) => tape("cutting", b as object) });
+    const { findByLabelText, unmount } = render(<TapeView projectId={12} tapeId={5} role="editor" username="cutter" delay={() => () => {}} />);
+    fireEvent.change(await findByLabelText("Name"), { target: { value: "Jett dash v2 " } });
+    unmount();
+    await waitFor(() => expect(fetchMock.mock.calls.some(([, i]) => i?.method === "PATCH")).toBe(true));
+    const patch = fetchMock.mock.calls.find(([, i]) => i?.method === "PATCH")!;
+    expect(JSON.parse(String(patch[1]!.body))).toEqual({ name: "Jett dash v2" });
+  });
+
   it("shows a pending files delete with Undo, and Undo brings the Final block back", async () => {
     let pending = [{ id: 3, kind: "tape_files", target_id: 5, label: "Jett dash", requested_by: "aryan", delete_at: 1, remaining_seconds: 3600, status: "pending" }];
     let itStatus = "deleting";

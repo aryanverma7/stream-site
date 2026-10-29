@@ -136,7 +136,7 @@ describe("useTransfers", () => {
     expect(calls(api, "POST", "/iterations/7/complete")).toHaveLength(1);
   });
 
-  it("cancel stops sending and forgets the entry", async () => {
+  it("cancel stops sending and hides the entry, keeping it only as abandoned", async () => {
     const mod = await fresh();
     backend({ "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" } }, { hold: 8 * MiB });
     const { result } = renderHook(() => mod.useTransfers());
@@ -144,8 +144,78 @@ describe("useTransfers", () => {
     await waitFor(() => expect(stored()[0]?.sent).toBe(8 * MiB));
     act(() => mod.cancelTransfer(result.current[0].key));
     await done;
-    expect(stored()).toEqual([]);
+    expect(stored()).toMatchObject([{ iterationId: 7, abandoned: true }]);
     expect(result.current).toEqual([]);
+  });
+
+  it("dropping a cancelled file again revives that version through /session, not as a new one", async () => {
+    const mod = await fresh();
+    localStorage.setItem(
+      "editor.uploads",
+      JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 8 * MiB, abandoned: true }]),
+    );
+    const { api, googleCalls } = backend({
+      "POST /iterations/7/session": { upload_url: "https://upload.example/new" },
+      "POST /iterations/7/complete": { id: 7, status: "ready" },
+      "PUT /iterations/7/media": { id: 7 },
+    });
+    const { result } = renderHook(() => mod.useTransfers());
+    expect(result.current).toEqual([]); // hidden while abandoned
+    await act(() => mod.startUpload(target, file()));
+    expect(calls(api, "POST", "/tapes/5/iterations")).toEqual([]);
+    expect(calls(api, "POST", "/iterations/7/session")).toHaveLength(1);
+    expect(googleCalls.every((c) => c.startsWith("https://upload.example/new"))).toBe(true);
+    expect(result.current[0]).toMatchObject({ version: 3, state: "done" });
+    expect(stored()).toEqual([]);
+  });
+
+  it("a cancelled version the server no longer takes is uploaded as a new version", async () => {
+    const mod = await fresh();
+    localStorage.setItem(
+      "editor.uploads",
+      JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0, abandoned: true }]),
+    );
+    const { api } = backend({
+      "POST /iterations/7/session": { status: 409, body: { error: "This version is not uploading" } },
+      "POST /tapes/5/iterations": { iteration_id: 8, version: 4, upload_url: "https://upload.example/s1" },
+      "POST /iterations/8/complete": { id: 8, status: "ready" },
+      "PUT /iterations/8/media": { id: 8 },
+    });
+    const { result } = renderHook(() => mod.useTransfers());
+    await act(() => mod.startUpload(target, file()));
+    expect(calls(api, "POST", "/tapes/5/iterations")).toHaveLength(1);
+    expect(result.current[0]).toMatchObject({ version: 4, state: "done" });
+  });
+
+  it("an expired session while the Mac Mini is down keeps asking for a new one", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const mod = await fresh();
+      localStorage.setItem(
+        "editor.uploads",
+        JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0 }]),
+      );
+      let down = true;
+      const { api } = backend(
+        {
+          "POST /iterations/7/session": () => (down ? { status: 502, body: { error: "Bad gateway" } } : { upload_url: "https://upload.example/new" }),
+          "POST /iterations/7/complete": { id: 7, status: "ready" },
+          "PUT /iterations/7/media": { id: 7 },
+        },
+        { expired: ["https://upload.example/old"] },
+      );
+      const { result } = renderHook(() => mod.useTransfers());
+      const done = mod.startUpload(target, file());
+      for (let i = 0; i < 20 && calls(api, "POST", "/iterations/7/session").length < 1; i++) await act(() => vi.advanceTimersByTimeAsync(10));
+      expect(result.current[0].state).toBe("retrying");
+      down = false;
+      await act(() => vi.advanceTimersByTimeAsync(5000));
+      await act(() => done);
+      expect(calls(api, "POST", "/iterations/7/session")).toHaveLength(2);
+      expect(result.current[0].state).toBe("done");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("cancel tells the server the version is abandoned, so it stops blocking deletes", async () => {
@@ -171,7 +241,7 @@ describe("useTransfers", () => {
     act(() => mod.cancelTransfer(result.current[0].key));
     await done;
     await new Promise((r) => setTimeout(r, 0));
-    expect(stored()).toEqual([]);
+    expect(stored()).toMatchObject([{ abandoned: true }]);
     expect(result.current).toEqual([]);
   });
 

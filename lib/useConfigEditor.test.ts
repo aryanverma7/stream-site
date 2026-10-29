@@ -78,4 +78,24 @@ describe("useConfigEditor", () => {
       body: JSON.stringify({ http_port: 9000 }),
     });
   });
+
+  it("a save that worked is not reported as failed when only the re-fetch fails", async () => {
+    let configStatus = 200;
+    const m = vi.fn((url: string, init?: RequestInit) => {
+      if (init?.method === "PUT") return Promise.resolve(json(200, { status: "ok" }));
+      if (url === "/api/config/schema") return Promise.resolve(json(200, SCHEMA));
+      return Promise.resolve(json(configStatus, { http_port: 8765 }));
+    });
+    global.fetch = asFetchMock(m);
+    const { result } = renderHook(() => useConfigEditor());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    configStatus = 502;
+    await act(async () => {
+      await result.current.save({ http_port: 9000 });
+    });
+    expect(result.current.saveError).toBeNull();
+    expect(result.current.saveSuccess).toBe(true);
+    expect(result.current.reloadFailed).toBe(true);
+    expect(result.current.saving).toBe(false);
+  });
 });

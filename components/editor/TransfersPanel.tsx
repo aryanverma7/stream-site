@@ -52,8 +52,10 @@ function Toast({ n }: { n: SpaceNotice }) {
  * Every upload in a corner: this tab's, and the unfinished ones a closed
  * browser left in localStorage (checked with the server on mount, so one
  * the reconcile job already finished disappears). The page asks before
- * closing while bytes are being sent or the file is being checked (closing
- * then would lose the checks and thumbnail).
+ * closing while bytes are being sent, or are about to be again (offline,
+ * retrying), or the file is being checked (closing then would lose the
+ * checks and thumbnail). "waiting" does not ask: the bytes are on Google and
+ * the reconcile job finishes the version.
  */
 export function TransfersPanel() {
   const transfers = useTransfers();
@@ -62,7 +64,7 @@ export function TransfersPanel() {
     void refreshStored();
   }, []);
 
-  const sending = transfers.some((t) => t.state === "uploading" || t.state === "checking");
+  const sending = transfers.some((t) => ["uploading", "offline", "retrying", "checking"].includes(t.state));
   useEffect(() => {
     if (!sending) return;
     const ask = (e: BeforeUnloadEvent) => {

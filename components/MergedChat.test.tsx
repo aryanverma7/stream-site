@@ -6,6 +6,7 @@ class MockWebSocket {
   static instances: MockWebSocket[] = [];
   url: string;
   onmessage: ((event: { data: string }) => void) | null = null;
+  onclose: (() => void) | null = null;
   closed = false;
 
   constructor(url: string) {
@@ -67,5 +68,22 @@ describe("MergedChat", () => {
 
     unmount();
     expect(ws.closed).toBe(true);
+  });
+
+  it("reconnects after a drop with a doubling delay, and stops on unmount", () => {
+    const waits: number[] = [];
+    let run = () => {};
+    const schedule = (fn: () => void, ms: number) => ((waits.push(ms), (run = fn)), () => void (run = () => {}));
+    const { unmount } = render(<MergedChat schedule={schedule} />);
+    MockWebSocket.instances[0].onclose?.();
+    run();
+    expect(MockWebSocket.instances).toHaveLength(2);
+    MockWebSocket.instances[1].onclose?.();
+    run();
+    expect(waits).toEqual([1000, 2000]);
+    expect(MockWebSocket.instances).toHaveLength(3);
+    unmount();
+    MockWebSocket.instances[2].onclose?.();
+    expect(waits).toHaveLength(2);
   });
 });

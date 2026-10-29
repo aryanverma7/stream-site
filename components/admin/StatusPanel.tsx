@@ -112,7 +112,7 @@ function OcrAgentBlock({ agent }: { agent: OcrAgentStatus | null | undefined }) 
             : `Last seen ${formatAge(lastSeen)}, past the ${agent.heartbeat_timeout_seconds}s cutoff.`}
         </p>
       )}
-      {!agent.tesseract_available && (
+      {agent.tesseract_available === false && (
         <p className="mt-1.5 text-[13px] leading-snug text-rec">
           Tesseract isn&apos;t where the Mac Mini expects it - every capture will come back 503.
         </p>
@@ -391,7 +391,7 @@ function buildFeeds(status: AdminStatus): Feed[] {
       : "up";
 
   const ocr = status.ocr_agent;
-  const ocrState: FeedState = !ocr ? "unknown" : !ocr.connected ? "down" : !ocr.tesseract_available ? "warn" : "up";
+  const ocrState: FeedState = !ocr ? "unknown" : !ocr.connected ? "down" : ocr.tesseract_available === false ? "warn" : "up";
 
   const obs: FeedState =
     status.obs_websocket_connected === null ? "unknown" : status.obs_websocket_connected ? "up" : "down";
@@ -484,12 +484,14 @@ function FeedTile({ feed, index }: { feed: Feed; index: number }) {
 /** The one line that answers "is anything broken" before any detail. */
 const SUMMARY_STICKER = { lost: "/stickers/scared.png", warn: "/stickers/huh.png", ok: "/stickers/king.png" };
 
-function Summary({ feeds }: { feeds: Feed[] }) {
+export function Summary({ feeds }: { feeds: Feed[] }) {
   const lost = feeds.filter((f) => f.state === "down");
   const warn = feeds.filter((f) => f.state === "warn");
   const ok = feeds.filter((f) => f.state === "up").length;
   const quiet = feeds.length - ok - lost.length - warn.length;
   const trouble = [...lost, ...warn];
+  // nothing lost and nothing up is "not reporting", not "OK"
+  const tone = lost.length > 0 ? "lost" : warn.length > 0 || ok === 0 ? "warn" : "ok";
 
   return (
     <div
@@ -499,7 +501,7 @@ function Summary({ feeds }: { feeds: Feed[] }) {
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- static export, local sticker */}
       <img
-        src={SUMMARY_STICKER[lost.length > 0 ? "lost" : warn.length > 0 ? "warn" : "ok"]}
+        src={SUMMARY_STICKER[tone]}
         alt=""
         className="sticker absolute -top-3 left-3 w-16 rotate-[-8deg] sm:w-20"
       />
@@ -508,7 +510,9 @@ function Summary({ feeds }: { feeds: Feed[] }) {
           ? `${lost.length} feed${lost.length === 1 ? "" : "s"} lost`
           : warn.length > 0
             ? `${warn.length} to check`
-            : "All feeds OK"}
+            : ok > 0
+              ? "All feeds OK"
+              : "Nothing reporting yet"}
       </p>
       <p className="osd flex flex-wrap gap-x-3 text-xl">
         <span className="whitespace-nowrap">{ok} ok</span>

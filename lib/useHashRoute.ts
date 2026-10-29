@@ -34,6 +34,9 @@ export function parseHash(hash: string): Route {
   return { view: "iteration", projectId, tapeId, iterationId, ...(Number.isFinite(seekS) && seekS >= 0 && { seekS }) };
 }
 
+/** Milliseconds at most, no trailing zeros: 222.5, 12, never 12.300000000000001 or 1e-7. */
+const seconds = (s: number) => String(Number(s.toFixed(3)));
+
 export function routeHash(route: Route): string {
   switch (route.view) {
     case "projects":
@@ -43,7 +46,7 @@ export function routeHash(route: Route): string {
     case "tape":
       return `#/p/${route.projectId}/t/${route.tapeId}`;
     case "iteration":
-      return `#/p/${route.projectId}/t/${route.tapeId}/v/${route.iterationId}${route.seekS !== undefined ? `@${route.seekS}` : ""}`;
+      return `#/p/${route.projectId}/t/${route.tapeId}/v/${route.iterationId}${route.seekS !== undefined ? `@${seconds(route.seekS)}` : ""}`;
     default:
       return `#/${route.view}`;
   }

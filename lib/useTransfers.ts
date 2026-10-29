@@ -12,8 +12,8 @@ import { grade, measureMedia, thumbnail } from "./mediaChecks";
  * again from Google's offset when the same file is dropped on that tape.
  *
  * The stored session URL can only put bytes into that one Drive file; it
- * is kept for exactly that and deleted on completion or cancel, never shown
- * or logged.
+ * is kept for exactly that and deleted on completion (a cancelled entry is
+ * kept, hidden, until the same file revives it), never shown or logged.
  */
 const KEY = "editor.uploads";
 // ponytail: no cross-tab lock. Tabs share these entries but not live state,
@@ -30,6 +30,8 @@ interface Stored {
   version: number;
   uploadUrl: string;
   sent: number;
+  /** Cancelled: hidden, kept only so dropping the same file revives this version (via /session) instead of making a new one. */
+  abandoned?: boolean;
 }
 
 export type TransferState = "uploading" | "offline" | "retrying" | "waiting" | "checking" | "paused" | "done" | "failed";
@@ -128,7 +130,7 @@ function getSnapshot(): Transfer[] {
   snapshot ??= [
     ...live.values(),
     ...load()
-      .filter((s) => !live.has(keyOf(s.tapeId, s)))
+      .filter((s) => !s.abandoned && !live.has(keyOf(s.tapeId, s)))
       .map((s): Transfer => ({
         key: keyOf(s.tapeId, s),
         tapeId: s.tapeId,
@@ -177,14 +179,14 @@ function describe(e: unknown): string {
   return e instanceof Error ? e.message : "Upload failed";
 }
 
-/** Mac Mini down or Drive hiccuping: keep asking, since the bytes are already safe on Google. */
-async function completeWhenReachable(key: string, iterationId: number, fileId: string, signal: AbortSignal) {
+/** Mac Mini down or Drive hiccuping: keep asking (a 4xx is the server's answer and is thrown). */
+async function whenReachable<T>(key: string, signal: AbortSignal, call: () => Promise<T>, meanwhile: TransferState = "waiting"): Promise<T> {
   for (let n = 0; ; n++) {
     try {
-      return await editorApi(`/iterations/${iterationId}/complete`, { method: "POST", body: { file_id: fileId } });
+      return await call();
     } catch (e) {
       if (e instanceof EditorApiError && e.status < 500) throw e;
-      update(key, { state: "waiting" });
+      update(key, { state: meanwhile });
       await sleep(Math.min(5 * 2 ** n, 300) * 1000, signal);
     }
   }
@@ -209,6 +211,8 @@ export async function startUpload(
   const signal = ctl.signal;
   const mime = file.type || "application/octet-stream";
   let entry = load().find((s) => keyOf(s.tapeId, s) === key);
+  const newSession = (iterationId: number) =>
+    whenReachable(key, signal, () => editorApi<{ upload_url: string }>(`/iterations/${iterationId}/session`, { method: "POST", body: { mime } }), "retrying");
   live.set(key, {
     key, tapeId, projectId, name: file.name, size: file.size,
     version: entry?.version ?? null, sent: entry?.sent ?? 0, speed: null, state: "uploading", message: null,
@@ -230,6 +234,21 @@ export async function startUpload(
     });
 
   try {
+    if (entry?.abandoned) {
+      // a cancelled version: the server puts it back to uploading with a fresh session
+      try {
+        const { upload_url } = await newSession(entry.iterationId);
+        if (signal.aborted) return;
+        entry = { ...entry, uploadUrl: upload_url, sent: 0, abandoned: false };
+        patchStored(key, { uploadUrl: upload_url, sent: 0, abandoned: false });
+        update(key, { sent: 0, state: "uploading" });
+      } catch (err) {
+        if (!(err instanceof EditorApiError && err.status === 409)) throw err;
+        patchStored(key, null); // it was finished or deleted meanwhile: upload as a new version
+        entry = undefined;
+        update(key, { version: null, sent: 0, state: "uploading" });
+      }
+    }
     if (!entry) {
       const space = await driveSpace();
       if (signal.aborted) return;
@@ -269,7 +288,7 @@ export async function startUpload(
       update(key, { sent: 0, message: "Google's upload session had expired, so this version is being sent again from the start" });
       let upload_url: string;
       try {
-        ({ upload_url } = await editorApi<{ upload_url: string }>(`/iterations/${id}/session`, { method: "POST", body: { mime } }));
+        ({ upload_url } = await newSession(id));
       } catch (err) {
         if (err instanceof EditorApiError && err.status === 409) {
           patchStored(key, null);
@@ -282,7 +301,7 @@ export async function startUpload(
       last = null;
       uploaded = await send(upload_url);
     }
-    await completeWhenReachable(key, id, uploaded.id, signal);
+    await whenReachable(key, signal, () => editorApi(`/iterations/${id}/complete`, { method: "POST", body: { file_id: uploaded.id } }));
     patchStored(key, null);
     update(key, { state: "checking", speed: null, message: null });
 
@@ -310,14 +329,18 @@ function abandon(iterationId: number) {
   fetch(`/api/editor/iterations/${iterationId}/abandon`, { method: "POST", credentials: "same-origin" }).catch(() => {});
 }
 
-/** Stops sending, forgets the upload and abandons its version; dropping the file again revives it. */
+/**
+ * Stops sending and abandons the version. Its stored entry stays, marked
+ * abandoned and hidden, so dropping the same file again revives that version
+ * through /session rather than creating the next one.
+ */
 export function cancelTransfer(key: string) {
   const entry = load().find((s) => keyOf(s.tapeId, s) === key);
   if (entry) abandon(entry.iterationId);
   controllers.get(key)?.abort();
   controllers.delete(key);
   live.delete(key);
-  patchStored(key, null);
+  if (entry) patchStored(key, { abandoned: true });
   emit();
 }
 

@@ -82,15 +82,15 @@ describe("TransfersPanel", () => {
   });
 
   it.each([
-    ["offline", "62% - paused, offline"],
-    ["retrying", "62% - connection trouble, retrying"],
-    ["waiting", "Sent - waiting for the Mac Mini"],
-    ["done", "Done"],
-  ] as const)("labels %s and does not prompt on close", (state, text) => {
+    ["offline", "62% - paused, offline", true],
+    ["retrying", "62% - connection trouble, retrying", true],
+    ["waiting", "Sent - waiting for the Mac Mini", false],
+    ["done", "Done", false],
+  ] as const)("labels %s; prompts on close: %s", (state, text, prompts) => {
     store.list = [t({ state })];
     const { getByText } = render(<TransfersPanel />);
     expect(getByText(text)).toBeTruthy();
-    expect(beforeUnloadBlocked()).toBe(false);
+    expect(beforeUnloadBlocked()).toBe(prompts);
   });
 
   it("asks before the page is closed while the file is being checked (checks and thumbnail not sent yet)", () => {
