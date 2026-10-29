@@ -34,3 +34,59 @@ export function editorBackend(table: Record<string, unknown>) {
   global.fetch = asFetchMock(mock);
   return mock;
 }
+
+/** In-memory stand-in for an OPFS directory: files hold a byte length only. */
+export function fakeDir(): FileSystemDirectoryHandle & { files: Map<string, number>; dirs: Map<string, ReturnType<typeof fakeDir>>; failWrites?: string } {
+  const files = new Map<string, number>();
+  const dirs = new Map<string, ReturnType<typeof fakeDir>>();
+  const dir = {
+    kind: "directory",
+    files,
+    dirs,
+    failWrites: undefined as string | undefined,
+    async getDirectoryHandle(name: string, o?: { create?: boolean }) {
+      if (!dirs.has(name)) {
+        if (!o?.create) throw new DOMException("missing", "NotFoundError");
+        dirs.set(name, fakeDir());
+      }
+      return dirs.get(name);
+    },
+    async getFileHandle(name: string, o?: { create?: boolean }) {
+      if (!files.has(name)) {
+        if (!o?.create) throw new DOMException("missing", "NotFoundError");
+        files.set(name, 0);
+      }
+      return {
+        kind: "file",
+        getFile: async () => ({ size: files.get(name) }),
+        createWritable: async () => {
+          let len = 0;
+          return {
+            write: async (b: Blob) => {
+              if (dir.failWrites) throw new DOMException("full", dir.failWrites);
+              len = b.size;
+            },
+            close: async () => void files.set(name, len),
+          };
+        },
+      };
+    },
+    async removeEntry(name: string) {
+      files.delete(name);
+      dirs.delete(name);
+    },
+    async *entries() {
+      for (const [n, d] of dirs) yield [n, d];
+      for (const n of files.keys()) yield [n, { kind: "file" }];
+    },
+  };
+  return dir as unknown as ReturnType<typeof fakeDir>;
+}
+
+/** Replaces navigator.storage with a fake whose quota/usage the test sets. */
+export function fakeStorage(root: FileSystemDirectoryHandle, state: { quota: number; usage: () => number }) {
+  Object.defineProperty(navigator, "storage", {
+    configurable: true,
+    value: { getDirectory: async () => root, estimate: async () => ({ quota: state.quota, usage: state.usage() }) },
+  });
+}
