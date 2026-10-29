@@ -99,6 +99,12 @@ describe("downloadToOpfs", () => {
     expect(sleep.mock.calls).toEqual([[2000], [4000]]);
   });
 
+  it("retries a 429 like a 5xx", async () => {
+    const calls = fakeFetch([{ status: 429 }]);
+    await setup(MIB).run();
+    expect(calls).toHaveLength(2);
+  });
+
   it("throws NotEnoughStorage before fetching when freeSpaceFor cannot make room", async () => {
     const calls = fakeFetch();
     await expect(setup(70 * MIB, 10 * MIB).run()).rejects.toBeInstanceOf(NotEnoughStorage);
@@ -153,11 +159,18 @@ describe("keepOnlyProject and freeSpaceFor", () => {
 
   it("two quick calls run in order", async () => {
     const root = await seeded();
+    const log: string[] = [];
+    const orig = root.removeEntry.bind(root);
+    root.removeEntry = async (n: string) => {
+      log.push("start " + n);
+      await new Promise((r) => setTimeout(r, 5));
+      await orig(n);
+      log.push("end " + n);
+    };
     await Promise.all([keepOnlyProject(null, root), keepOnlyProject(7, root)]);
-    expect(root.dirs.size).toBe(0);
-    const root2 = await seeded();
-    await Promise.all([keepOnlyProject(7, root2), keepOnlyProject(null, root2)]);
-    expect(root2.dirs.size).toBe(0);
+    // the second call's listing happens after the first finished: nothing left to remove
+    expect(log).toHaveLength(8);
+    expect(log.every((l, i) => l.startsWith(i % 2 ? "end" : "start"))).toBe(true);
   });
 
   it("freeSpaceFor deletes least recently opened first, never protected or another project's", async () => {
@@ -169,8 +182,8 @@ describe("keepOnlyProject and freeSpaceFor", () => {
     opened.set("it-7-2-b", 30);
     opened.set("it-7-3-c", 10);
     opened.set("it-7-4-d", 20);
-    await freeSpaceFor(60, 7, ["it-7-3-"], root);
-    expect([...root.dirs.keys()].sort()).toEqual(["it-3-1-a", "it-7-3-c"]);
+    await freeSpaceFor(40, 7, ["it-7-3-"], root);
+    expect([...root.dirs.keys()].sort()).toEqual(["it-3-1-a", "it-7-2-b", "it-7-3-c"]);
   });
 });
 

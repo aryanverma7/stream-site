@@ -16,7 +16,10 @@ export const dirName = (projectId: number, iterationId: number, fileId: string) 
 /** Bytes chunk `i` holds: CHUNK_BYTES, except the last. */
 export const chunkLength = (size: number, i: number) => Math.min(size, (i + 1) * CHUNK_BYTES) - i * CHUNK_BYTES;
 
-export class MediaGone extends Error {
+/** An error retrying cannot fix. */
+export class FatalMediaError extends Error {}
+
+export class MediaGone extends FatalMediaError {
   constructor(message = "This file is no longer on Drive") {
     super(message);
     this.name = "MediaGone";
@@ -24,7 +27,7 @@ export class MediaGone extends Error {
 }
 
 const gb = (n: number) => (n / 1024 ** 3).toFixed(1);
-export class NotEnoughStorage extends Error {
+export class NotEnoughStorage extends FatalMediaError {
   constructor(public needBytes: number, public freeBytes: number) {
     super(`Not enough browser storage: needs ${gb(needBytes)} GB, ${gb(freeBytes)} GB free`);
     this.name = "NotEnoughStorage";
@@ -166,20 +169,18 @@ export async function downloadToOpfs(opts: DownloadOpts): Promise<void> {
           await current(true);
           continue;
         }
-        if (res.status === 401) throw new Error("Drive refused the download link");
+        if (res.status === 401) throw new FatalMediaError("Drive refused the download link");
         if (res.status === 403 || res.status === 404) throw new MediaGone();
-        if (res.status === 200) throw new Error("Drive did not honour the range request");
+        if (res.status === 200) throw new FatalMediaError("Drive did not honour the range request");
         if (res.status !== 206) {
-          if (res.status >= 500) throw new Error(`Drive error ${res.status}`);
-          throw new Error(`Unexpected response ${res.status}`);
+          if (res.status >= 500 || res.status === 429) throw new Error(`Drive error ${res.status}`);
+          throw new FatalMediaError(`Unexpected response ${res.status}`);
         }
         const got = await res.blob();
         if (got.size !== want) throw new Error("Drive sent a short chunk");
         blob = got;
       } catch (e) {
-        if (signal.aborted || e instanceof MediaGone) throw e;
-        const msg = e instanceof Error ? e.message : "";
-        if (msg === "Drive did not honour the range request" || msg === "Drive refused the download link" || msg.startsWith("Unexpected")) throw e;
+        if (signal.aborted || e instanceof FatalMediaError) throw e;
         if (navigator.onLine === false) await waitOnline(signal);
         else await sleep(Math.min(2 * 2 ** n, 60) * 1000);
         n++;
