@@ -10,6 +10,8 @@ export type FieldMeta = {
   unit?: string;
   min?: number;
   max?: number;
+  // true: flag while empty; a key name: flag while empty and that bool setting is on.
+  needed?: boolean | string;
 };
 export type Schema = { sections: string[]; fields: Record<string, FieldMeta> };
 export type NewField = { key: string; type: FieldType; section: string; value: unknown };
@@ -34,6 +36,20 @@ export function searchFields(schema: Schema, query: string): string[] {
     const m = schema.fields[k];
     return [k, m.label, m.description].some((s) => s.toLowerCase().includes(q));
   });
+}
+
+const isEmpty = (v: unknown) =>
+  v === undefined || v === null || v === "" ||
+  (Array.isArray(v) ? v.length === 0 : typeof v === "object" && Object.keys(v as object).length === 0);
+
+/** Needed settings that are still empty, in section order. A masked secret counts as filled. */
+export function missingFields(schema: Schema, config: Record<string, unknown>): string[] {
+  return groupBySection(schema)
+    .flatMap((g) => g.keys)
+    .filter((k) => {
+      const need = schema.fields[k].needed;
+      return (need === true || (typeof need === "string" && config[need] === true)) && isEmpty(config[k]);
+    });
 }
 
 const isSimple = (v: unknown) =>
