@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { enqueue, flush, list, newClientId, remove, type Entry } from "./unsentQueue";
 
-const e = (id: string): Entry => ({ client_id: id, kind: "comment", iterationId: 1, payload: { body: id }, created_at: 1 });
+const e = (id: string, username = "me"): Entry => ({ client_id: id, kind: "comment", iterationId: 1, payload: { body: id }, created_at: 1, username });
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -24,11 +24,21 @@ describe("unsentQueue", () => {
     await flush(async (x) => {
       seen.push(x.client_id);
       return x.client_id === "a" ? "drop" : "retry";
-    });
+    }, "me");
     expect(seen).toEqual(["a", "b"]);
     expect(list().map((x) => x.client_id)).toEqual(["b", "c"]);
-    await flush(async () => "sent");
+    await flush(async () => "sent", "me");
     expect(list()).toEqual([]);
+  });
+
+  it("sends only the signed-in person's entries and leaves the others", async () => {
+    enqueue(e("a", "streamer"));
+    enqueue(e("b", "cutter"));
+    enqueue({ ...e("c"), username: undefined });
+    const seen: string[] = [];
+    await flush(async (x) => (seen.push(x.client_id), "sent"), "cutter");
+    expect(seen).toEqual(["b"]);
+    expect(list().map((x) => x.client_id)).toEqual(["a", "c"]);
   });
 
   it("still sends when storage throws", async () => {
@@ -40,7 +50,7 @@ describe("unsentQueue", () => {
     });
     enqueue(e("m"));
     const send = vi.fn(async () => "sent" as const);
-    await flush(send);
+    await flush(send, "me");
     expect(send).toHaveBeenCalledTimes(1);
     remove("m");
     expect(list()).toEqual([]);
@@ -53,7 +63,7 @@ describe("unsentQueue", () => {
     enqueue(e("q"));
     expect(list().map((x) => x.client_id)).toEqual(["q"]);
     const send = vi.fn(async () => "sent" as const);
-    await flush(send);
+    await flush(send, "me");
     expect(send).toHaveBeenCalledTimes(1);
     expect(list()).toEqual([]);
   });

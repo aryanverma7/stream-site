@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CHUNK_BYTES, MediaGone, NotEnoughStorage, chunkName, dirName, downloadToOpfs, freeSpaceFor, keepOnlyProject, opened } from "./opfsMedia";
+import { CHUNK_BYTES, FatalMediaError, MediaGone, NotEnoughStorage, chunkName, dirName, downloadToOpfs, freeSpaceFor, holdLocks, keepOnlyProject, opened } from "./opfsMedia";
+import { EditorApiError } from "./editorApi";
 import { asFetchMock, fakeDir, fakeStorage } from "./testUtils";
 
 const MIB = 1024 * 1024;
 const link = { url: "https://www.googleapis.com/drive/v3/files/F?alt=media", access_token: "t1", expires_in: 3600 };
-type Res = { status: number; size?: number };
-const ok = (r: Res) => ({ status: r.status, blob: async () => ({ size: r.size ?? 0 }) });
+type Res = { status: number; size?: number; json?: unknown };
+const ok = (r: Res) => ({ status: r.status, blob: async () => ({ size: r.size ?? 0 }), json: async () => r.json ?? {} });
 
 /** A fetch answering 206 with exactly the requested range unless `script` says otherwise. */
 function fakeFetch(script: Res[] = []) {
@@ -129,6 +130,48 @@ describe("downloadToOpfs", () => {
     await expect(setup(MIB).run()).rejects.toBeInstanceOf(MediaGone);
   });
 
+  it("a 403 rate limit is retried; any other 403 is MediaGone", async () => {
+    const limited = { error: { errors: [{ reason: "userRateLimitExceeded" }] } };
+    const calls = fakeFetch([{ status: 403, json: limited }]);
+    await setup(MIB).run();
+    expect(calls).toHaveLength(2);
+    fakeFetch([{ status: 403, json: { error: { errors: [{ reason: "forbidden" }] } } }]);
+    await expect(setup(MIB).run()).rejects.toBeInstanceOf(MediaGone);
+  });
+
+  it("a final media-link answer is fatal with the server's words; a passing one is retried and reported", async () => {
+    fakeFetch();
+    const gone = vi.fn(async () => {
+      throw new EditorApiError(404, "This file is no longer on Drive");
+    });
+    const s = setup(MIB);
+    await expect(s.run({ getLink: gone })).rejects.toThrow(new FatalMediaError("This file is no longer on Drive"));
+    expect(gone).toHaveBeenCalledTimes(1);
+    let n = 0;
+    const flaky = vi.fn(async () => {
+      if (n++ === 0) throw new EditorApiError(503, "Drive is not connected");
+      return link;
+    });
+    const onRetry = vi.fn();
+    await setup(MIB).run({ getLink: flaky, onRetry });
+    expect(onRetry).toHaveBeenCalledWith("Drive is not connected");
+  });
+
+  it("gives up after five short chunks in a row", async () => {
+    const calls = fakeFetch(Array.from({ length: 6 }, () => ({ status: 206, size: 1 })));
+    await expect(setup(MIB).run()).rejects.toBeInstanceOf(FatalMediaError);
+    expect(calls).toHaveLength(5);
+  });
+
+  it("creates no folder once aborted", async () => {
+    fakeFetch();
+    const ctl = new AbortController();
+    ctl.abort();
+    const s = setup(MIB);
+    await expect(s.run({ signal: ctl.signal })).rejects.toThrow();
+    expect(s.root.dirs.size).toBe(0);
+  });
+
   it("refuses a 200 for part of the file", async () => {
     fakeFetch([{ status: 200, size: 40 * MIB }]);
     const s = setup(40 * MIB);
@@ -192,6 +235,66 @@ describe("keepOnlyProject and freeSpaceFor", () => {
     opened.set("it-7-4-d", 20);
     await freeSpaceFor(40, 7, ["it-7-3-"], root);
     expect([...root.dirs.keys()].sort()).toEqual(["it-3-1-a", "it-7-2-b", "it-7-3-c"]);
+  });
+});
+
+describe("another tab's locks", () => {
+  function fakeLocks() {
+    const held: { name: string }[] = [];
+    const locks = {
+      held,
+      request: async (name: string, _o: unknown, cb: () => Promise<void>) => {
+        const l = { name };
+        held.push(l);
+        try {
+          await cb();
+        } finally {
+          held.splice(held.indexOf(l), 1);
+        }
+      },
+      query: async () => ({ held: [...held] }),
+    };
+    Object.defineProperty(navigator, "locks", { configurable: true, value: locks });
+    return locks;
+  }
+  afterEach(() => void delete (navigator as unknown as { locks?: unknown }).locks);
+
+  async function seeded() {
+    const root = fakeDir();
+    fakeStorage(root, { quota: 100, usage: () => 0 });
+    for (const n of ["it-3-1-a", "it-7-2-b", "it-7-3-c"]) await root.getDirectoryHandle(n, { create: true });
+    return root;
+  }
+
+  it("keepOnlyProject skips a project another tab holds, not one this page holds", async () => {
+    const locks = fakeLocks();
+    const root = await seeded();
+    locks.held.push({ name: "opfs-project-3" }); // the other tab
+    await keepOnlyProject(null, root);
+    expect([...root.dirs.keys()]).toEqual(["it-3-1-a"]);
+    locks.held.length = 0;
+    const release = holdLocks(["opfs-project-3"]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(locks.held).toHaveLength(1);
+    await keepOnlyProject(null, root);
+    expect(root.dirs.size).toBe(0);
+    release();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(locks.held).toHaveLength(0);
+  });
+
+  it("freeSpaceFor skips a version another tab holds", async () => {
+    const locks = fakeLocks();
+    const root = await seeded();
+    const free = { n: 0 };
+    fakeStorage(root, { quota: 100, usage: () => 100 - free.n });
+    const orig = root.removeEntry.bind(root);
+    root.removeEntry = async (n: string) => { free.n += 40; await orig(n); };
+    opened.set("it-7-2-b", 10);
+    opened.set("it-7-3-c", 20);
+    locks.held.push({ name: "opfs-version-it-7-2-b" });
+    await freeSpaceFor(40, 7, [], root);
+    expect([...root.dirs.keys()].sort()).toEqual(["it-3-1-a", "it-7-2-b"]);
   });
 });
 

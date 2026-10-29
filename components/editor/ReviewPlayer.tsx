@@ -5,9 +5,10 @@ import { editorApi } from "@/lib/editorApi";
 import { routeHash } from "@/lib/useHashRoute";
 import type { Iteration } from "@/lib/useTape";
 import { useMediaFile } from "@/lib/useMediaFile";
+import { dirName, holdLocks, projectLock, versionLock } from "@/lib/opfsMedia";
 import { mediaUrl, useMediaWorker } from "@/lib/useMediaWorker";
 import { useTape } from "@/lib/useTape";
-import { useComments } from "@/lib/useComments";
+import { useComments, type SeenFn } from "@/lib/useComments";
 import { usePlayerKeys } from "@/lib/usePlayerKeys";
 import { formatTime } from "@/lib/timecode";
 import { SPEEDS, downloadedRanges, fpsOf, mimeOf, startPosition } from "@/lib/playerLogic";
@@ -23,6 +24,30 @@ const SAVE_EVERY_MS = 10_000;
 const REPLY_WAIT_MS = 4_000;
 const OPEN_COMPOSER = "editor.openComposer";
 const RESUME_PLAYING = "editor.resumePlaying";
+const RESUME_WITHIN_MS = 30_000;
+const FLAGS = [OPEN_COMPOSER, RESUME_PLAYING];
+
+/**
+ * The one-shot flags hold the version they are for ("<iterationId>", the
+ * resume one "<iterationId>:<ms>"). Removes those whose target `drop` picks.
+ */
+function dropFlags(drop: (target: number) => boolean) {
+  try {
+    for (const k of FLAGS) {
+      const v = sessionStorage.getItem(k);
+      if (v !== null && drop(Number(v.split(":")[0]))) sessionStorage.removeItem(k);
+    }
+  } catch {
+    /* no storage: no flags */
+  }
+}
+const readFlag = (k: string) => {
+  try {
+    return sessionStorage.getItem(k);
+  } catch {
+    return null;
+  }
+};
 const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
 const gb = (n: number) => (n / 1024 ** 3).toFixed(1);
 
@@ -43,6 +68,7 @@ export function ReviewPlayer(props: ReviewPlayerProps) {
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const { iterations, tape, error: tapeError } = useTape(props.tapeId);
   // The tape list decides the compare partner, which useMediaFile must know
   // before its first run (it protects the partner's cached copy); so wait for it.
@@ -61,19 +87,64 @@ export function ReviewPlayer(props: ReviewPlayerProps) {
     let live = true;
     editorApi<Loaded>(`/iterations/${iterationId}`)
       .then((d) => live && setData(d))
-      .catch((e: Error) => live && setError(e.message));
+      .catch((e: Error) => {
+        if (!live) return;
+        dropFlags(() => true); // the version never opened: its flags must not fire on a later visit
+        setError(e.message);
+      });
     return () => {
       live = false;
     };
+  }, [iterationId, loadAttempt]);
+
+  // A flag for another version is stale; leaving the player drops this version's unused ones.
+  // The drop on leaving waits a microtask, so StrictMode's unmount-remount keeps them.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    dropFlags((t) => t !== iterationId);
+    return () => {
+      mounted.current = false;
+      queueMicrotask(() => !mounted.current && dropFlags((t) => t === iterationId));
+    };
   }, [iterationId]);
 
-  if (error) return <p className="text-rec">{error}</p>;
+  // /seen is posted once per version view, so a remount (Try again) keeps the first previous_seen_at.
+  const seenView = useRef<{ id: number; p: ReturnType<SeenFn> } | null>(null);
+  const seen = useCallback<SeenFn>(() => {
+    if (seenView.current?.id !== iterationId) {
+      const p = editorApi<{ previous_seen_at: number | null }>(`/iterations/${iterationId}/seen`, { method: "POST" });
+      p.catch(() => {});
+      seenView.current = { id: iterationId, p };
+    }
+    return seenView.current.p;
+  }, [iterationId]);
+
+  if (error)
+    return (
+      <section className="space-y-3">
+        <h2 tabIndex={-1} className="stencil text-4xl">
+          This version could not be opened
+        </h2>
+        <p className="text-rec">{error}</p>
+        <button
+          type="button"
+          className={btn}
+          onClick={() => {
+            setError(null);
+            setLoadAttempt((n) => n + 1);
+          }}
+        >
+          Try again
+        </button>
+      </section>
+    );
   // after a version switch the old version's data must not render under the new id
   if (!data || data.iteration.id !== iterationId) return <p className="osd text-xl text-dim">Loading…</p>;
-  return <Watch key={`${iterationId}-${attempt}`} {...props} data={data} retry={() => setAttempt(attempt + 1)} partner={partner} tapeReady={tapeReady} />;
+  return <Watch key={`${iterationId}-${attempt}`} {...props} data={data} retry={() => setAttempt(attempt + 1)} partner={partner} tapeReady={tapeReady} seen={seen} />;
 }
 
-function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Date.now, data, retry, partner, tapeReady }: ReviewPlayerProps & { data: Loaded; retry(): void; partner: Iteration | null; tapeReady: boolean }) {
+function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Date.now, data, retry, partner, tapeReady, seen }: ReviewPlayerProps & { data: Loaded; retry(): void; partner: Iteration | null; tapeReady: boolean; seen: SeenFn }) {
   const it = data.iteration;
   const media = useMediaFile(it.drive_file_id && tapeReady ? { id: it.id, drive_file_id: it.drive_file_id, size: it.size } : null, projectId, partner?.id ?? null);
   const [toast, setToast] = useState<string | null>(null);
@@ -83,18 +154,19 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
     return () => clearTimeout(t);
   }, [toast]);
   // One-shot flags, read once at mount: the card menu's Add comment, and V pressed while playing.
+  // Each counts only for the version it names (and resume only for 30 s).
   const wantComposer = useRef(false);
   const wantResume = useRef(false);
+  const clockAtMount = useRef(now);
   useEffect(() => {
-    try {
-      wantComposer.current = sessionStorage.getItem(OPEN_COMPOSER) !== null;
-      wantResume.current = sessionStorage.getItem(RESUME_PLAYING) !== null;
-      sessionStorage.removeItem(OPEN_COMPOSER);
-      sessionStorage.removeItem(RESUME_PLAYING);
-    } catch {
-      /* no storage: neither */
-    }
-  }, []);
+    wantComposer.current = readFlag(OPEN_COMPOSER) === String(iterationId);
+    const [target, at] = (readFlag(RESUME_PLAYING) ?? "").split(":");
+    wantResume.current = target === String(iterationId) && clockAtMount.current() - Number(at) < RESUME_WITHIN_MS;
+    dropFlags((t) => t === iterationId);
+  }, [iterationId]);
+  // Another tab must not delete what this one plays or downloads (see holdLocks).
+  const fileId = it.drive_file_id;
+  useEffect(() => holdLocks([projectLock(projectId), ...(fileId ? [versionLock(dirName(projectId, iterationId, fileId))] : [])]), [projectId, iterationId, fileId]);
   const worker = useMediaWorker();
   const [started, setStarted] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -106,7 +178,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
   const [sheet, setSheet] = useState(false);
   // start null: a general comment; a new start/end updates an open form without clearing its text
   const [composer, setComposer] = useState<{ start: number | null; end: number | null } | null>(null);
-  const cm = useComments(iterationId, { role, username });
+  const cm = useComments(iterationId, { role, username }, { seen });
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoKey, setVideoKey] = useState(0);
   const reloadAt = useRef<number | null>(null);
@@ -184,6 +256,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
   const reloadVideo = () => {
     reloadAt.current = video.current?.currentTime ?? lastTime.current;
     wantPlay.current = false;
+    setPaused(true); // the new element starts paused, and its play event is what says otherwise
     setVideoError(null);
     setStartError(null);
     setVideoKey((k) => k + 1);
@@ -232,7 +305,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
       const at = started ? video.current?.currentTime : undefined;
       if (started && video.current && !video.current.paused) {
         try {
-          sessionStorage.setItem(RESUME_PLAYING, "1");
+          sessionStorage.setItem(RESUME_PLAYING, `${partner.id}:${now()}`);
         } catch {
           /* no storage: the other version opens paused */
         }
@@ -291,45 +364,47 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
 
       {toast && <p role="status" className="text-amber">{toast}</p>}
 
-      {!started && (
-        <div className="space-y-3 border border-seam bg-bezel p-4">
-          <div className="flex items-center gap-3">
-            {ring}
-            <p>
-              {media.state === "complete"
-                ? "Downloaded"
-                : `Loading v${it.version} · ${gb(media.doneBytes)} of ${gb(media.total)} GB · ${pct}%`}
-            </p>
+      {/* the comments show while the version loads too, so fix notes can be read before playback */}
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {!started && (
+          <div className="space-y-3 self-start border border-seam bg-bezel p-4">
+            <div className="flex items-center gap-3">
+              {ring}
+              <p>
+                {media.state === "complete"
+                  ? "Downloaded"
+                  : `Loading v${it.version} · ${gb(media.doneBytes)} of ${gb(media.total)} GB · ${pct}%`}
+              </p>
+            </div>
+            {!uploaded && <p className="text-amber">This version isn&apos;t uploaded yet</p>}
+            {media.retrying && <p className="text-amber">Waiting for the Mac Mini / Drive: {media.retrying}</p>}
+            {storageNote}
+            {err && <p className="text-rec">{err}</p>}
+            <div className="flex flex-wrap items-center gap-2">
+              {uploaded && media.state === "complete" && (
+                <button type="button" className={btn} onClick={startWatching} disabled={!worker.ready}>
+                  Play
+                </button>
+              )}
+              {uploaded && canWatchNow && (
+                <button type="button" className={btn} onClick={startWatching} disabled={!worker.ready}>
+                  Start watching now
+                </button>
+              )}
+              {!worker.ready && !worker.error && lateWorker && <span className="text-amber">Reload the page to enable playback</span>}
+              {media.state === "error" && !storageOnly && (
+                <button type="button" className={btn} onClick={retry}>
+                  Try again
+                </button>
+              )}
+              <button type="button" className={btn} onClick={() => (window.location.hash = routeHash({ view: "tape", projectId, tapeId }))}>
+                Cancel
+              </button>
+            </div>
           </div>
-          {!uploaded && <p className="text-amber">This version isn&apos;t uploaded yet</p>}
-          {storageNote}
-          {err && <p className="text-rec">{err}</p>}
-          <div className="flex flex-wrap items-center gap-2">
-            {uploaded && media.state === "complete" && (
-              <button type="button" className={btn} onClick={startWatching} disabled={!worker.ready}>
-                Play
-              </button>
-            )}
-            {uploaded && canWatchNow && (
-              <button type="button" className={btn} onClick={startWatching} disabled={!worker.ready}>
-                Start watching now
-              </button>
-            )}
-            {!worker.ready && !worker.error && lateWorker && <span className="text-amber">Reload the page to enable playback</span>}
-            {media.state === "error" && !storageOnly && (
-              <button type="button" className={btn} onClick={retry}>
-                Try again
-              </button>
-            )}
-            <button type="button" className={btn} onClick={() => (window.location.hash = routeHash({ view: "tape", projectId, tapeId }))}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+        )}
 
-      {started && (
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {started && (
           <div ref={box} className="relative space-y-2 bg-ink">
             <video
               key={videoKey}
@@ -339,6 +414,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
               onClick={toggle}
               onLoadedMetadata={(e) => {
                 setDuration(e.currentTarget.duration);
+                e.currentTarget.playbackRate = SPEEDS[speed]; // a reloaded element starts at 1×
                 if (reloadAt.current !== null) e.currentTarget.currentTime = reloadAt.current;
                 reloadAt.current = null;
               }}
@@ -358,13 +434,26 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
             {err && (
               <p className="text-rec">
                 {err}{" "}
-                <button type="button" className={btn} onClick={videoError && !media.error && !worker.error ? reloadVideo : retry}>
+                <button type="button" className={btn} onClick={videoError && !(media.error && !storageOnly) && !worker.error ? reloadVideo : retry}>
                   Try again
                 </button>
               </p>
             )}
             {storageNote}
-            <ScrubBar duration={duration} current={current} downloaded={ranges} size={it.size} markers={markers} onSeek={seekTo} rangeMode={!!composer} onRangeSelect={(start, end) => setComposer({ start, end })} />
+            <ScrubBar
+              duration={duration}
+              current={current}
+              downloaded={ranges}
+              size={it.size}
+              markers={markers}
+              onSeek={seekTo}
+              rangeMode={!!composer}
+              onRangeSelect={(start, end) => {
+                leaveFullscreen(); // the composer is outside the fullscreen box
+                video.current?.pause();
+                setComposer({ start, end });
+              }}
+            />
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <button type="button" className={btn} onClick={toggle}>
                 {paused ? "Play" : "Pause"}
@@ -385,23 +474,24 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
             </div>
             {sheet && <KeySheet onClose={() => setSheet(false)} />}
           </div>
-          <div className="space-y-3">
-            {composer && (
-              <CommentComposer
-                start={composer.start}
-                end={composer.end}
-                getNow={() => video.current?.currentTime ?? current}
-                onSubmit={(draft) => {
-                  void cm.add(draft);
-                  setComposer(null);
-                }}
-                onCancel={() => setComposer(null)}
-              />
-            )}
-            <CommentPanel cm={cm} username={username} projectId={projectId} tapeId={tapeId} currentTime={current} onSeek={seekTo} now={now} />
-          </div>
+        )}
+        <div className="space-y-3">
+          {composer && (
+            <CommentComposer
+              start={composer.start}
+              end={composer.end}
+              getNow={() => video.current?.currentTime ?? current}
+              onSubmit={(draft) => {
+                void cm.add(draft);
+                setComposer(null);
+              }}
+              onCancel={() => setComposer(null)}
+            />
+          )}
+          {/* no seeking until there is something to seek */}
+          <CommentPanel cm={cm} username={username} projectId={projectId} tapeId={tapeId} currentTime={current} onSeek={started ? seekTo : undefined} now={now} />
         </div>
-      )}
+      </div>
       {!started && sheet && <KeySheet onClose={() => setSheet(false)} />}
     </section>
   );

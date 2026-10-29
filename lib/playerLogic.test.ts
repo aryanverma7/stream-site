@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CHUNK_BYTES } from "./opfsMedia";
-import { downloadedRanges, fpsOf, startPosition } from "./playerLogic";
+import { downloadedRanges, fpsOf, mimeOf, startPosition } from "./playerLogic";
 
 describe("playerLogic", () => {
   it("merges neighbouring present chunks and clips the last one", () => {
@@ -23,4 +23,10 @@ describe("playerLogic", () => {
     expect(fpsOf({ fps: { value: "x" } })).toBe(60);
     expect(fpsOf(null)).toBe(60);
   });
+});
+
+it("serves .mov as video/mp4 and keeps the other types", () => {
+  expect(mimeOf("cut.MOV")).toBe("video/mp4");
+  expect(mimeOf("cut.webm")).toBe("video/webm");
+  expect(mimeOf("cut.mkv")).toBe("video/x-matroska");
 });

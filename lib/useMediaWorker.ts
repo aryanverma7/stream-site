@@ -54,7 +54,10 @@ export function useMediaWorker() {
     const onMessage = (e: MessageEvent) => {
       if (e.data?.type !== "need-link") return;
       const info = infos.current.get(e.data.iterationId);
-      if (info) send(e.data.iterationId, info, true, true).catch(() => {}); // the worker answers 503 without a link
+      if (!info) return;
+      // a downloaded version plays from disk: answer at once, then fetch a link in the background
+      if (info.downloaded) void send(e.data.iterationId, info, false, false);
+      send(e.data.iterationId, info, true, true).catch(() => {}); // the worker answers 503 without a link
     };
     sw.addEventListener("message", onMessage);
     sw.register("/editor/media-sw.js", { scope: "/editor" })

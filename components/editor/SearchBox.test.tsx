@@ -50,4 +50,32 @@ describe("SearchBox", () => {
     fireEvent.keyDown(document.body, { key: "/" });
     expect(document.activeElement).toBe(screen.getByLabelText("Search comments"));
   });
+
+  it("a pick leaves the box, so the player's keys work again", () => {
+    render(<SearchBox />);
+    const box = screen.getByLabelText("Search comments");
+    box.focus();
+    fireEvent.change(box, { target: { value: "jet" } });
+    fireEvent.mouseDown(screen.getByText(/fix <b>/));
+    fireEvent.click(screen.getByText(/fix <b>/));
+    expect(document.activeElement).not.toBe(box);
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("closes when focus goes elsewhere, not when it moves to a hit", () => {
+    render(
+      <>
+        <SearchBox />
+        <button>elsewhere</button>
+      </>,
+    );
+    const box = screen.getByLabelText("Search comments");
+    box.focus();
+    fireEvent.change(box, { target: { value: "jet" } });
+    const hit = screen.getByText(/fix <b>/).closest("button")!;
+    fireEvent.blur(box, { relatedTarget: hit });
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    fireEvent.blur(hit, { relatedTarget: screen.getByText("elsewhere") });
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
 });

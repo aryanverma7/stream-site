@@ -68,4 +68,48 @@ describe("useComments", () => {
     expect(result.current.unsent).toHaveLength(1);
     expect(result.current.failed).toHaveLength(0);
   });
+
+  it("keeps the sent placeholder until the reloaded list has the comment", async () => {
+    let finish!: () => void;
+    let gets = 0;
+    const back = editorBackend({ "POST /iterations/7/seen": { previous_seen_at: null }, "POST /iterations/7/comments": { id: 9 } });
+    global.fetch = ((u: string, i?: RequestInit) => {
+      if (i?.method === "GET" && u.endsWith("/iterations/7") && ++gets > 1)
+        return new Promise((res) => (finish = () => res({ ok: true, status: 200, json: async () => ({ comments: [c({ id: 9 })] }) })));
+      return back(u, i);
+    }) as unknown as typeof fetch;
+    const { result } = renderHook(() => useComments(7, { role: "admin", username: "me" }, { schedule: noTimer }));
+    await waitFor(() => expect(gets).toBe(1));
+    let sending!: Promise<void>;
+    act(() => void (sending = result.current.add({ kind: "fix", body: "hi", start_s: 3, end_s: null })));
+    await waitFor(() => expect(gets).toBe(2));
+    expect(result.current.unsent).toHaveLength(1);
+    expect(result.current.comments).toHaveLength(0);
+    await act(async () => {
+      finish();
+      await sending;
+    });
+    expect(result.current.unsent).toHaveLength(0);
+    expect(result.current.comments).toHaveLength(1);
+  });
+
+  it("never sends or shows another person's queued entries, and drops a reused client_id with the message", async () => {
+    localStorage.setItem("editor.unsent", JSON.stringify([
+      { client_id: "a".repeat(32), kind: "comment", iterationId: 7, payload: { body: "theirs" }, created_at: 1, username: "streamer" },
+    ]));
+    const back = editorBackend({
+      "/iterations/7": { comments: [] },
+      "POST /iterations/7/seen": { previous_seen_at: null },
+      "POST /iterations/7/comments": { status: 409, body: { error: "client_id already used" } },
+    });
+    const { result } = renderHook(() => useComments(7, { role: "editor", username: "cutter" }, { schedule: noTimer }));
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+    expect(result.current.unsent).toHaveLength(0);
+    expect(back.mock.calls.some((x) => x[1]?.method === "POST" && String(x[0]).endsWith("/comments"))).toBe(false);
+    await act(() => result.current.add({ kind: "fix", body: "mine", start_s: null, end_s: null }));
+    expect(result.current.failed[0].message).toBe("client_id already used");
+    expect(JSON.parse(localStorage.getItem("editor.unsent")!).map((e: { username: string }) => e.username)).toEqual(["streamer"]);
+  });
 });

@@ -30,7 +30,7 @@ export function CommentItem({
   projectId: number;
   tapeId: number;
   pendingReplies: Entry[];
-  onSeek(s: number): void;
+  onSeek?(s: number): void;
 }) {
   const [reply, setReply] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export function CommentItem({
           <span className="label text-[10px] text-dim">{c.resolved ? "Resolved" : "Open"}</span>
         )}
         {timed ? (
-          <button type="button" data-player-keys aria-label={`Go to ${formatTime(c.start_s as number)}`} className="text-left" onClick={() => onSeek(c.start_s as number)}>
+          <button type="button" data-player-keys aria-label={`Go to ${formatTime(c.start_s as number)}`} className="text-left disabled:cursor-default" disabled={!onSeek} onClick={() => onSeek?.(c.start_s as number)}>
             {head}
           </button>
         ) : (

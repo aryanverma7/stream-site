@@ -35,14 +35,22 @@ function fresh(m) {
 
 /** Posts "need-link" to the page and waits (at most 15 s) for its "media" answer. */
 async function ask(id, clientId) {
+  var mine;
   var arrived = new Promise(function (resolve) {
+    mine = resolve;
     waiting.set(id, (waiting.get(id) || []).concat(resolve));
   });
+  var timer;
+  var timeout = new Promise(function (resolve) { timer = setTimeout(resolve, LINK_WAIT_MS); });
   var client = clientId ? await self.clients.get(clientId) : null;
   var targets = client ? [client] : await self.clients.matchAll({ type: "window" });
   targets.forEach(function (c) { c.postMessage({ type: "need-link", iterationId: Number(id) }); });
-  var timeout = new Promise(function (resolve) { setTimeout(resolve, LINK_WAIT_MS); });
   await Promise.race([arrived, timeout]);
+  clearTimeout(timer);
+  // a timed-out wait leaves its resolver behind otherwise
+  var left = (waiting.get(id) || []).filter(function (r) { return r !== mine; });
+  if (left.length) waiting.set(id, left);
+  else waiting.delete(id);
   return media.get(id) || null;
 }
 
@@ -54,12 +62,14 @@ async function info(id, clientId, force) {
   return fresh(m) ? m : null;
 }
 
-async function driveStream(id, clientId, m, piece) {
+async function driveStream(id, clientId, m, piece, signal) {
   for (var retried = false; ; retried = true) {
     var res = await fetch(m.link.url, {
       headers: { Authorization: "Bearer " + m.link.access_token, Range: "bytes=" + piece.from + "-" + piece.to },
+      signal: signal,
     });
     if (rangeAnswered(res.status, piece.from, piece.to, m.size)) return res.body;
+    if (res.body) res.body.cancel().catch(function () {}); // an unread error body would hold the connection
     if (res.status !== 401 || retried) throw new Error("Drive answered " + res.status);
     m = await info(id, clientId, true);
     if (!m) throw new Error("No playback link");
@@ -94,8 +104,10 @@ async function serve(id, rangeHeader, clientId) {
     if (!m) return new Response("Playback link unavailable", { status: 503 });
   }
 
+  // one controller per response: cancelling it aborts whichever Drive fetch is in flight
+  var abort = new AbortController();
   async function open(p) {
-    if (p.source === "drive") return driveStream(id, clientId, m, p);
+    if (p.source === "drive") return driveStream(id, clientId, m, p, abort.signal);
     var base = p.chunk * CHUNK_BYTES;
     var file = await (await dir.getFileHandle(chunkName(p.chunk))).getFile();
     return file.slice(p.from - base, p.to + 1 - base).stream();
@@ -114,11 +126,14 @@ async function serve(id, rangeHeader, clientId) {
         var chunk = await reader.read();
         if (!chunk.done) return ctl.enqueue(chunk.value);
         if (next >= pieces.length) return ctl.close();
-        reader = (await open(pieces[next++])).getReader();
+        var opened = (await open(pieces[next++])).getReader();
+        if (abort.signal.aborted) return opened.cancel(); // cancelled while it opened
+        reader = opened;
       }
     },
     cancel() {
-      return reader.cancel();
+      abort.abort();
+      return reader.cancel().catch(function () {});
     },
   });
   return new Response(body, {

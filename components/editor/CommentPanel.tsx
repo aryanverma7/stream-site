@@ -30,7 +30,8 @@ export function CommentPanel({
   projectId: number;
   tapeId: number;
   currentTime: number;
-  onSeek(s: number): void;
+  /** Absent while nothing is playable: the go-to buttons are then disabled. */
+  onSeek?(s: number): void;
   now?: () => number;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Open");

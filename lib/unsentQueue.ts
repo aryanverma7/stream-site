@@ -11,6 +11,8 @@ export type Entry = {
   commentId?: number;
   payload: Record<string, unknown>;
   created_at: number;
+  /** Who wrote it: only that person's session may send it (an entry without one is never sent). */
+  username?: string;
 };
 export type Outcome = "sent" | "retry" | "drop";
 
@@ -45,9 +47,9 @@ function save(entries: Entry[]) {
 export const enqueue = (e: Entry) => save([...list(), e]);
 export const remove = (clientId: string) => save(list().filter((e) => e.client_id !== clientId));
 
-/** Oldest first; stops at the first "retry" so order is kept. */
-export async function flush(send: (e: Entry) => Promise<Outcome>): Promise<void> {
-  for (const e of list()) {
+/** `username`'s entries, oldest first; stops at the first "retry" so order is kept. Others' entries wait for their own login. */
+export async function flush(send: (e: Entry) => Promise<Outcome>, username: string): Promise<void> {
+  for (const e of list().filter((x) => x.username === username)) {
     const r = await send(e);
     if (r === "retry") return;
     remove(e.client_id);

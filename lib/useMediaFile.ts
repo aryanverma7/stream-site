@@ -8,6 +8,8 @@ export type MediaFile = {
   doneBytes: number;
   total: number;
   error: string | null;
+  /** Set while a failed step waits to be retried: what went wrong. */
+  retrying: string | null;
   getLink(fresh?: boolean): Promise<MediaLink>;
 };
 
@@ -22,6 +24,7 @@ export function useMediaFile(iteration: Iteration | null, projectId: number, com
   const [state, setState] = useState<MediaFile["state"]>("checking");
   const [present, setPresent] = useState<boolean[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
   const cache = useRef<{ link: MediaLink; at: number } | null>(null);
   const id = iteration?.id ?? null;
   const fileId = iteration?.drive_file_id ?? "";
@@ -49,12 +52,16 @@ export function useMediaFile(iteration: Iteration | null, projectId: number, com
       setState("checking");
       setPresent([]);
       setError(null);
+      setRetrying(null);
       const name = dirName(projectId, id, fileId);
       opened.set(name, Date.now());
       const root = await navigator.storage.getDirectory();
+      ctl.signal.throwIfAborted();
       for (const n of await versionDirs(root)) {
+        ctl.signal.throwIfAborted();
         if (n.startsWith(`it-${projectId}-${id}-`) && n !== name) await root.removeEntry(n, { recursive: true }).catch(() => {});
       }
+      ctl.signal.throwIfAborted();
       await downloadToOpfs({
         projectId,
         iterationId: id,
@@ -64,15 +71,21 @@ export function useMediaFile(iteration: Iteration | null, projectId: number, com
         signal: ctl.signal,
         root,
         protect: comparePartnerId === null ? [] : [`it-${projectId}-${comparePartnerId}-`],
+        onRetry: (m) => !ctl.signal.aborted && setRetrying(m),
         onProgress: (p) => {
           if (ctl.signal.aborted) return;
+          setRetrying(null);
           setPresent(p);
           setState(p.every(Boolean) ? "complete" : "downloading");
         },
       });
-      if (!ctl.signal.aborted) setState("complete");
+      if (!ctl.signal.aborted) {
+        setRetrying(null);
+        setState("complete");
+      }
     })().catch((e) => {
       if (ctl.signal.aborted) return;
+      setRetrying(null);
       setError(e instanceof Error ? e.message : "Download failed");
       setState("error");
     });
@@ -80,5 +93,5 @@ export function useMediaFile(iteration: Iteration | null, projectId: number, com
   }, [id, fileId, size, projectId, comparePartnerId, getLink]);
 
   const doneBytes = present.reduce((s, p, i) => s + (p ? chunkLength(size, i) : 0), 0);
-  return { state, present, doneBytes, total: size, error, getLink };
+  return { state, present, doneBytes, total: size, error, retrying, getLink };
 }
