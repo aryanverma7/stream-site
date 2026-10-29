@@ -78,7 +78,7 @@ export function useComments(
             sent = true;
             return "sent";
           } catch (err) {
-            // 4xx is the server's final answer (a 401 is an expired session: keep it for after login)
+            // 4xx is the server's final answer, except 401: editorApi is already sending the browser to login, and the entry must survive to be sent after it
             if (err instanceof EditorApiError && err.status >= 400 && err.status < 500 && err.status !== 401) {
               setFailed((f) => [...f, { client_id: e.client_id, message: err.message, body: String(e.payload.body ?? "") }]);
               return "drop";

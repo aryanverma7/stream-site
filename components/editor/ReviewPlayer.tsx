@@ -149,8 +149,8 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
     general: () => started && setComposer((c) => ({ start: null, end: null, n: (c?.n ?? 0) + 1 })),
     help: () => setSheet((s) => !s),
     escape: () => {
-      if (sheet) setSheet(false);
-      else if (composer) setComposer(null);
+      if (composer) setComposer(null);
+      else if (sheet) setSheet(false);
       else return false;
       return true;
     },

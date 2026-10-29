@@ -15,12 +15,15 @@ export type Entry = {
 export type Outcome = "sent" | "retry" | "drop";
 
 const KEY = "editor.unsent";
-let mem: Entry[] = []; // ponytail: used only while localStorage throws; lost on reload
+let mem: Entry[] = [];
+let useMem = false; // true once a write failed: memory is then the truth even if reads still work
+// ponytail: used only while localStorage throws; lost on reload
 
 /** 32 hex characters, which fits the backend's client_id pattern. */
 export const newClientId = () => crypto.randomUUID().replaceAll("-", "");
 
 export function list(): Entry[] {
+  if (useMem) return mem;
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? "[]");
     return Array.isArray(v) ? v : [];
@@ -32,8 +35,10 @@ export function list(): Entry[] {
 function save(entries: Entry[]) {
   try {
     localStorage.setItem(KEY, JSON.stringify(entries));
+    useMem = false;
   } catch {
     mem = entries;
+    useMem = true;
   }
 }
 

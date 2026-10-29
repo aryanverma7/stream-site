@@ -46,6 +46,18 @@ describe("unsentQueue", () => {
     expect(list()).toEqual([]);
   });
 
+  it("keeps and sends entries when only setItem throws", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("quota");
+    });
+    enqueue(e("q"));
+    expect(list().map((x) => x.client_id)).toEqual(["q"]);
+    const send = vi.fn(async () => "sent" as const);
+    await flush(send);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(list()).toEqual([]);
+  });
+
   it("makes 32-hex client ids", () => {
     expect(newClientId()).toMatch(/^[0-9a-f]{32}$/);
   });

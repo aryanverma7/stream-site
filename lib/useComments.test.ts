@@ -56,4 +56,16 @@ describe("useComments", () => {
     expect(result.current.failed[0].message).toBe("body is empty");
     expect(result.current.unsent).toHaveLength(0);
   });
+
+  it("keeps a 401 entry in the queue and does not report it as failed", async () => {
+    editorBackend({
+      "/iterations/7": { comments: [] },
+      "POST /iterations/7/seen": { previous_seen_at: null },
+      "POST /iterations/7/comments": { status: 401, body: { error: "Sign in" } },
+    });
+    const { result } = renderHook(() => useComments(7, { role: "editor", username: "me" }, { schedule: noTimer }));
+    await act(() => result.current.add({ kind: "fix", body: "q", start_s: null, end_s: null }));
+    expect(result.current.unsent).toHaveLength(1);
+    expect(result.current.failed).toHaveLength(0);
+  });
 });

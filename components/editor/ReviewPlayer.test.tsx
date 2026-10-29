@@ -158,6 +158,20 @@ describe("ReviewPlayer", () => {
     expect(await screen.findByRole("form", { name: "General comment" })).toBeInTheDocument();
   });
 
+  it("Esc closes the composer before the key sheet", async () => {
+    await open();
+    loaded(await watch());
+    fireEvent.keyDown(document.body, { key: "g" });
+    await screen.findByLabelText("Comment text");
+    fireEvent.keyDown(document.body, { key: "?" });
+    await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByLabelText("Comment text")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Keyboard shortcuts" })).toBeNull();
+  });
+
   it("saves the position at most every 10 s on an injected clock", async () => {
     let t = 1_000_000;
     await open({}, () => t);
