@@ -4,6 +4,7 @@ import {
   buildPayload,
   changedKeys,
   groupBySection,
+  missingFields,
   searchFields,
   validateField,
   validateNewKey,
@@ -132,5 +133,33 @@ describe("buildPayload", () => {
         b: { type: "number", section: "Other" },
       },
     });
+  });
+});
+
+describe("missingFields", () => {
+  const f = (section: string, needed?: boolean | string, type: FieldMeta["type"] = "text"): FieldMeta =>
+    ({ label: "L", description: "", section, type, needed });
+  const schema: Schema = {
+    sections: ["A", "B"],
+    fields: {
+      token: f("B", true, "secret"),
+      users: f("A", true, "list"),
+      bot: f("B", "dm_on", "secret"),
+      dm_on: f("B", undefined, "bool"),
+      extra: f("A"),
+    },
+  };
+
+  it("lists empty needed settings in section order and skips filled, masked or optional ones", () => {
+    expect(missingFields(schema, { token: "", users: [], bot: "", dm_on: false, extra: "" })).toEqual(["users", "token"]);
+    expect(missingFields(schema, { token: SECRET_MASK, users: ["me"], bot: "", dm_on: false })).toEqual([]);
+  });
+
+  it("flags a conditional setting only while its switch is on", () => {
+    expect(missingFields(schema, { token: SECRET_MASK, users: ["me"], bot: "", dm_on: true })).toEqual(["bot"]);
+  });
+
+  it("treats an absent key as empty", () => {
+    expect(missingFields(schema, { users: ["me"] })).toEqual(["token"]);
   });
 });

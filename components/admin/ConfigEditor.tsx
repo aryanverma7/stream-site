@@ -7,6 +7,7 @@ import {
   buildPayload,
   changedKeys,
   groupBySection,
+  missingFields,
   searchFields,
   validateField,
   type NewField,
@@ -128,6 +129,32 @@ export function ConfigEditor() {
   );
 }
 
+/** Red banner naming every needed setting still empty; each name jumps to its field. */
+function MissingSettings({ keys, schema, onJump }: { keys: string[]; schema: Schema; onJump: (key: string) => void }) {
+  if (!keys.length) return null;
+  return (
+    <div role="alert" className="mb-4 border border-rec bg-rec/10 px-4 py-3">
+      <p className="text-sm font-bold text-rec">
+        {keys.length === 1 ? "1 important setting is empty" : `${keys.length} important settings are empty`}
+      </p>
+      <ul className="mt-2 flex flex-wrap gap-2">
+        {keys.map((k) => (
+          <li key={k}>
+            <button
+              type="button"
+              onClick={() => onJump(k)}
+              className="border border-rec/60 px-2 py-1 text-xs text-phosphor hover:bg-rec/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-field"
+            >
+              <span className="text-dim">{schema.fields[k].section} · </span>
+              {schema.fields[k].label}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 type EditorProps = Omit<ReturnType<typeof useConfigEditor>, "config"> & { config: Record<string, unknown> };
 
 function SettingsEditor({ config, schema: rawSchema, schemaMissing, saving, saveError, saveErrorField, save }: EditorProps) {
@@ -206,6 +233,14 @@ function SettingsEditor({ config, schema: rawSchema, schemaMissing, saving, save
       })()
     : groups.filter((g) => g.section === activeView);
 
+  // From the saved config, not the draft: the banner clears once a save lands.
+  const missing = schema ? missingFields(schema, config) : [];
+  const jumpTo = (key: string) => {
+    setQuery("");
+    setView(schema!.fields[key].section);
+    requestAnimationFrame(() => document.getElementById(`setting-${key}`)?.focus());
+  };
+
   const row = (key: string) => {
     const meta = schema!.fields[key];
     const id = `setting-${key}`;
@@ -222,6 +257,7 @@ function SettingsEditor({ config, schema: rawSchema, schemaMissing, saving, save
           </label>
           <code className="font-mono text-[11px] text-dim">{key}</code>
           {isChanged && <span className="text-[10px] font-bold uppercase tracking-widest text-field">Changed</span>}
+          {missing.includes(key) && <span className="text-[10px] font-bold uppercase tracking-widest text-rec">Needed</span>}
         </div>
         {meta.description && <p className="mb-2 max-w-prose text-[13px] leading-snug text-dim">{meta.description}</p>}
         <FieldInput
@@ -259,6 +295,8 @@ function SettingsEditor({ config, schema: rawSchema, schemaMissing, saving, save
       </nav>
 
       <div className="min-w-0 flex-1">
+        {schema && <MissingSettings keys={missing} schema={schema} onJump={jumpTo} />}
+
         {schema && (
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <label htmlFor="settings-search" className="sr-only">

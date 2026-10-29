@@ -106,6 +106,36 @@ describe("ConfigEditor", () => {
     expect(utils.getByText("aryanverma7")).toBeTruthy();
   });
 
+  it("names empty needed settings in a red banner and jumps to one on click", async () => {
+    const schema: Schema = {
+      ...SCHEMA,
+      fields: {
+        ...SCHEMA.fields,
+        streamlabs_access_token: { ...SCHEMA.fields.streamlabs_access_token, needed: true },
+        admin_github_users: { ...SCHEMA.fields.admin_github_users, needed: true },
+      },
+    };
+    mockBackend({ schema, config: { ...CONFIG, admin_github_users: [] } });
+    const utils = await renderLoaded();
+
+    const banner = utils.getByRole("alert");
+    expect(banner.textContent).toContain("1 important setting is empty");
+    // The masked secret counts as filled.
+    expect(within(banner).queryByText("Streamlabs access token")).toBeNull();
+
+    fireEvent.click(within(banner).getByRole("button", { name: /Admin GitHub users/ }));
+    expect(utils.getByText("Needed")).toBeTruthy();
+    expect(utils.getByText("admin_github_users")).toBeTruthy();
+  });
+
+  it("shows no banner when every needed setting is filled", async () => {
+    mockBackend({
+      schema: { ...SCHEMA, fields: { ...SCHEMA.fields, http_port: { ...SCHEMA.fields.http_port, needed: true } } },
+    });
+    const utils = await renderLoaded();
+    expect(utils.queryByRole("alert")).toBeNull();
+  });
+
   it("search finds a field in another section by its description", async () => {
     mockBackend();
     const utils = await renderLoaded();
