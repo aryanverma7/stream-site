@@ -120,6 +120,22 @@ export function IterationCard({
               Play
             </a>
           )}
+          {ready && (
+            <button
+              type="button"
+              className={btn}
+              onClick={() => {
+                try {
+                  sessionStorage.setItem("editor.openComposer", "1");
+                } catch {
+                  /* the player just opens without the composer */
+                }
+                window.location.hash = play;
+              }}
+            >
+              Add comment
+            </button>
+          )}
           <StatusSelect name={tape.name} status={tape.status} role={role} onChange={onStatus} />
           {ready && iteration.drive_file_id && (
             <DownloadLink fileId={iteration.drive_file_id} disabled={locked} className={btn}>

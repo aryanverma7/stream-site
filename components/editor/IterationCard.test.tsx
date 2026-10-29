@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { CheckBadges, IterationCard, IterationDetails } from "./IterationCard";
 import type { Checks, Iteration } from "@/lib/useTape";
 import type { Tape } from "@/lib/useProject";
@@ -44,6 +44,17 @@ describe("IterationCard", () => {
     const { getByText, getByRole } = render(<IterationCard iteration={it2({ checks: { duration_s: 222 } as Checks })} tape={tape} role="editor" onStatus={() => {}} locked />);
     expect(getByText("3:42")).toBeTruthy();
     expect((getByRole("button", { name: "Download" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+describe("IterationCard Add comment", () => {
+  it("sets the one-shot flag and goes to the version", () => {
+    editorBackend({ "/iterations/2": { comments: [] } });
+    sessionStorage.clear();
+    const { getByRole } = render(<IterationCard iteration={it2()} tape={tape} role="editor" onStatus={() => {}} locked={false} />);
+    fireEvent.click(getByRole("button", { name: "Add comment" }));
+    expect(sessionStorage.getItem("editor.openComposer")).toBe("1");
+    expect(window.location.hash).toBe("#/p/12/t/5/v/2");
   });
 });
 
