@@ -12,6 +12,7 @@ import { ReviewPlayer } from "./ReviewPlayer";
 import { isTyping } from "@/lib/isTyping";
 import { keepOnlyProject } from "@/lib/opfsMedia";
 import { Bell } from "./Bell";
+import { SearchBox } from "./SearchBox";
 import { HomeView } from "./HomeView";
 import { FixListView } from "./FixListView";
 import { TodoView } from "./TodoView";
@@ -133,6 +134,7 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
           <span className="osd hidden text-xl sm:inline">Editor</span>
         </div>
         <div className="flex items-center gap-4">
+          {me && <SearchBox />}
           {me && <Bell role={me.role} />}
           <form method="post" action="/auth/logout">
             <button

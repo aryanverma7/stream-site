@@ -6,7 +6,8 @@ import { ReviewPlayer } from "./ReviewPlayer";
 const GB = 1024 ** 3;
 const media = { state: "downloading", present: [true, false], doneBytes: 1.2 * GB, total: 3.4 * GB, error: null as string | null, getLink: vi.fn() };
 const worker = { ready: true, error: null as string | null, provide: vi.fn(async () => {}) };
-vi.mock("@/lib/useMediaFile", () => ({ useMediaFile: () => media }));
+const mediaSpy = vi.fn();
+vi.mock("@/lib/useMediaFile", () => ({ useMediaFile: (...a: unknown[]) => (mediaSpy(...a), media) }));
 vi.mock("@/lib/useMediaWorker", async () => ({
   ...(await vi.importActual<object>("@/lib/useMediaWorker")),
   useMediaWorker: () => worker,
@@ -253,5 +254,44 @@ describe("ReviewPlayer", () => {
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(zoomOut).toHaveBeenCalledTimes(1);
     window.removeEventListener("keydown", onKey);
+  });
+
+  describe("compare and the card's Add comment", () => {
+    const withTape = (t: Record<string, unknown>) =>
+      editorBackend({ "/iterations/7": { iteration: IT, comments: [], position_s: 100 }, "PUT /iterations/7/position": { ok: true }, ...t });
+    const tapeOf = (...v: [number, number, string][]) => ({ "/tapes/2": { tape: { id: 2 }, iterations: v.map(([id, version, status]) => ({ id, version, status })) } });
+    beforeEach(() => {
+      window.location.hash = "";
+      sessionStorage.clear();
+    });
+
+    it("V goes to the previous ready version at the current time, and hands it to useMediaFile", async () => {
+      withTape(tapeOf([5, 2, "ready"], [6, 4, "uploading"], [7, 3, "ready"]));
+      await open();
+      await waitFor(() => expect(mediaSpy).toHaveBeenLastCalledWith(expect.anything(), 1, 5));
+      expect(screen.getByText("Comparing v2 ↔ v3 · V to switch")).toBeInTheDocument();
+      loaded(await watch());
+      time = 12.5;
+      fireEvent.keyDown(document.body, { key: "v" });
+      expect(window.location.hash).toBe("#/p/1/t/2/v/5@12.5");
+    });
+
+    it("V with no earlier version shows a toast and stays", async () => {
+      withTape(tapeOf([7, 3, "ready"]));
+      await open();
+      loaded(await watch());
+      fireEvent.keyDown(document.body, { key: "v" });
+      expect(await screen.findByText("No earlier version to compare")).toBeInTheDocument();
+      expect(window.location.hash).toBe("");
+    });
+
+    it("opens the composer once at the resume time when the card set the flag, then clears it", async () => {
+      sessionStorage.setItem("editor.openComposer", "1");
+      await open({ seekS: 42 });
+      expect(sessionStorage.getItem("editor.openComposer")).toBeNull();
+      loaded(await watch());
+      expect(await screen.findByRole("button", { name: /Save|Add|Post|Send/i })).toBeInTheDocument();
+      expect(time).toBe(42);
+    });
   });
 });

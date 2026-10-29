@@ -6,6 +6,7 @@ import { routeHash } from "@/lib/useHashRoute";
 import type { Iteration } from "@/lib/useTape";
 import { useMediaFile } from "@/lib/useMediaFile";
 import { mediaUrl, useMediaWorker } from "@/lib/useMediaWorker";
+import { useTape } from "@/lib/useTape";
 import { useComments } from "@/lib/useComments";
 import { usePlayerKeys } from "@/lib/usePlayerKeys";
 import { formatTime } from "@/lib/timecode";
@@ -52,13 +53,40 @@ export function ReviewPlayer(props: ReviewPlayerProps) {
   }, [iterationId]);
 
   if (error) return <p className="text-rec">{error}</p>;
-  if (!data) return <p className="osd text-xl text-dim">Loading…</p>;
+  // after a version switch the old version's data must not render under the new id
+  if (!data || data.iteration.id !== iterationId) return <p className="osd text-xl text-dim">Loading…</p>;
   return <Watch key={`${iterationId}-${attempt}`} {...props} data={data} retry={() => setAttempt(attempt + 1)} />;
 }
 
 function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Date.now, data, retry }: ReviewPlayerProps & { data: Loaded; retry(): void }) {
   const it = data.iteration;
-  const media = useMediaFile(it.drive_file_id ? { id: it.id, drive_file_id: it.drive_file_id, size: it.size } : null, projectId, null);
+  const { iterations } = useTape(tapeId);
+  // Compare partner: the newest ready version below this one; on the latest
+  // version that is the previous one, anywhere else the next newer one.
+  const partner = useMemo(() => {
+    const ready = iterations.filter((i) => i.status === "ready" && i.id !== it.id).sort((a, b) => a.version - b.version);
+    const newer = ready.find((i) => i.version > it.version);
+    const lower = ready.filter((i) => i.version < it.version).pop();
+    const isLatest = !ready.some((i) => i.version > it.version);
+    return (isLatest ? lower : newer) ?? lower ?? null;
+  }, [iterations, it.id, it.version]);
+  const media = useMediaFile(it.drive_file_id ? { id: it.id, drive_file_id: it.drive_file_id, size: it.size } : null, projectId, partner?.id ?? null);
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
+  // One-shot flag from the card menu's Add comment; read once, at mount.
+  const wantComposer = useRef(false);
+  useEffect(() => {
+    try {
+      wantComposer.current = sessionStorage.getItem("editor.openComposer") !== null;
+      sessionStorage.removeItem("editor.openComposer");
+    } catch {
+      /* no storage: no composer */
+    }
+  }, []);
   const worker = useMediaWorker();
   const [started, setStarted] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -105,6 +133,13 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
     v.currentTime = startPosition(seekS, data.position_s, duration);
   }, [duration, seekS, data.position_s, started]);
 
+  useEffect(() => {
+    if (!wantComposer.current || !started || !(duration > 0)) return;
+    wantComposer.current = false;
+    video.current?.pause();
+    setComposer((c) => ({ start: video.current?.currentTime ?? 0, end: null, n: (c?.n ?? 0) + 1 }));
+  }, [started, duration]);
+
   async function startWatching() {
     setStartError(null);
     try {
@@ -147,6 +182,11 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
       setComposer((c) => ({ start: video.current?.currentTime ?? 0, end: null, n: (c?.n ?? 0) + 1 }));
     },
     general: () => started && setComposer((c) => ({ start: null, end: null, n: (c?.n ?? 0) + 1 })),
+    compare: () => {
+      if (!partner) return setToast("No earlier version to compare");
+      const at = started ? video.current?.currentTime : undefined;
+      window.location.hash = routeHash({ view: "iteration", projectId, tapeId, iterationId: partner.id, ...(at !== undefined && { seekS: Math.round(at * 100) / 100 }) });
+    },
     help: () => setSheet((s) => !s),
     escape: () => {
       if (composer) setComposer(null);
@@ -177,6 +217,11 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
           Version {it.version}
         </h2>
         <CheckBadges checks={it.checks} />
+        {partner && (
+          <span className="label text-[11px] text-dim">
+            Comparing v{Math.min(it.version, partner.version)} ↔ v{Math.max(it.version, partner.version)} · V to switch
+          </span>
+        )}
         {it.drive_file_id && (
           <>
             <DownloadLink fileId={it.drive_file_id} className={btn}>
@@ -186,6 +231,8 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
           </>
         )}
       </header>
+
+      {toast && <p role="status" className="text-amber">{toast}</p>}
 
       {!started && (
         <div className="space-y-3 border border-seam bg-bezel p-4">
