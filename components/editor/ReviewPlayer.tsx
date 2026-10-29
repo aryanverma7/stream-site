@@ -68,6 +68,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, sidePanel, now = Date.no
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(2);
   const [sheet, setSheet] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const fps = fpsOf(it.checks);
@@ -143,7 +144,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, sidePanel, now = Date.no
       setSheet(false);
       return true;
     },
-  });
+  }, { container: box });
 
   const markers: Marker[] = useMemo(
     () =>
@@ -156,7 +157,8 @@ function Watch({ projectId, tapeId, iterationId, seekS, sidePanel, now = Date.no
   const ring = <DownloadRing doneBytes={media.doneBytes} total={media.total} />;
   const pct = media.total > 0 ? Math.round((media.doneBytes / media.total) * 100) : 0;
   const canWatchNow = media.state !== "complete" && (media.state !== "error" || storageOnly);
-  const err = (media.error && !storageOnly ? media.error : null) ?? worker.error ?? startError;
+  const err = (media.error && !storageOnly ? media.error : null) ?? worker.error ?? startError ?? videoError;
+  const uploaded = !!it.drive_file_id;
 
   return (
     <section className="space-y-3">
@@ -182,18 +184,19 @@ function Watch({ projectId, tapeId, iterationId, seekS, sidePanel, now = Date.no
             <p>
               {media.state === "complete"
                 ? "Downloaded"
-                : `Downloading ${gb(media.doneBytes)} of ${gb(media.total)} GB (${pct}%)`}
+                : `Loading v${it.version} · ${gb(media.doneBytes)} of ${gb(media.total)} GB · ${pct}%`}
             </p>
           </div>
+          {!uploaded && <p className="text-amber">This version isn&apos;t uploaded yet</p>}
           {storageOnly && <p className="text-amber">Streaming only: not enough browser storage to save it</p>}
           {err && <p className="text-rec">{err}</p>}
           <div className="flex flex-wrap items-center gap-2">
-            {media.state === "complete" && (
+            {uploaded && media.state === "complete" && (
               <button type="button" className={btn} onClick={startWatching} disabled={!worker.ready}>
                 Play
               </button>
             )}
-            {canWatchNow && (
+            {uploaded && canWatchNow && (
               <button type="button" className={btn} onClick={startWatching} disabled={!worker.ready}>
                 Start watching now
               </button>
@@ -226,12 +229,15 @@ function Watch({ projectId, tapeId, iterationId, seekS, sidePanel, now = Date.no
                 setCurrent(e.currentTarget.currentTime);
                 if (!e.currentTarget.paused) save();
               }}
+              onError={() => setVideoError("The video could not be played")}
               onPlay={() => setPaused(false)}
               onPause={() => {
                 setPaused(true);
                 save();
               }}
             />
+            {err && <p className="text-rec">{err}</p>}
+            {storageOnly && <p className="text-amber">Streaming only: not enough browser storage to save it</p>}
             <ScrubBar duration={duration} current={current} downloaded={ranges} size={it.size} markers={markers} onSeek={seekTo} onRangeSelect={() => {}} />
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <button type="button" className={btn} onClick={toggle}>

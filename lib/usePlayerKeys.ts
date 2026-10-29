@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import { isTyping } from "./isTyping";
 
 export type PlayerKeyHandlers = {
@@ -22,7 +22,7 @@ export type PlayerKeyHandlers = {
  * Single-key shortcuts on window, in the capture phase so Esc can stop the
  * shell's zoom-out. Ignored while typing and with Ctrl/Alt/Meta held.
  */
-export function usePlayerKeys(handlers: PlayerKeyHandlers, { enabled = true }: { enabled?: boolean } = {}) {
+export function usePlayerKeys(handlers: PlayerKeyHandlers, { enabled = true, container }: { enabled?: boolean; container?: RefObject<HTMLElement | null> } = {}) {
   const ref = useRef(handlers);
   useEffect(() => {
     ref.current = handlers;
@@ -33,6 +33,9 @@ export function usePlayerKeys(handlers: PlayerKeyHandlers, { enabled = true }: {
       if (e.ctrlKey || e.altKey || e.metaKey || isTyping(e)) return;
       const h = ref.current;
       const el = e.target as HTMLElement | null;
+      // Only inside the player, or with nothing focused; never from a dialog or the bell.
+      const inside = !!container?.current && el instanceof Node && container.current.contains(el);
+      if (!inside && el !== document.body && el !== document.documentElement) return;
       const key = e.key.toLowerCase();
       let handled = true;
       if (key === "escape") {
@@ -65,5 +68,5 @@ export function usePlayerKeys(handlers: PlayerKeyHandlers, { enabled = true }: {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [enabled]);
+  }, [enabled, container]);
 }

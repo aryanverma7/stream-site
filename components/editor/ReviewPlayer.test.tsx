@@ -59,7 +59,7 @@ const loaded = (v: HTMLVideoElement) => fireEvent.loadedMetadata(v);
 describe("ReviewPlayer", () => {
   it("shows download progress; Play only when complete, Start watching now otherwise", async () => {
     await open();
-    expect(screen.getByText("Downloading 1.2 of 3.4 GB (35%)")).toBeInTheDocument();
+    expect(screen.getByText("Loading v3 · 1.2 of 3.4 GB · 35%")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Play" })).toBeNull();
     expect(screen.getByRole("button", { name: "Start watching now" })).toBeEnabled();
   });
@@ -181,6 +181,33 @@ describe("ReviewPlayer", () => {
     expect(v.playbackRate).toBe(2);
     fireEvent.click(speed);
     expect(speed).toHaveTextContent("0.25×");
+  });
+
+  it("ignores keys when focus is on something outside the player", async () => {
+    await open();
+    await watch();
+    const out = document.body.appendChild(document.createElement("button"));
+    fireEvent.keyDown(out, { key: "?" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Speed" }), { key: "?" });
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    out.remove();
+  });
+
+  it("offers nothing to play before the upload finished", async () => {
+    serve({ iteration: { ...IT, drive_file_id: null } });
+    await open();
+    expect(screen.getByText("This version isn't uploaded yet")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Start watching now|^Play$/ })).toBeNull();
+    expect(worker.provide).not.toHaveBeenCalled();
+  });
+
+  it("shows errors while playing, keeping Download reachable", async () => {
+    await open();
+    const v = await watch();
+    fireEvent.error(v);
+    expect(screen.getByText("The video could not be played")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Download" })).toBeInTheDocument();
   });
 
   it("? opens the key sheet; Esc closes it without the shell's zoom-out, then passes through", async () => {
