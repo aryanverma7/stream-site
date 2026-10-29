@@ -41,6 +41,19 @@ export function ReviewPlayer(props: ReviewPlayerProps) {
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const { iterations, tape, error: tapeError } = useTape(props.tapeId);
+  // The tape list decides the compare partner, which useMediaFile must know
+  // before its first run (it protects the partner's cached copy); so wait for it.
+  const tapeReady = tape !== null || tapeError !== null;
+  const cur = data?.iteration;
+  const partner = useMemo(() => {
+    if (!cur) return null;
+    const ready = iterations.filter((i) => i.status === "ready" && i.id !== cur.id).sort((a, b) => a.version - b.version);
+    const newer = ready.find((i) => i.version > cur.version);
+    const lower = ready.filter((i) => i.version < cur.version).pop();
+    const isLatest = !ready.some((i) => i.version > cur.version);
+    return (isLatest ? lower : newer) ?? lower ?? null;
+  }, [iterations, cur]);
 
   useEffect(() => {
     let live = true;
@@ -55,22 +68,12 @@ export function ReviewPlayer(props: ReviewPlayerProps) {
   if (error) return <p className="text-rec">{error}</p>;
   // after a version switch the old version's data must not render under the new id
   if (!data || data.iteration.id !== iterationId) return <p className="osd text-xl text-dim">Loading…</p>;
-  return <Watch key={`${iterationId}-${attempt}`} {...props} data={data} retry={() => setAttempt(attempt + 1)} />;
+  return <Watch key={`${iterationId}-${attempt}`} {...props} data={data} retry={() => setAttempt(attempt + 1)} partner={partner} tapeReady={tapeReady} />;
 }
 
-function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Date.now, data, retry }: ReviewPlayerProps & { data: Loaded; retry(): void }) {
+function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Date.now, data, retry, partner, tapeReady }: ReviewPlayerProps & { data: Loaded; retry(): void; partner: Iteration | null; tapeReady: boolean }) {
   const it = data.iteration;
-  const { iterations } = useTape(tapeId);
-  // Compare partner: the newest ready version below this one; on the latest
-  // version that is the previous one, anywhere else the next newer one.
-  const partner = useMemo(() => {
-    const ready = iterations.filter((i) => i.status === "ready" && i.id !== it.id).sort((a, b) => a.version - b.version);
-    const newer = ready.find((i) => i.version > it.version);
-    const lower = ready.filter((i) => i.version < it.version).pop();
-    const isLatest = !ready.some((i) => i.version > it.version);
-    return (isLatest ? lower : newer) ?? lower ?? null;
-  }, [iterations, it.id, it.version]);
-  const media = useMediaFile(it.drive_file_id ? { id: it.id, drive_file_id: it.drive_file_id, size: it.size } : null, projectId, partner?.id ?? null);
+  const media = useMediaFile(it.drive_file_id && tapeReady ? { id: it.id, drive_file_id: it.drive_file_id, size: it.size } : null, projectId, partner?.id ?? null);
   const [toast, setToast] = useState<string | null>(null);
   useEffect(() => {
     if (!toast) return;
@@ -183,6 +186,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
     },
     general: () => started && setComposer((c) => ({ start: null, end: null, n: (c?.n ?? 0) + 1 })),
     compare: () => {
+      if (!tapeReady) return;
       if (!partner) return setToast("No earlier version to compare");
       const at = started ? video.current?.currentTime : undefined;
       window.location.hash = routeHash({ view: "iteration", projectId, tapeId, iterationId: partner.id, ...(at !== undefined && { seekS: Math.round(at * 100) / 100 }) });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { editorBackend } from "@/lib/testUtils";
 import { ReviewPlayer } from "./ReviewPlayer";
 
@@ -274,6 +274,23 @@ describe("ReviewPlayer", () => {
       time = 12.5;
       fireEvent.keyDown(document.body, { key: "v" });
       expect(window.location.hash).toBe("#/p/1/t/2/v/5@12.5");
+    });
+
+    it("never starts the download without the partner, and V while the tape loads does nothing", async () => {
+      withTape(tapeOf([5, 2, "ready"], [7, 3, "ready"]));
+      mediaSpy.mockClear();
+      await open();
+      await waitFor(() => expect(mediaSpy).toHaveBeenLastCalledWith(expect.anything(), 1, 5));
+      for (const c of mediaSpy.mock.calls) if (c[0] !== null) expect(c[2]).toBe(5);
+      cleanup();
+      const fake = editorBackend({ "/iterations/7": { iteration: IT, comments: [], position_s: 100 } });
+      global.fetch = ((u: string, i?: RequestInit) => (u.includes("/tapes/") ? new Promise(() => {}) : fake(u, i))) as unknown as typeof fetch;
+      mediaSpy.mockClear();
+      render(<ReviewPlayer projectId={1} tapeId={2} iterationId={7} role="editor" username="u" />);
+      await screen.findByText("Version 3");
+      fireEvent.keyDown(document.body, { key: "v" });
+      expect(screen.queryByText("No earlier version to compare")).toBeNull();
+      expect(mediaSpy.mock.calls.every((c) => c[0] === null)).toBe(true);
     });
 
     it("V with no earlier version shows a toast and stays", async () => {
