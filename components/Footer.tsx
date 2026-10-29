@@ -56,6 +56,11 @@ export function Footer() {
         <div className="flex flex-col gap-3">
           <p className="stencil text-5xl text-field">DualBladeX</p>
           <p className="osd text-lg text-dim">End of tape · Valorant on Twitch and YouTube</p>
+          {/* Plain <a>: a document load, like /admin, so no router data fetch is needed. */}
+          <p className="flex gap-4 text-sm text-dim">
+            <a href="/privacy" className="hover:text-field">Privacy</a>
+            <a href="/terms" className="hover:text-field">Terms</a>
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {platforms.map((platform) => {

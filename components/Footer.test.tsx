@@ -75,6 +75,17 @@ describe("Footer", () => {
 
     const { container } = render(<Footer />);
 
-    await waitFor(() => expect(container.querySelectorAll("a").length).toBe(0));
+    await waitFor(() => expect(container.querySelectorAll("a[aria-label]").length).toBe(0));
+  });
+
+  it("always links the privacy policy and terms, which Google's consent screen points at", () => {
+    global.fetch = asFetchMock(
+      vi.fn().mockResolvedValue({ json: () => Promise.resolve({ social_links: {} }) }),
+    );
+
+    const { getByText } = render(<Footer />);
+
+    expect(getByText("Privacy").getAttribute("href")).toBe("/privacy");
+    expect(getByText("Terms").getAttribute("href")).toBe("/terms");
   });
 });
