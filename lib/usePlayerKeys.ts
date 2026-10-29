@@ -45,8 +45,9 @@ export function usePlayerKeys(handlers: PlayerKeyHandlers, { enabled = true, con
         }
         return;
       }
-      // A focused button/link keeps its own Space; the slider keeps its own arrows.
-      if (key === " " && el?.closest?.("button, a, [role=slider]")) return;
+      // A focused button/link keeps its own Space (unless it opts out with data-player-keys);
+      // the slider keeps its own arrows but not Space, which it has no use for.
+      if (key === " " && el?.closest?.("button, a") && !el.closest("[data-player-keys]")) return;
       if ((key === "arrowleft" || key === "arrowright") && el?.closest?.("[role=slider]")) return;
       if (key === " " || key === "k") h.toggle?.();
       else if (key === "arrowleft") h.seekBy?.(-5);

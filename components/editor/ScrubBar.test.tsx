@@ -23,6 +23,11 @@ function setup(extra: Partial<React.ComponentProps<typeof ScrubBar>> = {}) {
 }
 
 describe("ScrubBar", () => {
+  it("labels a marker with its comment's kind", () => {
+    setup({ markers: [{ id: 1, start: 100, kind: "keep", active: true }, { id: 2, start: 30, kind: "question", active: true }] });
+    expect(screen.getByRole("button", { name: "Keep at 1:40" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Question at 0:30" })).toBeInTheDocument();
+  });
   it("click at 25% seeks to a quarter", () => {
     const { bar, onSeek } = setup();
     fireEvent.mouseDown(bar, { clientX: 250 });

@@ -8,7 +8,7 @@ const C = 2 * Math.PI * R;
 export function DownloadRing({ doneBytes, total }: { doneBytes: number; total: number }) {
   const f = total > 0 ? Math.min(doneBytes / total, 1) : 0;
   const done = total > 0 && doneBytes >= total;
-  const label = done ? "Downloaded · plays from this computer" : `Downloaded ${gb(doneBytes)} of ${gb(total)} GB (${Math.round(f * 100)}%)`;
+  const label = done ? "Downloaded · plays from this computer" : `Downloaded ${gb(doneBytes)} of ${gb(total)} GB (${Math.floor(f * 100)}%)`;
   return (
     <svg role="img" aria-label={label} width="18" height="18" viewBox="0 0 18 18" className={`shrink-0 ${done ? "text-signal" : "text-field"}`}>
       <title>{label}</title>

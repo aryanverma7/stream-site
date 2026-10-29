@@ -10,7 +10,8 @@ const btn = "label border border-seam px-2 py-0.5 text-[10px] text-phosphor hove
 const KIND: Record<string, string> = { fix: "Fix", keep: "Keep", question: "Question" };
 const TONE: Record<string, string> = { fix: "text-rec", keep: "text-signal", question: "text-amber" };
 
-export const spanOf = (c: Comment) => (c.start_s === null ? "General" : c.end_s !== null ? `${formatTime(c.start_s)}–${formatTime(c.end_s)}` : formatTime(c.start_s));
+// a carried comment's time belongs to its origin version: its link says so, the chip does not
+export const spanOf = (c: Comment) => (c.carried ? "" : c.start_s === null ? "General" : c.end_s !== null ? `${formatTime(c.start_s)}–${formatTime(c.end_s)}` : formatTime(c.start_s));
 
 export function CommentItem({
   c,
@@ -50,7 +51,7 @@ export function CommentItem({
           <span className="label text-[10px] text-dim">{c.resolved ? "Resolved" : "Open"}</span>
         )}
         {timed ? (
-          <button type="button" aria-label={`Go to ${formatTime(c.start_s as number)}`} className="text-left" onClick={() => onSeek(c.start_s as number)}>
+          <button type="button" data-player-keys aria-label={`Go to ${formatTime(c.start_s as number)}`} className="text-left" onClick={() => onSeek(c.start_s as number)}>
             {head}
           </button>
         ) : (
@@ -77,8 +78,7 @@ export function CommentItem({
             type="button"
             className={btn}
             onClick={async () => {
-              await cm.edit(c.id, { body: editing });
-              setEditing(null);
+              if (await cm.edit(c.id, { body: editing })) setEditing(null);
             }}
           >
             Save

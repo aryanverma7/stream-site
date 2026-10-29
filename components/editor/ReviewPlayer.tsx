@@ -21,6 +21,8 @@ import { CommentComposer } from "./CommentComposer";
 
 const SAVE_EVERY_MS = 10_000;
 const REPLY_WAIT_MS = 4_000;
+const OPEN_COMPOSER = "editor.openComposer";
+const RESUME_PLAYING = "editor.resumePlaying";
 const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
 const gb = (n: number) => (n / 1024 ** 3).toFixed(1);
 
@@ -80,14 +82,17 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
     const t = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(t);
   }, [toast]);
-  // One-shot flag from the card menu's Add comment; read once, at mount.
+  // One-shot flags, read once at mount: the card menu's Add comment, and V pressed while playing.
   const wantComposer = useRef(false);
+  const wantResume = useRef(false);
   useEffect(() => {
     try {
-      wantComposer.current = sessionStorage.getItem("editor.openComposer") !== null;
-      sessionStorage.removeItem("editor.openComposer");
+      wantComposer.current = sessionStorage.getItem(OPEN_COMPOSER) !== null;
+      wantResume.current = sessionStorage.getItem(RESUME_PLAYING) !== null;
+      sessionStorage.removeItem(OPEN_COMPOSER);
+      sessionStorage.removeItem(RESUME_PLAYING);
     } catch {
-      /* no storage: no composer */
+      /* no storage: neither */
     }
   }, []);
   const worker = useMediaWorker();
@@ -99,12 +104,16 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(2);
   const [sheet, setSheet] = useState(false);
-  // start null: a general comment; n makes a new prefill remount the form
-  const [composer, setComposer] = useState<{ start: number | null; end: number | null; n: number } | null>(null);
+  // start null: a general comment; a new start/end updates an open form without clearing its text
+  const [composer, setComposer] = useState<{ start: number | null; end: number | null } | null>(null);
   const cm = useComments(iterationId, { role, username });
   const [videoError, setVideoError] = useState<string | null>(null);
+  const [videoKey, setVideoKey] = useState(0);
+  const reloadAt = useRef<number | null>(null);
+  const wantPlay = useRef(false);
   const video = useRef<HTMLVideoElement>(null);
   const box = useRef<HTMLDivElement>(null);
+  const area = useRef<HTMLElement>(null);
   const fps = fpsOf(it.checks);
   const storageOnly = media.error?.startsWith("Not enough browser storage") ?? false;
 
@@ -116,42 +125,69 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
 
   // Position: saved at most every 10 s, whatever triggers it.
   const lastSave = useRef(-Infinity);
+  const applied = useRef<string | null>(null);
   const lastTime = useRef(0);
   const clock = useRef(now);
   const save = useCallback(() => {
     const t = clock.current();
-    if (!started || t - lastSave.current < SAVE_EVERY_MS) return;
+    // before the resume point is applied the element sits at 0, which must not overwrite it
+    if (!started || applied.current === null || t - lastSave.current < SAVE_EVERY_MS) return;
     lastSave.current = t;
     // on unmount React has already detached the element, so fall back to the last tick
     editorApi(`/iterations/${iterationId}/position`, { method: "PUT", body: { position_s: video.current?.currentTime ?? lastTime.current } }).catch(() => {});
   }, [iterationId, started]);
   useEffect(() => save, [save]); // on unmount
 
-  const applied = useRef<string | null>(null);
   useEffect(() => {
     const v = video.current;
     const key = String(seekS);
     if (!v || !(duration > 0) || applied.current === key) return;
     applied.current = key;
     v.currentTime = startPosition(seekS, data.position_s, duration);
+    // the person already pressed Play (or was playing before V); the composer flag means pause
+    if (wantPlay.current && !wantComposer.current) void v.play()?.catch(() => {});
+    wantPlay.current = false;
   }, [duration, seekS, data.position_s, started]);
 
   useEffect(() => {
     if (!wantComposer.current || !started || !(duration > 0)) return;
     wantComposer.current = false;
     video.current?.pause();
-    setComposer((c) => ({ start: video.current?.currentTime ?? 0, end: null, n: (c?.n ?? 0) + 1 }));
+    setComposer({ start: video.current?.currentTime ?? 0, end: null });
   }, [started, duration]);
 
-  async function startWatching() {
+  const startWatching = useCallback(async () => {
     setStartError(null);
     try {
-      await worker.provide(it.id, { projectId, fileId: it.drive_file_id ?? "", size: it.size, mime: mimeOf(it.filename), getLink: media.getLink });
+      const downloaded = media.state === "complete";
+      await worker.provide(it.id, { projectId, fileId: it.drive_file_id ?? "", size: it.size, mime: mimeOf(it.filename), downloaded, getLink: media.getLink });
+      wantPlay.current = true;
       setStarted(true);
     } catch (e) {
       setStartError(e instanceof Error ? e.message : "Playback could not start");
     }
-  }
+  }, [worker, it, projectId, media.state, media.getLink]);
+
+  const uploaded = !!it.drive_file_id;
+  const canWatchNow = media.state !== "complete" && (media.state !== "error" || storageOnly);
+  // V pressed while playing: carry on in this version once it can start
+  useEffect(() => {
+    if (!wantResume.current || started || !worker.ready || !uploaded || media.state === "checking") return;
+    if (media.state !== "complete" && !canWatchNow) return;
+    wantResume.current = false;
+    void Promise.resolve().then(startWatching); // off the effect's synchronous path
+  }, [started, worker.ready, uploaded, media.state, canWatchNow, startWatching]);
+
+  const leaveFullscreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen?.()?.catch(() => {});
+  };
+  const reloadVideo = () => {
+    reloadAt.current = video.current?.currentTime ?? lastTime.current;
+    wantPlay.current = false;
+    setVideoError(null);
+    setStartError(null);
+    setVideoKey((k) => k + 1);
+  };
 
   const seekTo = (s: number) => {
     const v = video.current;
@@ -181,14 +217,26 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
     fullscreen: () => started && fullscreen(),
     comment: () => {
       if (!started) return;
+      leaveFullscreen(); // the composer is outside the fullscreen box
       video.current?.pause();
-      setComposer((c) => ({ start: video.current?.currentTime ?? 0, end: null, n: (c?.n ?? 0) + 1 }));
+      setComposer({ start: video.current?.currentTime ?? 0, end: null });
     },
-    general: () => started && setComposer((c) => ({ start: null, end: null, n: (c?.n ?? 0) + 1 })),
+    general: () => {
+      if (!started) return;
+      leaveFullscreen();
+      setComposer({ start: null, end: null });
+    },
     compare: () => {
       if (!tapeReady) return;
       if (!partner) return setToast("No earlier version to compare");
       const at = started ? video.current?.currentTime : undefined;
+      if (started && video.current && !video.current.paused) {
+        try {
+          sessionStorage.setItem(RESUME_PLAYING, "1");
+        } catch {
+          /* no storage: the other version opens paused */
+        }
+      }
       window.location.hash = routeHash({ view: "iteration", projectId, tapeId, iterationId: partner.id, ...(at !== undefined && { seekS: Math.round(at * 100) / 100 }) });
     },
     help: () => setSheet((s) => !s),
@@ -198,7 +246,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
       else return false;
       return true;
     },
-  }, { container: box });
+  }, { container: area });
 
   const markers: Marker[] = useMemo(
     () =>
@@ -209,13 +257,18 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
   );
   const ranges = useMemo(() => downloadedRanges(media.present, it.size), [media.present, it.size]);
   const ring = <DownloadRing doneBytes={media.doneBytes} total={media.total} />;
-  const pct = media.total > 0 ? Math.round((media.doneBytes / media.total) * 100) : 0;
-  const canWatchNow = media.state !== "complete" && (media.state !== "error" || storageOnly);
+  // floor: 100% only once it is all there
+  const pct = media.total > 0 ? Math.floor((media.doneBytes / media.total) * 100) : 0;
   const err = (media.error && !storageOnly ? media.error : null) ?? worker.error ?? startError ?? videoError;
-  const uploaded = !!it.drive_file_id;
+  const storageNote = storageOnly && (
+    <p className="text-amber">
+      Streaming only: not enough browser storage to save it
+      <span className="block text-[11px]">{media.error}</span>
+    </p>
+  );
 
   return (
-    <section className="space-y-3">
+    <section ref={area} className="space-y-3">
       <header className="flex flex-wrap items-center gap-3">
         <h2 tabIndex={-1} className="stencil text-4xl">
           Version {it.version}
@@ -249,7 +302,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
             </p>
           </div>
           {!uploaded && <p className="text-amber">This version isn&apos;t uploaded yet</p>}
-          {storageOnly && <p className="text-amber">Streaming only: not enough browser storage to save it</p>}
+          {storageNote}
           {err && <p className="text-rec">{err}</p>}
           <div className="flex flex-wrap items-center gap-2">
             {uploaded && media.state === "complete" && (
@@ -279,11 +332,16 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div ref={box} className="relative space-y-2 bg-ink">
             <video
+              key={videoKey}
               ref={video}
               src={mediaUrl(iterationId)}
               className="aspect-video w-full bg-black"
               onClick={toggle}
-              onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+              onLoadedMetadata={(e) => {
+                setDuration(e.currentTarget.duration);
+                if (reloadAt.current !== null) e.currentTarget.currentTime = reloadAt.current;
+                reloadAt.current = null;
+              }}
               onDurationChange={(e) => setDuration(e.currentTarget.duration)}
               onTimeUpdate={(e) => {
                 lastTime.current = e.currentTarget.currentTime;
@@ -297,9 +355,16 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
                 save();
               }}
             />
-            {err && <p className="text-rec">{err}</p>}
-            {storageOnly && <p className="text-amber">Streaming only: not enough browser storage to save it</p>}
-            <ScrubBar duration={duration} current={current} downloaded={ranges} size={it.size} markers={markers} onSeek={seekTo} rangeMode={!!composer} onRangeSelect={(start, end) => setComposer((c) => ({ start, end, n: (c?.n ?? 0) + 1 }))} />
+            {err && (
+              <p className="text-rec">
+                {err}{" "}
+                <button type="button" className={btn} onClick={videoError && !media.error && !worker.error ? reloadVideo : retry}>
+                  Try again
+                </button>
+              </p>
+            )}
+            {storageNote}
+            <ScrubBar duration={duration} current={current} downloaded={ranges} size={it.size} markers={markers} onSeek={seekTo} rangeMode={!!composer} onRangeSelect={(start, end) => setComposer({ start, end })} />
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <button type="button" className={btn} onClick={toggle}>
                 {paused ? "Play" : "Pause"}
@@ -323,7 +388,6 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
           <div className="space-y-3">
             {composer && (
               <CommentComposer
-                key={composer.n}
                 start={composer.start}
                 end={composer.end}
                 getNow={() => video.current?.currentTime ?? current}

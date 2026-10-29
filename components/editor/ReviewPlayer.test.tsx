@@ -99,6 +99,7 @@ describe("ReviewPlayer", () => {
     Object.assign(media, { state: "error", error: "Not enough browser storage: needs 3.4 GB, 1.0 GB free" });
     await open();
     expect(screen.getByText("Streaming only: not enough browser storage to save it")).toBeInTheDocument();
+    expect(screen.getByText("Not enough browser storage: needs 3.4 GB, 1.0 GB free")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start watching now" })).toBeEnabled();
   });
 
@@ -108,6 +109,36 @@ describe("ReviewPlayer", () => {
     await open();
     expect(screen.getByText("Download failed")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("rounds the percentage down, so 100% means complete", async () => {
+    Object.assign(media, { doneBytes: 3.39 * GB });
+    await open();
+    expect(screen.getByText("Loading v3 · 3.4 of 3.4 GB · 99%")).toBeInTheDocument();
+  });
+
+  it("Play on a downloaded version needs no link and starts playing once the position is applied", async () => {
+    media.state = "complete";
+    await open();
+    play.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    const v = await waitFor(() => {
+      const el = document.querySelector("video");
+      expect(el).not.toBeNull();
+      return el as HTMLVideoElement;
+    });
+    expect(worker.provide).toHaveBeenCalledWith(7, expect.objectContaining({ downloaded: true }));
+    expect(play).not.toHaveBeenCalled();
+    loaded(v);
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+    expect(time).toBe(100);
+  });
+
+  it("never saves position 0 before the resume point is applied", async () => {
+    const r = await open();
+    await watch();
+    r.unmount();
+    expect(puts()).toHaveLength(0);
   });
 
   it("Cancel goes back to the tape", async () => {
@@ -213,6 +244,65 @@ describe("ReviewPlayer", () => {
     expect(speed).toHaveTextContent("0.25×");
   });
 
+  it("Space after clicking the timeline plays; keys work from the comment list, not from its reply field", async () => {
+    serve({}, [{ id: 1, kind: "fix", author: "s", body: "b", start_s: 83, end_s: null, created_at: 1, updated_at: 1, resolved: false, carried: false, replies: [] }]);
+    await open();
+    loaded(await watch());
+    paused = true;
+    play.mockClear();
+    fireEvent.keyDown(screen.getByRole("slider"), { key: " " });
+    expect(play).toHaveBeenCalledTimes(1);
+    const goTo = await screen.findByRole("button", { name: "Go to 1:23" });
+    fireEvent.keyDown(goTo, { key: "?" });
+    expect(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeInTheDocument();
+    pause.mockClear();
+    fireEvent.keyDown(goTo, { key: " " }); // playing now: Space on the go-to control pauses
+    expect(pause).toHaveBeenCalledTimes(1);
+    paused = true;
+    play.mockClear();
+    fireEvent.keyDown(screen.getByLabelText("Reply to s"), { key: "k" });
+    expect(play).not.toHaveBeenCalled();
+  });
+
+  it("C leaves fullscreen before opening the composer", async () => {
+    await open();
+    loaded(await watch());
+    const exit = vi.fn(async () => {});
+    Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => document.body });
+    Object.defineProperty(document, "exitFullscreen", { configurable: true, value: exit });
+    fireEvent.keyDown(document.body, { key: "c" });
+    expect(exit).toHaveBeenCalled();
+    expect(await screen.findByLabelText("Comment text")).toBeInTheDocument();
+    Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => null });
+  });
+
+  it("selecting a range while composing keeps the typed text and kind, and updates the times", async () => {
+    await open();
+    loaded(await watch());
+    time = 20;
+    fireEvent.keyDown(document.body, { key: "c" });
+    fireEvent.change(await screen.findByLabelText("Comment text"), { target: { value: "too long" } });
+    fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "question" } });
+    const bar = screen.getByRole("slider");
+    bar.getBoundingClientRect = () => ({ left: 0, width: 600, top: 0, height: 10, right: 600, bottom: 10, x: 0, y: 0, toJSON() {} });
+    fireEvent.mouseDown(bar, { clientX: 30, shiftKey: true });
+    fireEvent.mouseMove(window, { clientX: 60 });
+    fireEvent.mouseUp(window);
+    await waitFor(() => expect(screen.getByLabelText("Start")).toHaveValue("0:30.0"));
+    expect(screen.getByLabelText("End")).toHaveValue("1:00.0");
+    expect(screen.getByLabelText("Comment text")).toHaveValue("too long");
+    expect(screen.getByLabelText("Kind")).toHaveValue("question");
+  });
+
+  it("Try again after a playback error reloads the video", async () => {
+    await open();
+    const v = await watch();
+    fireEvent.error(v);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(screen.queryByText("The video could not be played")).toBeNull();
+    expect(document.querySelector("video")).not.toBe(v);
+  });
+
   it("ignores keys when focus is on something outside the player", async () => {
     await open();
     await watch();
@@ -291,6 +381,34 @@ describe("ReviewPlayer", () => {
       fireEvent.keyDown(document.body, { key: "v" });
       expect(screen.queryByText("No earlier version to compare")).toBeNull();
       expect(mediaSpy.mock.calls.every((c) => c[0] === null)).toBe(true);
+    });
+
+    it("V while playing opens the other version playing at the same time", async () => {
+      withTape(tapeOf([5, 2, "ready"], [7, 3, "ready"]));
+      await open();
+      loaded(await watch());
+      paused = false;
+      time = 12.5;
+      fireEvent.keyDown(document.body, { key: "v" });
+      expect(sessionStorage.getItem("editor.resumePlaying")).toBe("1");
+      cleanup();
+      play.mockClear();
+      worker.provide.mockClear();
+      await open({ seekS: 12.5 });
+      expect(sessionStorage.getItem("editor.resumePlaying")).toBeNull();
+      await waitFor(() => expect(worker.provide).toHaveBeenCalled());
+      loaded(await waitFor(() => document.querySelector("video") as HTMLVideoElement));
+      await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+      expect(time).toBe(12.5);
+    });
+
+    it("V while paused does not set the resume flag", async () => {
+      withTape(tapeOf([5, 2, "ready"], [7, 3, "ready"]));
+      await open();
+      loaded(await watch());
+      paused = true; // Start watching now played it; the person paused
+      fireEvent.keyDown(document.body, { key: "v" });
+      expect(sessionStorage.getItem("editor.resumePlaying")).toBeNull();
     });
 
     it("V with no earlier version shows a toast and stays", async () => {

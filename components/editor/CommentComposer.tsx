@@ -30,6 +30,13 @@ export function CommentComposer({
   const [startText, setStartText] = useState(start === null ? "" : formatTime(start, true));
   const [endText, setEndText] = useState(end == null ? "" : formatTime(end, true));
   const [error, setError] = useState<string | null>(null);
+  // A new start/end (a range dragged, C again) replaces the times and keeps what was typed.
+  const [times, setTimes] = useState([start, end ?? null]);
+  if (times[0] !== start || times[1] !== (end ?? null)) {
+    setTimes([start, end ?? null]);
+    setStartText(start === null ? "" : formatTime(start, true));
+    setEndText(end == null ? "" : formatTime(end, true));
+  }
 
   function submit() {
     let s: number | null = null;

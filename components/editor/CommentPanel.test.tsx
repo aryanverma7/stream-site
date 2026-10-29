@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { Comment, CommentsApi } from "@/lib/useComments";
 import { CommentPanel } from "./CommentPanel";
 
@@ -53,6 +53,21 @@ describe("CommentPanel", () => {
     expect(link).toHaveAttribute("href", "#/p/1/t/2/v/7@222");
     expect(document.querySelector('[data-comment="1"]')).not.toHaveAttribute("aria-current");
     expect(within(document.querySelector('[data-comment="1"]') as HTMLElement).queryByRole("button", { name: /Go to/ })).toBeNull();
+    // no time chip of its own: the 3:42 belongs to v1 and only the link says it
+    expect(within(document.querySelector('[data-comment="1"]') as HTMLElement).getAllByText(/3:42/)).toHaveLength(1);
+  });
+
+  it("a failed edit keeps the editor open with the typed text; a good one closes it", async () => {
+    const edit = vi.fn(async () => false);
+    panel(api([c({ id: 9, author: "me", body: "old" })], { edit }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Edit comment"), { target: { value: "new words" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(edit).toHaveBeenCalledWith(9, { body: "new words" }));
+    expect(screen.getByLabelText("Edit comment")).toHaveValue("new words");
+    edit.mockResolvedValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByLabelText("Edit comment")).toBeNull());
   });
 
   it("editor gets no resolve checkbox; admin does", () => {

@@ -113,14 +113,17 @@ export function useComments(
     return flushNow();
   };
 
-  const act = async (fn: () => Promise<unknown>) => {
+  /** True when the call went through; a failure is shown in `error`. */
+  const act = async (fn: () => Promise<unknown>): Promise<boolean> => {
     setError(null);
     try {
       await fn();
-      await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
+      return false;
     }
+    await reload();
+    return true;
   };
 
   return {

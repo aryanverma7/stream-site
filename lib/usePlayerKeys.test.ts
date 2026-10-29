@@ -42,6 +42,24 @@ describe("usePlayerKeys", () => {
     area.remove();
   });
 
+  it("Space on the slider plays; on a button it is the button's unless it opts in with data-player-keys", () => {
+    const box = document.body.appendChild(document.createElement("div"));
+    box.innerHTML = '<div role="slider" tabindex="0"></div><button>x</button><button data-player-keys>go</button>';
+    const [slider, plain, goTo] = [...box.children] as HTMLElement[];
+    const h = { toggle: vi.fn(), seekBy: vi.fn() };
+    renderHook(() => usePlayerKeys(h, { container: { current: box } }));
+    fireEvent.keyDown(slider, { key: " " });
+    expect(h.toggle).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(slider, { key: "ArrowLeft" });
+    expect(h.seekBy).not.toHaveBeenCalled(); // the slider's own arrows
+    fireEvent.keyDown(plain, { key: " " });
+    expect(h.toggle).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(goTo, { key: " " });
+    fireEvent.keyDown(goTo, { key: "k" });
+    expect(h.toggle).toHaveBeenCalledTimes(3);
+    box.remove();
+  });
+
   it("Esc stops propagation only when something closed", () => {
     const h = setup();
     const after = vi.fn();

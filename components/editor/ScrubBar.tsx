@@ -6,6 +6,7 @@ import { formatTime } from "@/lib/timecode";
 export type Marker = { id: number; start: number; end?: number; kind: string; active: boolean };
 
 const TONE: Record<string, string> = { fix: "bg-rec", keep: "bg-signal", question: "bg-amber" };
+const KIND: Record<string, string> = { fix: "Fix", keep: "Keep", question: "Question" };
 
 /**
  * The timeline. Click seeks, a plain drag scrubs, Shift+drag (or dragging
@@ -93,7 +94,7 @@ export function ScrubBar({
           <button
             key={m.id}
             type="button"
-            aria-label={`Fix at ${formatTime(m.start)}`}
+            aria-label={`${KIND[m.kind] ?? "Comment"} at ${formatTime(m.start)}`}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={() => onSeek(m.start)}
             className={`absolute inset-y-0 min-w-1 ${TONE[m.kind] ?? "bg-amber"} ${m.active ? "opacity-100" : "opacity-40"}`}
