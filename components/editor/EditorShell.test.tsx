@@ -2,6 +2,9 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, fireEvent, waitFor, act } from "@testing-library/react";
 import { EditorShell } from "./EditorShell";
 import { asFetchMock } from "@/lib/testUtils";
+import { keepOnlyProject } from "@/lib/opfsMedia";
+
+vi.mock("@/lib/opfsMedia", async () => ({ ...(await vi.importActual<object>("@/lib/opfsMedia")), keepOnlyProject: vi.fn(async () => {}) }));
 
 const ADMIN = { username: "aryan", role: "admin", brand_kit_url: "https://drive.google.com/drive/folders/kit" };
 const EDITOR = { username: "cutter", role: "editor", brand_kit_url: null };
@@ -67,6 +70,15 @@ describe("EditorShell", () => {
     backend({ "/me": ADMIN });
     const admin = render(<EditorShell />);
     expect(await admin.findByRole("heading", { name: "Projects" })).toBeTruthy();
+  });
+
+  it("keeps only the route's project in browser storage, none off the project views", async () => {
+    backend({ "/me": ADMIN, "/projects": { projects: [] }, "/projects/12": PROJECT });
+    window.location.hash = "#/p/12";
+    render(<EditorShell />);
+    await waitFor(() => expect(keepOnlyProject).toHaveBeenCalledWith(12));
+    act(() => void (window.location.hash = "#/home"));
+    await waitFor(() => expect(keepOnlyProject).toHaveBeenLastCalledWith(null));
   });
 
   it("renders the breadcrumb with names, and Esc zooms out one level", async () => {

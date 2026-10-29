@@ -8,7 +8,9 @@ import { Breadcrumb } from "./Breadcrumb";
 import { ProjectsView } from "./ProjectsView";
 import { ProjectView } from "./ProjectView";
 import { TapeView } from "./TapeView";
-import { IterationDetails } from "./IterationCard";
+import { ReviewPlayer } from "./ReviewPlayer";
+import { isTyping } from "@/lib/isTyping";
+import { keepOnlyProject } from "@/lib/opfsMedia";
 import { Bell } from "./Bell";
 import { HomeView } from "./HomeView";
 import { FixListView } from "./FixListView";
@@ -18,12 +20,6 @@ import { StorageView } from "./StorageView";
 const DELETED = "That was deleted or never existed";
 
 const depth = (r: Route) => ({ project: 1, tape: 2, iteration: 3 })[r.view as string] ?? 0;
-
-/** Typing in a field: Esc there belongs to the field (or the IME), not to the zoom. */
-function isTyping(e: KeyboardEvent): boolean {
-  const t = e.target as HTMLElement | null;
-  return e.isComposing || !!t?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t?.tagName ?? "");
-}
 
 /** What each route shows. */
 function RouteView({ route, me }: { route: Route; me: EditorMe }) {
@@ -35,7 +31,7 @@ function RouteView({ route, me }: { route: Route; me: EditorMe }) {
     case "tape":
       return <TapeView projectId={route.projectId} tapeId={route.tapeId} role={me.role} username={me.username} />;
     case "iteration":
-      return <IterationDetails iterationId={route.iterationId} />;
+      return <ReviewPlayer projectId={route.projectId} tapeId={route.tapeId} iterationId={route.iterationId} seekS={route.seekS} role={me.role} username={me.username} />;
     case "home":
       return <HomeView role={me.role} username={me.username} />;
     case "fixes":
@@ -92,6 +88,12 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
   const viewKey = hash.split("@")[0];
   if (notice && !notice.arrived && notice.hash === hash) setNotice({ ...notice, arrived: true });
   if (notice?.arrived && notice.hash !== hash) setNotice(null);
+
+  // Browser copies of other projects' versions are only ever deleted here.
+  const projectId = "projectId" in route ? route.projectId : null;
+  useEffect(() => {
+    keepOnlyProject(projectId).catch(() => {});
+  }, [projectId]);
 
   const viewRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
