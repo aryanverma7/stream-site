@@ -10,6 +10,8 @@ export type MediaInfo = {
   fileId: string;
   size: number;
   mime: string;
+  /** Every chunk is on disk: provide sends no link (no Mac Mini call); the worker asks if it ever needs Drive. */
+  downloaded?: boolean;
   getLink(fresh?: boolean): Promise<MediaLink>;
 };
 
@@ -23,12 +25,23 @@ export function useMediaWorker() {
   const [error, setError] = useState<string | null>(null);
   const infos = useRef(new Map<number, MediaInfo>());
 
-  const send = useCallback(async (iterationId: number, info: MediaInfo, fresh: boolean) => {
-    const got = await info.getLink(fresh);
-    // a cached link's expires_in is its lifetime when fetched, not what is left
-    const link = { ...got, expires_at: got.expires_at ?? Date.now() + got.expires_in * 1000 };
+  // The info is posted even when the link cannot be had (link: null), so the
+  // worker can still play what is on disk; the link's failure is rethrown.
+  const send = useCallback(async (iterationId: number, info: MediaInfo, fresh: boolean, withLink: boolean) => {
+    let link: MediaLink | null = null;
+    let failure: unknown = null;
+    if (withLink) {
+      try {
+        const got = await info.getLink(fresh);
+        // a cached link's expires_in is its lifetime when fetched, not what is left
+        link = { ...got, expires_at: got.expires_at ?? Date.now() + got.expires_in * 1000 };
+      } catch (e) {
+        failure = e ?? new Error("No playback link");
+      }
+    }
     const { projectId, fileId, size, mime } = info;
     navigator.serviceWorker?.controller?.postMessage({ type: "media", iterationId, projectId, fileId, size, mime, link });
+    if (failure) throw failure;
   }, []);
 
   useEffect(() => {
@@ -41,7 +54,7 @@ export function useMediaWorker() {
     const onMessage = (e: MessageEvent) => {
       if (e.data?.type !== "need-link") return;
       const info = infos.current.get(e.data.iterationId);
-      if (info) send(e.data.iterationId, info, true).catch(() => {}); // the worker answers 503 after its wait
+      if (info) send(e.data.iterationId, info, true, true).catch(() => {}); // the worker answers 503 without a link
     };
     sw.addEventListener("message", onMessage);
     sw.register("/editor/media-sw.js", { scope: "/editor" })
@@ -58,7 +71,7 @@ export function useMediaWorker() {
   const provide = useCallback(
     (iterationId: number, info: MediaInfo) => {
       infos.current.set(iterationId, info);
-      return send(iterationId, info, false);
+      return send(iterationId, info, false, !info.downloaded);
     },
     [send],
   );

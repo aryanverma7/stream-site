@@ -129,11 +129,19 @@ describe("downloadToOpfs", () => {
     await expect(setup(MIB).run()).rejects.toBeInstanceOf(MediaGone);
   });
 
-  it("refuses a 200", async () => {
-    fakeFetch([{ status: 200, size: MIB }]);
-    const s = setup(MIB);
+  it("refuses a 200 for part of the file", async () => {
+    fakeFetch([{ status: 200, size: 40 * MIB }]);
+    const s = setup(40 * MIB);
     await expect(s.run()).rejects.toThrow("range");
     expect(s.dir().files.size).toBe(0);
+  });
+
+  it("accepts a 200 when the one chunk is the whole file", async () => {
+    const calls = fakeFetch([{ status: 200, size: MIB }]);
+    const s = setup(MIB);
+    await s.run();
+    expect(calls[0].headers.Range).toBe("bytes=0-1048575");
+    expect([...s.dir().files]).toEqual([["c00000", MIB]]);
   });
 });
 

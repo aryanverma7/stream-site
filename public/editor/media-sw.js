@@ -3,8 +3,9 @@
  * chunks already in OPFS come from disk, the rest are ranged fetches from
  * Drive. It never writes to OPFS (only the page's download does) and logs
  * nothing, so the access token never reaches a log. The page tells it about
- * each version with a "media" message; when it has no info or no fresh token
- * it asks the page with "need-link".
+ * each version with a "media" message (its link may be null when every chunk
+ * is on disk); when it has no info, or needs Drive without a fresh token, it
+ * asks the page with "need-link".
  */
 importScripts("/editor/media-range.js");
 
@@ -32,10 +33,8 @@ function fresh(m) {
   return !!m && linkFresh(m.link, Date.now());
 }
 
-/** The version's info with a usable token, asking the page when needed; null after 15 s. */
-async function info(id, clientId, force) {
-  var m = media.get(id);
-  if (!force && fresh(m)) return m;
+/** Posts "need-link" to the page and waits (at most 15 s) for its "media" answer. */
+async function ask(id, clientId) {
   var arrived = new Promise(function (resolve) {
     waiting.set(id, (waiting.get(id) || []).concat(resolve));
   });
@@ -44,7 +43,14 @@ async function info(id, clientId, force) {
   targets.forEach(function (c) { c.postMessage({ type: "need-link", iterationId: Number(id) }); });
   var timeout = new Promise(function (resolve) { setTimeout(resolve, LINK_WAIT_MS); });
   await Promise.race([arrived, timeout]);
-  m = media.get(id);
+  return media.get(id) || null;
+}
+
+/** The version's info with a usable token, asking the page when needed; null when none came. */
+async function info(id, clientId, force) {
+  var m = media.get(id);
+  if (!force && fresh(m)) return m;
+  m = await ask(id, clientId);
   return fresh(m) ? m : null;
 }
 
@@ -53,7 +59,7 @@ async function driveStream(id, clientId, m, piece) {
     var res = await fetch(m.link.url, {
       headers: { Authorization: "Bearer " + m.link.access_token, Range: "bytes=" + piece.from + "-" + piece.to },
     });
-    if (res.status === 206) return res.body;
+    if (rangeAnswered(res.status, piece.from, piece.to, m.size)) return res.body;
     if (res.status !== 401 || retried) throw new Error("Drive answered " + res.status);
     m = await info(id, clientId, true);
     if (!m) throw new Error("No playback link");
@@ -61,7 +67,8 @@ async function driveStream(id, clientId, m, piece) {
 }
 
 async function serve(id, rangeHeader, clientId) {
-  var m = await info(id, clientId, false);
+  // size and mime are enough to plan; a token is only needed for a Drive piece
+  var m = media.get(id) || (await ask(id, clientId));
   if (!m) return new Response("Playback link unavailable", { status: 503 });
   var r = parseRange(rangeHeader, m.size);
   if (!r) return new Response(null, { status: 416, headers: { "Content-Range": "bytes */" + m.size } });
@@ -82,6 +89,10 @@ async function serve(id, rangeHeader, clientId) {
     }
   }
   var pieces = planRange(r.start, r.end, present);
+  if (pieces.some(function (p) { return p.source === "drive"; }) && !fresh(m)) {
+    m = await info(id, clientId, false);
+    if (!m) return new Response("Playback link unavailable", { status: 503 });
+  }
 
   async function open(p) {
     if (p.source === "drive") return driveStream(id, clientId, m, p);

@@ -51,6 +51,30 @@ describe("useMediaWorker", () => {
     expect(sw.controller.postMessage).toHaveBeenCalledTimes(2);
   });
 
+  it("a downloaded version is provided without asking for a link", async () => {
+    const sw = fakeSw();
+    const getLink = vi.fn(async () => link("x"));
+    const { result } = renderHook(() => useMediaWorker());
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    await act(() => result.current.provide(3, { projectId: 7, fileId: "F", size: 10, mime: "video/mp4", downloaded: true, getLink }));
+    expect(getLink).not.toHaveBeenCalled();
+    expect(sw.controller.postMessage).toHaveBeenLastCalledWith({ type: "media", iterationId: 3, projectId: 7, fileId: "F", size: 10, mime: "video/mp4", link: null });
+  });
+
+  it("still tells the worker the size and type when the link fails, then reports the failure", async () => {
+    const sw = fakeSw();
+    const getLink = vi.fn(async () => {
+      throw new Error("Mac Mini offline");
+    });
+    const { result } = renderHook(() => useMediaWorker());
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    await expect(result.current.provide(3, { projectId: 7, fileId: "F", size: 10, mime: "video/mp4", getLink })).rejects.toThrow("Mac Mini offline");
+    expect(sw.controller.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: "media", iterationId: 3, size: 10, link: null }));
+    act(() => sw.emit({ type: "need-link", iterationId: 3 }));
+    await waitFor(() => expect(sw.controller.postMessage).toHaveBeenCalledTimes(2));
+    expect(sw.controller.postMessage.mock.calls[1][0]).toMatchObject({ type: "media", iterationId: 3, link: null });
+  });
+
   it("sends the link's real expiry, not its original lifetime", async () => {
     const sw = fakeSw();
     vi.spyOn(Date, "now").mockReturnValue(1_000_000);

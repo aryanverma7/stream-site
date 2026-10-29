@@ -61,3 +61,13 @@ describe("linkFresh", () => {
     expect(range.linkFresh(null, 0)).toBe(false);
   });
 });
+
+describe("rangeAnswered", () => {
+  it("takes a 206, and a 200 only when the range is the whole file", () => {
+    expect(range.rangeAnswered(206, 100, 199, big)).toBe(true);
+    expect(range.rangeAnswered(200, 0, 99, 100)).toBe(true);
+    expect(range.rangeAnswered(200, 0, 49, 100)).toBe(false);
+    expect(range.rangeAnswered(200, 10, 99, 100)).toBe(false);
+    expect(range.rangeAnswered(416, 0, 99, 100)).toBe(false);
+  });
+});

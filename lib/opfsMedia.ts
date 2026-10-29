@@ -172,8 +172,10 @@ export async function downloadToOpfs(opts: DownloadOpts): Promise<void> {
         }
         if (res.status === 401) throw new FatalMediaError("Drive refused the download link");
         if (res.status === 403 || res.status === 404) throw new MediaGone();
-        if (res.status === 200) throw new FatalMediaError("Drive did not honour the range request");
-        if (res.status !== 206) {
+        // a one-chunk file asks for every byte, and Drive may answer that with a plain 200
+        const whole = start === 0 && want === size;
+        if (res.status === 200 && !whole) throw new FatalMediaError("Drive did not honour the range request");
+        if (res.status !== 206 && res.status !== 200) {
           if (res.status >= 500 || res.status === 429) throw new Error(`Drive error ${res.status}`);
           throw new FatalMediaError(`Unexpected response ${res.status}`);
         }

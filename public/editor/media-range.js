@@ -55,6 +55,11 @@ function linkFresh(link, now) {
   return !!link && typeof link.expires_at === "number" && now < link.expires_at - 60000;
 }
 
+/** Drive answered a ranged request: a 206, or a 200 when the range was the whole file. */
+function rangeAnswered(status, from, to, size) {
+  return status === 206 || (status === 200 && from === 0 && to === size - 1);
+}
+
 if (typeof module !== "undefined") {
-  module.exports = { CHUNK_BYTES: CHUNK_BYTES, chunkName: chunkName, dirName: dirName, chunkLength: chunkLength, parseRange: parseRange, planRange: planRange, linkFresh: linkFresh };
+  module.exports = { CHUNK_BYTES: CHUNK_BYTES, chunkName: chunkName, dirName: dirName, chunkLength: chunkLength, parseRange: parseRange, planRange: planRange, linkFresh: linkFresh, rangeAnswered: rangeAnswered };
 }
