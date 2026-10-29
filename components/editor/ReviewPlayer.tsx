@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { editorApi } from "@/lib/editorApi";
 import { routeHash } from "@/lib/useHashRoute";
 import type { Iteration } from "@/lib/useTape";
 import { useMediaFile } from "@/lib/useMediaFile";
 import { mediaUrl, useMediaWorker } from "@/lib/useMediaWorker";
+import { useComments } from "@/lib/useComments";
 import { usePlayerKeys } from "@/lib/usePlayerKeys";
 import { formatTime } from "@/lib/timecode";
 import { SPEEDS, downloadedRanges, fpsOf, mimeOf, startPosition } from "@/lib/playerLogic";
@@ -14,14 +15,15 @@ import { DownloadLink, OpenInDrive } from "./DriveLinks";
 import { DownloadRing } from "./DownloadRing";
 import { ScrubBar, type Marker } from "./ScrubBar";
 import { KeySheet } from "./KeySheet";
+import { CommentPanel } from "./CommentPanel";
+import { CommentComposer } from "./CommentComposer";
 
 const SAVE_EVERY_MS = 10_000;
 const REPLY_WAIT_MS = 4_000;
 const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
 const gb = (n: number) => (n / 1024 ** 3).toFixed(1);
 
-type Comment = { id: number; kind: string; start_s: number | null; end_s: number | null; resolved: boolean; carried?: boolean };
-type Loaded = { iteration: Iteration; comments: Comment[]; position_s: number | null };
+type Loaded = { iteration: Iteration; position_s: number | null };
 
 export type ReviewPlayerProps = {
   projectId: number;
@@ -30,8 +32,6 @@ export type ReviewPlayerProps = {
   seekS?: number;
   role: "admin" | "editor";
   username: string;
-  /** Task 5's comment panel. */
-  sidePanel?: ReactNode;
   now?: () => number;
 };
 
@@ -56,7 +56,7 @@ export function ReviewPlayer(props: ReviewPlayerProps) {
   return <Watch key={`${iterationId}-${attempt}`} {...props} data={data} retry={() => setAttempt(attempt + 1)} />;
 }
 
-function Watch({ projectId, tapeId, iterationId, seekS, sidePanel, now = Date.now, data, retry }: ReviewPlayerProps & { data: Loaded; retry(): void }) {
+function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Date.now, data, retry }: ReviewPlayerProps & { data: Loaded; retry(): void }) {
   const it = data.iteration;
   const media = useMediaFile(it.drive_file_id ? { id: it.id, drive_file_id: it.drive_file_id, size: it.size } : null, projectId, null);
   const worker = useMediaWorker();
@@ -68,6 +68,9 @@ function Watch({ projectId, tapeId, iterationId, seekS, sidePanel, now = Date.no
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(2);
   const [sheet, setSheet] = useState(false);
+  // start null: a general comment; n makes a new prefill remount the form
+  const [composer, setComposer] = useState<{ start: number | null; end: number | null; n: number } | null>(null);
+  const cm = useComments(iterationId, { role, username });
   const [videoError, setVideoError] = useState<string | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -138,20 +141,27 @@ function Watch({ projectId, tapeId, iterationId, seekS, sidePanel, now = Date.no
     speed: (dir) => started && changeSpeed(Math.min(Math.max(speed + dir, 0), SPEEDS.length - 1)),
     seekPercent: (n) => started && seekTo((n / 10) * duration),
     fullscreen: () => started && fullscreen(),
+    comment: () => {
+      if (!started) return;
+      video.current?.pause();
+      setComposer((c) => ({ start: video.current?.currentTime ?? 0, end: null, n: (c?.n ?? 0) + 1 }));
+    },
+    general: () => started && setComposer((c) => ({ start: null, end: null, n: (c?.n ?? 0) + 1 })),
     help: () => setSheet((s) => !s),
     escape: () => {
-      if (!sheet) return false;
-      setSheet(false);
+      if (sheet) setSheet(false);
+      else if (composer) setComposer(null);
+      else return false;
       return true;
     },
   }, { container: box });
 
   const markers: Marker[] = useMemo(
     () =>
-      data.comments
+      cm.comments
         .filter((c) => c.start_s !== null && !c.carried)
         .map((c) => ({ id: c.id, start: c.start_s as number, end: c.end_s ?? undefined, kind: c.kind, active: !c.resolved })),
-    [data.comments],
+    [cm.comments],
   );
   const ranges = useMemo(() => downloadedRanges(media.present, it.size), [media.present, it.size]);
   const ring = <DownloadRing doneBytes={media.doneBytes} total={media.total} />;
@@ -238,7 +248,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, sidePanel, now = Date.no
             />
             {err && <p className="text-rec">{err}</p>}
             {storageOnly && <p className="text-amber">Streaming only: not enough browser storage to save it</p>}
-            <ScrubBar duration={duration} current={current} downloaded={ranges} size={it.size} markers={markers} onSeek={seekTo} onRangeSelect={() => {}} />
+            <ScrubBar duration={duration} current={current} downloaded={ranges} size={it.size} markers={markers} onSeek={seekTo} rangeMode={!!composer} onRangeSelect={(start, end) => setComposer((c) => ({ start, end, n: (c?.n ?? 0) + 1 }))} />
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <button type="button" className={btn} onClick={toggle}>
                 {paused ? "Play" : "Pause"}
@@ -259,7 +269,22 @@ function Watch({ projectId, tapeId, iterationId, seekS, sidePanel, now = Date.no
             </div>
             {sheet && <KeySheet onClose={() => setSheet(false)} />}
           </div>
-          {sidePanel}
+          <div className="space-y-3">
+            {composer && (
+              <CommentComposer
+                key={composer.n}
+                start={composer.start}
+                end={composer.end}
+                getNow={() => video.current?.currentTime ?? current}
+                onSubmit={(draft) => {
+                  void cm.add(draft);
+                  setComposer(null);
+                }}
+                onCancel={() => setComposer(null)}
+              />
+            )}
+            <CommentPanel cm={cm} username={username} projectId={projectId} tapeId={tapeId} currentTime={current} onSeek={seekTo} now={now} />
+          </div>
         </div>
       )}
       {!started && sheet && <KeySheet onClose={() => setSheet(false)} />}

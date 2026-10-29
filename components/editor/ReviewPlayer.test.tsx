@@ -143,6 +143,21 @@ describe("ReviewPlayer", () => {
     expect(screen.getAllByRole("button", { name: /^Fix at / }).map((b) => b.getAttribute("aria-label"))).toEqual(["Fix at 1:23"]);
   });
 
+  it("C pauses and opens the composer at the current time; G opens a general one; Esc closes", async () => {
+    await open();
+    const v = await watch();
+    loaded(v);
+    paused = false;
+    time = 83.4;
+    fireEvent.keyDown(document.body, { key: "c" });
+    expect(pause).toHaveBeenCalled();
+    expect(await screen.findByLabelText("Start")).toHaveValue("1:23.4");
+    fireEvent.keyDown(screen.getByLabelText("Comment text"), { key: "Escape" });
+    expect(screen.queryByLabelText("Comment text")).toBeNull();
+    fireEvent.keyDown(document.body, { key: "g" });
+    expect(await screen.findByRole("form", { name: "General comment" })).toBeInTheDocument();
+  });
+
   it("saves the position at most every 10 s on an injected clock", async () => {
     let t = 1_000_000;
     await open({}, () => t);
