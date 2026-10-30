@@ -8,6 +8,7 @@ import { useDeletions, type DeleteRequest } from "@/lib/useDeletions";
 import { StatusLabel } from "./StatusLabel";
 import { PendingDelete } from "./PendingDelete";
 import { DeleteDialog } from "./DeleteDialog";
+import { useAsk } from "./AskDialog";
 import { DownloadLink, OpenInDrive } from "./DriveLinks";
 
 const btn = "label border border-seam px-3 py-1.5 text-xs text-phosphor hover:border-field disabled:opacity-40";
@@ -48,6 +49,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
   const { vods, clips, reels, error, refresh } = useProjects();
   // An Undo (or any delete appearing or finishing) changes the target too: refetch it.
   const deletions = useDeletions(() => refresh());
+  const ask = useAsk();
   const me = { username, role };
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
@@ -68,13 +70,13 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
   // Not awaited: the link opens on this same click. The refresh shows the editor's Delete once recorded.
   const download = (p: Project) => void recordDownload(p.id).then(refresh);
 
-  const rename = (p: Project) => {
-    const name = window.prompt("New name", p.name)?.trim();
+  const rename = async (p: Project) => {
+    const name = await ask.prompt({ title: `Rename ${p.name}`, label: "New name", initial: p.name, confirmLabel: "Rename" });
     if (name && name !== p.name) run(() => editorApi(`/projects/${p.id}`, { method: "PATCH", body: { name } }).then(refresh));
   };
 
-  const combine = () => {
-    const name = window.prompt("Name for the combined reel")?.trim();
+  const combine = async () => {
+    const name = await ask.prompt({ title: "Combine into one reel", label: "Name for the combined reel", confirmLabel: "Combine" });
     if (!name) return;
     run(async () => {
       await editorApi("/clips/combine", { method: "POST", body: { project_ids: chosen, name } });
@@ -193,6 +195,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
           }}
         />
       )}
+      {ask.dialog}
     </section>
   );
 }

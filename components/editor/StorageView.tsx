@@ -6,6 +6,7 @@ import { useDeletions, type DeleteKind } from "@/lib/useDeletions";
 import { routeHash } from "@/lib/useHashRoute";
 import { PendingDelete } from "./PendingDelete";
 import { DeleteDialog } from "./DeleteDialog";
+import { useAsk } from "./AskDialog";
 
 const btn = "label border border-seam px-3 py-1.5 text-xs text-phosphor hover:border-field disabled:opacity-40";
 const del = `${btn} border-rec text-rec`;
@@ -22,6 +23,7 @@ export function StorageView({ username }: { username: string }) {
   const deletions = useDeletions(() => refresh());
   const me = { username, role: "admin" as const };
   const [deleting, setDeleting] = useState<Deleting | null>(null);
+  const ask = useAsk();
 
   const groups = new Map<number, StorageFile[]>();
   for (const f of storage?.files ?? []) groups.set(f.project_id, [...(groups.get(f.project_id) ?? []), f]);
@@ -57,8 +59,13 @@ export function StorageView({ username }: { username: string }) {
           </p>
           <button
             type="button"
-            onClick={() => {
-              if (window.confirm("Trust the Mac Mini's clock again? Pending deletes get at most an hour from now.")) resetClock();
+            onClick={async () => {
+              const yes = await ask.confirm({
+                title: "Trust the clock again?",
+                message: "Pending deletes get at most an hour from now.",
+                confirmLabel: "Trust the clock",
+              });
+              if (yes) resetClock();
             }}
             className={btn}
           >
@@ -163,6 +170,7 @@ export function StorageView({ username }: { username: string }) {
           }}
         />
       )}
+      {ask.dialog}
     </section>
   );
 }

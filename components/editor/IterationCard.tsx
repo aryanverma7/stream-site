@@ -8,6 +8,7 @@ import type { Checks, CheckState, Iteration } from "@/lib/useTape";
 import type { Tape, TapeStatus } from "@/lib/useProject";
 import { StatusSelect } from "./StatusLabel";
 import { DownloadLink, OpenInDrive } from "./DriveLinks";
+import { useAsk } from "./AskDialog";
 
 const CHECKS = [
   ["resolution", "Resolution"],
@@ -102,13 +103,21 @@ export function IterationCard({
   onChanged?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const ask = useAsk();
   const [cancelError, setCancelError] = useState<string | null>(null);
   const ready = iteration.status === "ready";
   // An upload this tab is sending has its own Cancel in the Transfers panel; the card's is for an orphan
   // (closed tab, other computer), which otherwise blocks the tape's deletes for 8 days.
   const sendingHere = useTransfers().some((t) => t.tapeId === tape.id && t.version === iteration.version && t.state !== "done" && t.state !== "failed");
   const cancelUpload = async () => {
-    if (!window.confirm(`Cancel the upload of v${iteration.version}? Dropping the same file again later picks it up.`)) return;
+    const yes = await ask.confirm({
+      title: `Cancel the upload of v${iteration.version}?`,
+      message: "Dropping the same file again later picks it up.",
+      confirmLabel: "Cancel upload",
+      cancelLabel: "Keep it",
+      danger: true,
+    });
+    if (!yes) return;
     setCancelError(null);
     try {
       await editorApi(`/iterations/${iteration.id}/abandon`, { method: "POST" });
@@ -172,6 +181,7 @@ export function IterationCard({
           )}
         </div>
       </div>
+      {ask.dialog}
     </article>
   );
 }

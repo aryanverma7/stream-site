@@ -55,16 +55,18 @@ describe("IterationCard Cancel this upload", () => {
 
   it("an orphaned upload can be cancelled by either role after a confirm, then the tape refreshes", async () => {
     const fetchMock = editorBackend({ "POST /iterations/2/abandon": { id: 2, status: "abandoned" } });
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
     const onChanged = vi.fn();
-    const { getByRole } = render(<IterationCard iteration={it2({ status: "uploading" })} tape={tape} role="editor" onStatus={() => {}} locked={false} onChanged={onChanged} />);
+    const { getByRole, findByRole, queryByRole } = render(<IterationCard iteration={it2({ status: "uploading" })} tape={tape} role="editor" onStatus={() => {}} locked={false} onChanged={onChanged} />);
     const abandons = () => fetchMock.mock.calls.filter(([u, i]) => u === "/api/editor/iterations/2/abandon" && i?.method === "POST");
     fireEvent.click(getByRole("button", { name: "Cancel this upload" }));
+    fireEvent.click(await findByRole("button", { name: "Keep it" }));
+    await waitFor(() => expect(queryByRole("alertdialog")).toBeNull());
     expect(abandons()).toHaveLength(0);
     fireEvent.click(getByRole("button", { name: "Cancel this upload" }));
+    expect(getByRole("alertdialog", { name: "Cancel the upload of v2?" })).toBeTruthy();
+    fireEvent.click(getByRole("button", { name: "Cancel upload" }));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(abandons()).toHaveLength(1);
-    expect(confirm).toHaveBeenCalledTimes(2);
   });
 
   it("is not offered on a ready version, nor for an upload this tab is sending", async () => {
