@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { routeHash, useHashRoute, type Route } from "@/lib/useHashRoute";
+import { parseHash, routeHash, useHashRoute, type Route } from "@/lib/useHashRoute";
 import { useEditorMe, type EditorMe } from "@/lib/useEditorMe";
 import { useCrumbNames } from "@/lib/useCrumbNames";
 import { Breadcrumb } from "./Breadcrumb";
@@ -91,9 +91,13 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
   if (notice?.arrived && notice.hash !== hash) setNotice(null);
 
   // Browser copies of other projects' versions are only ever deleted here.
+  // The hash is read again here: while the page hydrates, `route` is the
+  // server snapshot (the projects list), and trusting it would delete every
+  // download on each load of a deep link.
   const projectId = "projectId" in route ? route.projectId : null;
   useEffect(() => {
-    keepOnlyProject(projectId).catch(() => {});
+    const now = parseHash(window.location.hash);
+    keepOnlyProject("projectId" in now ? now.projectId : null).catch(() => {});
   }, [projectId]);
 
   const viewRef = useRef<HTMLDivElement>(null);
