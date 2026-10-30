@@ -13,8 +13,8 @@ export function DonateSection() {
       <div className="hazard h-3" aria-hidden />
       <div className="wallpaper relative overflow-hidden px-4 py-20 sm:px-6 md:py-28">
         <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-6">
-          <h2 className="stencil max-w-3xl text-[clamp(3.25rem,10vw,6rem)] text-ink">Support the stream</h2>
-          <p className="max-w-md text-base font-medium text-ink/85">
+          <h2 className="stencil tilt slam max-w-3xl text-[clamp(3.25rem,10vw,6rem)] text-ink">Support the stream</h2>
+          <p className="max-w-md rotate-[-1deg] bg-ink px-3 py-2 text-base font-medium text-phosphor">
             Donations go directly through Streamlabs — you&apos;ll be taken to their
             secure page to complete it.
           </p>
@@ -23,7 +23,7 @@ export function DonateSection() {
               href="https://streamlabs.com/dualbladex"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 bg-ink px-7 py-4 text-sm font-extrabold uppercase tracking-[0.08em] text-field shadow-[0_10px_24px_rgb(10_12_18_/_0.35)] transition-[transform,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:bg-bezel-2"
+              className="menu-pop label inline-flex items-center gap-3 border-[3px] border-phosphor bg-ink px-7 py-4 text-sm text-phosphor shadow-[6px_6px_0_var(--phosphor)] hover:bg-phosphor hover:text-ink"
             >
               Donate on Streamlabs
             </a>
