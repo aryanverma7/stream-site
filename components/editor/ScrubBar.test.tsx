@@ -63,4 +63,10 @@ describe("ScrubBar", () => {
     expect(bar).toHaveAttribute("aria-valuenow", "50");
     expect(document.querySelector("[data-downloaded]")).toHaveAttribute("title", "Downloaded (approx.)");
   });
+
+  it("markers are not inside the slider, so they are reachable controls", () => {
+    setup();
+    const marker = screen.getByRole("button", { name: "Fix at 1:40" });
+    expect(screen.getByRole("slider").contains(marker)).toBe(false);
+  });
 });

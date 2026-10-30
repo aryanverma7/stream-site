@@ -67,7 +67,8 @@ export interface OcrAgentStatus {
   captures_received: number;
   captures_accepted: number;
   heartbeat_timeout_seconds: number;
-  tesseract_available: boolean;
+  /** Absent from an older backend: only false is a warning. */
+  tesseract_available?: boolean;
 }
 
 /**

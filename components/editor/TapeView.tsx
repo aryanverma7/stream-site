@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { editorApi } from "@/lib/editorApi";
 import { useTape } from "@/lib/useTape";
 import { useDeletions } from "@/lib/useDeletions";
@@ -14,9 +14,52 @@ import { DownloadLink, OpenInDrive } from "./DriveLinks";
 
 const btn = "label border border-seam px-3 py-2 text-xs text-phosphor hover:border-field disabled:opacity-40";
 const field = "w-full border border-seam bg-ink px-3 py-2 text-sm text-phosphor";
+const SAVE_AFTER_MS = 1_000;
+
+export type Delay = (fn: () => void, ms: number) => () => void;
+const timeout: Delay = (fn, ms) => {
+  const t = setTimeout(fn, ms);
+  return () => clearTimeout(t);
+};
+
+/**
+ * Saves a field's draft a second after typing stops, and on unmount (leaving
+ * the tape mid-edit), each draft at most once. The returned flush is for blur.
+ */
+function useAutosave(draft: string | null, save: (v: string) => void, delay: Delay) {
+  const latest = useRef({ draft, save });
+  useEffect(() => {
+    latest.current = { draft, save };
+  });
+  const sent = useRef<string | null>(null);
+  const flush = useCallback(() => {
+    const { draft: d, save: s } = latest.current;
+    if (d === null || d === sent.current) return;
+    sent.current = d;
+    s(d);
+  }, []);
+  useEffect(() => {
+    if (draft !== null) return delay(flush, SAVE_AFTER_MS);
+    sent.current = null; // editing ended: the next edit starts afresh
+  }, [draft, delay, flush]);
+  useEffect(() => flush, [flush]);
+  return flush;
+}
 
 /** A tape: its name, notes and status, its versions newest first, and the Final download. */
-export function TapeView({ projectId, tapeId, role, username }: { projectId: number; tapeId: number; role: "admin" | "editor"; username: string }) {
+export function TapeView({
+  projectId,
+  tapeId,
+  role,
+  username,
+  delay = timeout,
+}: {
+  projectId: number;
+  tapeId: number;
+  role: "admin" | "editor";
+  username: string;
+  delay?: Delay;
+}) {
   const { tape, iterations, error, refresh, update } = useTape(tapeId);
   // An Undo (or any delete appearing or finishing) changes the target too: refetch it.
   const deletions = useDeletions(() => refresh());
@@ -44,6 +87,21 @@ export function TapeView({ projectId, tapeId, role, username }: { projectId: num
     }
   }
   const setStatus = (status: TapeStatus) => run(() => update({ status }));
+  const saveName = useAutosave(
+    name,
+    (v) => {
+      const next = v.trim();
+      if (tape && next && next !== tape.name) void run(() => update({ name: next }));
+    },
+    delay,
+  );
+  const saveNotes = useAutosave(
+    notes,
+    (v) => {
+      if (tape && v !== tape.notes) void run(() => update({ notes: v }));
+    },
+    delay,
+  );
 
   // One h2 in the same place loading or loaded, so the focus the shell gives it survives the load.
   const heading = (
@@ -80,9 +138,8 @@ export function TapeView({ projectId, tapeId, role, username }: { projectId: num
             value={name ?? tape.name}
             onChange={(e) => setName(e.target.value)}
             onBlur={() => {
-              const next = name?.trim();
+              saveName();
               setName(null);
-              if (next && next !== tape.name) run(() => update({ name: next }));
             }}
             className={field}
           />
@@ -98,9 +155,8 @@ export function TapeView({ projectId, tapeId, role, username }: { projectId: num
             value={notes ?? tape.notes}
             onChange={(e) => setNotes(e.target.value)}
             onBlur={() => {
-              const next = notes;
+              saveNotes();
               setNotes(null);
-              if (next !== null && next !== tape.notes) run(() => update({ notes: next }));
             }}
             className={field}
           />
@@ -142,7 +198,7 @@ export function TapeView({ projectId, tapeId, role, username }: { projectId: num
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {newestFirst.map((it) => (
-            <IterationCard key={it.id} iteration={it} tape={tape} role={role} onStatus={setStatus} locked={locked} />
+            <IterationCard key={it.id} iteration={it} tape={tape} role={role} onStatus={setStatus} locked={locked} onChanged={refresh} />
           ))}
         </div>
       )}

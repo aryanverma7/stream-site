@@ -390,12 +390,14 @@ describe("ReviewPlayer", () => {
       paused = false;
       time = 12.5;
       fireEvent.keyDown(document.body, { key: "v" });
-      expect(sessionStorage.getItem("editor.resumePlaying")).toBe("1");
+      expect(sessionStorage.getItem("editor.resumePlaying")).toMatch(/^5:\d+$/);
       cleanup();
       play.mockClear();
       worker.provide.mockClear();
-      await open({ seekS: 12.5 });
-      expect(sessionStorage.getItem("editor.resumePlaying")).toBeNull();
+      editorBackend({ "/iterations/5": { iteration: { ...IT, id: 5, version: 2 }, comments: [], position_s: 100 }, ...tapeOf([5, 2, "ready"], [7, 3, "ready"]) });
+      render(<ReviewPlayer projectId={1} tapeId={2} iterationId={5} seekS={12.5} role="editor" username="cutter" />);
+      await screen.findByText("Version 2");
+      await waitFor(() => expect(sessionStorage.getItem("editor.resumePlaying")).toBeNull());
       await waitFor(() => expect(worker.provide).toHaveBeenCalled());
       loaded(await waitFor(() => document.querySelector("video") as HTMLVideoElement));
       await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
@@ -421,12 +423,133 @@ describe("ReviewPlayer", () => {
     });
 
     it("opens the composer once at the resume time when the card set the flag, then clears it", async () => {
-      sessionStorage.setItem("editor.openComposer", "1");
+      sessionStorage.setItem("editor.openComposer", "7");
       await open({ seekS: 42 });
       expect(sessionStorage.getItem("editor.openComposer")).toBeNull();
       loaded(await watch());
       expect(await screen.findByRole("button", { name: /Save|Add|Post|Send/i })).toBeInTheDocument();
       expect(time).toBe(42);
+    });
+
+    it("a flag for another version, or a resume older than 30 s, does nothing and is cleared", async () => {
+      sessionStorage.setItem("editor.openComposer", "9");
+      sessionStorage.setItem("editor.resumePlaying", "7:1000");
+      await open({}, () => 1000 + 31_000);
+      await waitFor(() => expect(sessionStorage.getItem("editor.openComposer")).toBeNull());
+      expect(sessionStorage.getItem("editor.resumePlaying")).toBeNull();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(worker.provide).not.toHaveBeenCalled(); // no automatic start
+      loaded(await watch());
+      expect(screen.queryByLabelText("Comment text")).toBeNull();
+    });
+
+    it("a version that fails to load clears the flags and offers Try again under a heading", async () => {
+      sessionStorage.setItem("editor.openComposer", "7");
+      let fail = true;
+      const good = editorBackend({ "/iterations/7": { iteration: IT, comments: [], position_s: 100 } });
+      global.fetch = ((u: string, i?: RequestInit) =>
+        fail && u.endsWith("/iterations/7") ? Promise.resolve({ ok: false, status: 502, json: async () => ({ error: "Bad gateway" }) }) : good(u, i)) as unknown as typeof fetch;
+      render(<ReviewPlayer projectId={1} tapeId={2} iterationId={7} role="editor" username="cutter" />);
+      expect(await screen.findByRole("heading", { name: "This version could not be opened" })).toBeInTheDocument();
+      expect(screen.getByText("Bad gateway")).toBeInTheDocument();
+      expect(sessionStorage.getItem("editor.openComposer")).toBeNull();
+      fail = false;
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(await screen.findByText("Version 3")).toBeInTheDocument();
+    });
+
+    it("leaving while the version loads drops its flag", async () => {
+      sessionStorage.setItem("editor.openComposer", "7");
+      global.fetch = (() => new Promise(() => {})) as unknown as typeof fetch;
+      const r = render(<ReviewPlayer projectId={1} tapeId={2} iterationId={7} role="editor" username="cutter" />);
+      r.unmount();
+      await new Promise((res) => setTimeout(res, 0));
+      expect(sessionStorage.getItem("editor.openComposer")).toBeNull();
+    });
+  });
+
+  describe("audit fixes", () => {
+    it("storage-only: Try again after a playback error reloads the video", async () => {
+      Object.assign(media, { state: "error", error: "Not enough browser storage: needs 3.4 GB, 1.0 GB free" });
+      await open();
+      const v = await watch();
+      fireEvent.error(v);
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      const again = document.querySelector("video");
+      expect(again).not.toBeNull(); // still playing: the element was reloaded, not the whole player
+      expect(again).not.toBe(v);
+      expect(screen.queryByRole("button", { name: "Start watching now" })).toBeNull();
+    });
+
+    it("a reloaded video shows Play and keeps the chosen speed", async () => {
+      await open();
+      const v = await watch();
+      loaded(v);
+      fireEvent.play(v);
+      fireEvent.click(screen.getByRole("button", { name: "Speed" })); // 1.5×
+      fireEvent.error(v);
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      const v2 = document.querySelector("video") as HTMLVideoElement;
+      expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
+      loaded(v2);
+      expect(v2.playbackRate).toBe(1.5);
+    });
+
+    it("selecting a range in fullscreen leaves fullscreen and pauses", async () => {
+      await open();
+      loaded(await watch());
+      fireEvent.keyDown(document.body, { key: "c" });
+      await screen.findByLabelText("Comment text");
+      const exit = vi.fn(async () => {});
+      Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => document.body });
+      Object.defineProperty(document, "exitFullscreen", { configurable: true, value: exit });
+      pause.mockClear();
+      const bar = screen.getByRole("slider");
+      bar.getBoundingClientRect = () => ({ left: 0, width: 600, top: 0, height: 10, right: 600, bottom: 10, x: 0, y: 0, toJSON() {} });
+      fireEvent.mouseDown(bar, { clientX: 30, shiftKey: true });
+      fireEvent.mouseMove(window, { clientX: 60 });
+      fireEvent.mouseUp(window);
+      expect(exit).toHaveBeenCalled();
+      expect(pause).toHaveBeenCalled();
+      Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => null });
+    });
+
+    it("shows the comments while the version downloads, without seeking, and posts /seen once across Try again", async () => {
+      serve({}, [{ id: 1, kind: "fix", author: "s", body: "trim the intro", start_s: 83, end_s: null, created_at: 1, updated_at: 1, resolved: false, carried: false, replies: [] }]);
+      const fetchMock = backend;
+      Object.assign(media, { state: "error", error: "Download failed" });
+      await open();
+      expect(await screen.findByText("trim the intro")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Go to 1:23" })).toBeDisabled();
+      const seen = () => fetchMock.mock.calls.filter((c) => c[1]?.method === "POST" && String(c[0]).endsWith("/seen")).length;
+      await waitFor(() => expect(seen()).toBe(1));
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      await screen.findByText("trim the intro");
+      await new Promise((r) => setTimeout(r, 10));
+      expect(seen()).toBe(1);
+    });
+
+    it("says what it is waiting for while the download retries", async () => {
+      Object.assign(media, { retrying: "Drive is not connected" });
+      await open();
+      expect(screen.getByText("Waiting for the Mac Mini / Drive: Drive is not connected")).toBeInTheDocument();
+      Object.assign(media, { retrying: null });
+    });
+
+    it("holds shared locks on its project and version until it closes", async () => {
+      const held: string[] = [];
+      const request = vi.fn(async (name: string, _o: unknown, cb: () => Promise<void>) => {
+        held.push(name);
+        await cb();
+        held.splice(held.indexOf(name), 1);
+      });
+      Object.defineProperty(navigator, "locks", { configurable: true, value: { request, query: async () => ({ held: [] }) } });
+      const r = await open();
+      expect(request).toHaveBeenCalledWith("opfs-project-1", { mode: "shared" }, expect.any(Function));
+      expect(held.sort()).toEqual(["opfs-project-1", "opfs-version-it-1-7-F1"]);
+      r.unmount();
+      await waitFor(() => expect(held).toEqual([]));
+      delete (navigator as unknown as { locks?: unknown }).locks;
     });
   });
 });

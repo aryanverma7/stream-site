@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { duration, editorApi } from "@/lib/editorApi";
 import { routeHash } from "@/lib/useHashRoute";
+import { useTransfers } from "@/lib/useTransfers";
 import type { Checks, CheckState, Iteration } from "@/lib/useTape";
 import type { Tape, TapeStatus } from "@/lib/useProject";
 import { StatusSelect } from "./StatusLabel";
@@ -89,6 +90,7 @@ export function IterationCard({
   role,
   onStatus,
   locked,
+  onChanged,
 }: {
   iteration: Iteration;
   tape: Tape;
@@ -96,9 +98,25 @@ export function IterationCard({
   onStatus: (s: TapeStatus) => void;
   /** A delete covering this version is in its undo hour. */
   locked: boolean;
+  /** The version changed on the server (an upload was cancelled): refetch the tape. */
+  onChanged?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const ready = iteration.status === "ready";
+  // An upload this tab is sending has its own Cancel in the Transfers panel; the card's is for an orphan
+  // (closed tab, other computer), which otherwise blocks the tape's deletes for 8 days.
+  const sendingHere = useTransfers().some((t) => t.tapeId === tape.id && t.version === iteration.version && t.state !== "done" && t.state !== "failed");
+  const cancelUpload = async () => {
+    if (!window.confirm(`Cancel the upload of v${iteration.version}? Dropping the same file again later picks it up.`)) return;
+    setCancelError(null);
+    try {
+      await editorApi(`/iterations/${iteration.id}/abandon`, { method: "POST" });
+      onChanged?.();
+    } catch (e) {
+      setCancelError(e instanceof Error ? e.message : "Could not cancel the upload");
+    }
+  };
   const play = routeHash({ view: "iteration", projectId: tape.project_id, tapeId: tape.id, iterationId: iteration.id });
   return (
     <article className="group relative border border-seam bg-bezel">
@@ -114,6 +132,11 @@ export function IterationCard({
         </div>
         <CheckBadges checks={iteration.checks} />
         {ready && <CommentSummary iterationId={iteration.id} />}
+        {cancelError && (
+          <p role="alert" className="text-xs text-rec">
+            {cancelError}
+          </p>
+        )}
         <div className={`${open ? "flex" : "hidden"} flex-wrap items-center gap-2 group-hover:flex group-focus-within:flex`}>
           {ready && (
             <a href={play} className={btn}>
@@ -126,7 +149,7 @@ export function IterationCard({
               className={btn}
               onClick={() => {
                 try {
-                  sessionStorage.setItem("editor.openComposer", "1");
+                  sessionStorage.setItem("editor.openComposer", String(iteration.id)); // only that version opens it
                 } catch {
                   /* the player just opens without the composer */
                 }
@@ -137,6 +160,11 @@ export function IterationCard({
             </button>
           )}
           <StatusSelect name={tape.name} status={tape.status} role={role} onChange={onStatus} />
+          {iteration.status === "uploading" && !sendingHere && (
+            <button type="button" className={btn} onClick={cancelUpload}>
+              Cancel this upload
+            </button>
+          )}
           {ready && iteration.drive_file_id && (
             <DownloadLink fileId={iteration.drive_file_id} disabled={locked} className={btn}>
               Download

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, waitFor, fireEvent } from "@testing-library/react";
-import { StatusPanel } from "./StatusPanel";
+import { StatusPanel, Summary } from "./StatusPanel";
 import { asFetchMock } from "@/lib/testUtils";
 
 // Deliberately has NO credit_prediction key - this is what a backend that
@@ -404,6 +404,24 @@ describe("StatusPanel", () => {
     const { getByText } = render(<StatusPanel />);
 
     await waitFor(() => expect(getByText(/Tesseract isn't where the Mac Mini expects it/i)).toBeTruthy());
+  });
+
+  it("an older backend without tesseract_available raises no Tesseract warning", async () => {
+    const { tesseract_available: _gone, ...older } = liveAgent;
+    void _gone;
+    mockFetchOf({ ...mockStatus, ocr_agent: older });
+    const { findByText, queryByText } = render(<StatusPanel />);
+    await findByText("All feeds OK");
+    expect(queryByText(/Tesseract isn't where the Mac Mini expects it/i)).toBeNull();
+  });
+
+  it("does not say All feeds OK when no feed is up", () => {
+    const feed = (state: "up" | "off" | "unknown") => ({ name: state, state, body: null });
+    const quiet = render(<Summary feeds={[feed("off"), feed("unknown")]} />);
+    expect(quiet.getByText("Nothing reporting yet")).toBeTruthy();
+    expect(quiet.queryByText("All feeds OK")).toBeNull();
+    quiet.unmount();
+    expect(render(<Summary feeds={[feed("up"), feed("unknown")]} />).getByText("All feeds OK")).toBeTruthy();
   });
 
   it("shows the public URL as reachable, with when it was last checked", async () => {

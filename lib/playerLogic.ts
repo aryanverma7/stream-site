@@ -27,5 +27,5 @@ export function fpsOf(checks: { fps?: { value?: unknown } } | null | undefined):
   return typeof f === "number" && f > 0 ? f : 60;
 }
 
-const MIME: Record<string, string> = { mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime", webm: "video/webm", mkv: "video/x-matroska" };
+const MIME: Record<string, string> = { mp4: "video/mp4", m4v: "video/mp4", mov: "video/mp4" /* Firefox will not play video/quicktime; a .mov is the same ISO container */, webm: "video/webm", mkv: "video/x-matroska" };
 export const mimeOf = (filename: string) => MIME[filename.split(".").pop()?.toLowerCase() ?? ""] ?? "video/mp4";

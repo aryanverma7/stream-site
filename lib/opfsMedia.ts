@@ -8,6 +8,8 @@
  * CHUNK_BYTES / chunkCount / chunkName / dirName are repeated in the service
  * worker (plain JS); a test pins that they agree.
  */
+import { EditorApiError } from "./editorApi";
+
 export const CHUNK_BYTES = 32 * 1024 * 1024;
 export const chunkCount = (size: number) => Math.ceil(size / CHUNK_BYTES);
 export const chunkName = (i: number) => "c" + String(i).padStart(5, "0");
@@ -63,13 +65,69 @@ export async function presentChunks(dir: FileSystemDirectoryHandle, size: number
   );
 }
 
+/*
+ * OPFS is shared by every tab of the site, so a tab playing or downloading a
+ * version holds shared Web Locks on its project and its version directory for
+ * as long as it is open; deletion skips anything another tab holds. Without
+ * navigator.locks nothing is skipped (one tab's view of the world).
+ */
+type LockManager = {
+  request(name: string, o: { mode: "shared" }, cb: () => Promise<void>): Promise<void>;
+  query(): Promise<{ held?: { name?: string }[] }>;
+};
+const lockManager = () => (typeof navigator === "undefined" ? undefined : (navigator as unknown as { locks?: LockManager }).locks);
+export const projectLock = (projectId: number) => `opfs-project-${projectId}`;
+export const versionLock = (dir: string) => `opfs-version-${dir}`;
+/** Locks this page holds (granted and not yet released): they do not protect from this page's own deletions. */
+const mine = new Map<string, number>();
+const bump = (name: string, d: number) => mine.set(name, (mine.get(name) ?? 0) + d);
+
+/** Holds shared locks on `names` until the returned function is called. */
+export function holdLocks(names: string[]): () => void {
+  const locks = lockManager();
+  if (!locks) return () => {};
+  let release = () => {};
+  const gone = new Promise<void>((r) => (release = r));
+  for (const name of names) {
+    let granted = false;
+    locks
+      .request(name, { mode: "shared" }, async () => {
+        granted = true;
+        bump(name, 1);
+        await gone;
+      })
+      .catch(() => {})
+      .finally(() => granted && bump(name, -1));
+  }
+  return release;
+}
+
+/** Lock names some other tab holds; empty without the Locks API or when the query fails. */
+async function heldElsewhere(): Promise<Set<string>> {
+  const locks = lockManager();
+  const out = new Set<string>();
+  if (!locks) return out;
+  try {
+    const count = new Map<string, number>();
+    for (const l of (await locks.query()).held ?? []) if (l.name) count.set(l.name, (count.get(l.name) ?? 0) + 1);
+    for (const [name, n] of count) if (n > (mine.get(name) ?? 0)) out.add(name);
+  } catch {
+    /* treat as nothing held */
+  }
+  return out;
+}
+
+const projectOf = (dir: string) => Number(dir.split("-")[1]);
+
 let queue: Promise<unknown> = Promise.resolve();
 
-/** Deletes every version directory outside `projectId` (all when null). Calls run one after another. */
+/** Deletes every version directory outside `projectId` (all when null), except another tab's. Calls run one after another. */
 export function keepOnlyProject(projectId: number | null, root?: FileSystemDirectoryHandle): Promise<void> {
   const run = async () => {
     const r = await getRoot(root);
+    const held = await heldElsewhere();
     for (const name of await versionDirs(r)) {
+      if (held.has(projectLock(projectOf(name)))) continue;
       if (projectId === null || !name.startsWith(`it-${projectId}-`)) await r.removeEntry(name, { recursive: true }).catch(() => {});
     }
   };
@@ -86,8 +144,9 @@ async function freeBytes(): Promise<number> {
 /** Deletes `projectId`'s version directories, least recently opened first, until `needBytes` are free. */
 export async function freeSpaceFor(needBytes: number, projectId: number, protect: string[], root?: FileSystemDirectoryHandle): Promise<void> {
   const r = await getRoot(root);
+  const held = await heldElsewhere();
   const names = (await versionDirs(r))
-    .filter((n) => n.startsWith(`it-${projectId}-`) && !protect.some((p) => n.startsWith(p)))
+    .filter((n) => n.startsWith(`it-${projectId}-`) && !protect.some((p) => n.startsWith(p)) && !held.has(versionLock(n)))
     .sort((a, b) => (opened.get(a) ?? 0) - (opened.get(b) ?? 0));
   for (const name of names) {
     if ((await freeBytes()) >= needBytes) return;
@@ -121,13 +180,31 @@ export type DownloadOpts = {
   root?: FileSystemDirectoryHandle;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
+  /** Called before each wait to retry, with what went wrong, and with null once a retried request succeeds. */
+  onRetry?(message: string | null): void;
 };
+
+/** getLink answers the backend gives for good (no file, not allowed, gone from Drive, not ready). */
+const FINAL_LINK_STATUSES = [400, 403, 404, 409];
+/** Drive 403 reasons that mean "slow down", not "you may not have this". */
+const RATE_LIMITED = ["rateLimitExceeded", "userRateLimitExceeded", "downloadQuotaExceeded"];
+const SHORT_CHUNK_TRIES = 5;
+
+async function reasonsOf(res: Response): Promise<string[]> {
+  try {
+    const body = await res.json();
+    return (body?.error?.errors ?? []).map((e: { reason?: string }) => String(e?.reason ?? ""));
+  } catch {
+    return [];
+  }
+}
 
 export async function downloadToOpfs(opts: DownloadOpts): Promise<void> {
   const { projectId, iterationId, fileId, size, signal, onProgress } = opts;
   const now = opts.now ?? Date.now;
   const sleep = opts.sleep ?? realSleep;
   const root = await getRoot(opts.root);
+  signal.throwIfAborted(); // never recreate a folder for a version the person has left
   const name = dirName(projectId, iterationId, fileId);
   const dir = await root.getDirectoryHandle(name, { create: true });
   const present = await presentChunks(dir, size);
@@ -146,7 +223,12 @@ export async function downloadToOpfs(opts: DownloadOpts): Promise<void> {
   let linkAt = 0;
   const current = async (fresh = false) => {
     if (fresh || !link || (now() - linkAt) / 1000 > link.expires_in - 60) {
-      link = await opts.getLink(fresh);
+      try {
+        link = await opts.getLink(fresh);
+      } catch (e) {
+        if (e instanceof EditorApiError && FINAL_LINK_STATUSES.includes(e.status)) throw new FatalMediaError(e.message);
+        throw e;
+      }
       linkAt = now();
     }
     return link;
@@ -156,6 +238,7 @@ export async function downloadToOpfs(opts: DownloadOpts): Promise<void> {
     const start = i * CHUNK_BYTES;
     const want = chunkLength(size, i);
     let refreshed = false;
+    let short = 0;
     let blob: Blob | null = null;
     for (let n = 0; !blob; ) {
       signal.throwIfAborted();
@@ -171,6 +254,7 @@ export async function downloadToOpfs(opts: DownloadOpts): Promise<void> {
           continue;
         }
         if (res.status === 401) throw new FatalMediaError("Drive refused the download link");
+        if (res.status === 403 && (await reasonsOf(res)).some((r) => RATE_LIMITED.includes(r))) throw new Error("Drive asked to slow down");
         if (res.status === 403 || res.status === 404) throw new MediaGone();
         // a one-chunk file asks for every byte, and Drive may answer that with a plain 200
         const whole = start === 0 && want === size;
@@ -180,10 +264,15 @@ export async function downloadToOpfs(opts: DownloadOpts): Promise<void> {
           throw new FatalMediaError(`Unexpected response ${res.status}`);
         }
         const got = await res.blob();
-        if (got.size !== want) throw new Error("Drive sent a short chunk");
+        if (got.size !== want) {
+          if (++short >= SHORT_CHUNK_TRIES) throw new FatalMediaError("Drive keeps sending part of the file");
+          throw new Error("Drive sent a short chunk");
+        }
         blob = got;
+        if (n > 0) opts.onRetry?.(null); // through again: the waiting message goes before the write
       } catch (e) {
         if (signal.aborted || e instanceof FatalMediaError) throw e;
+        opts.onRetry?.(e instanceof Error ? e.message : "Connection lost");
         if (navigator.onLine === false) await waitOnline(signal);
         else await sleep(Math.min(2 * 2 ** n, 60) * 1000);
         n++;

@@ -121,6 +121,7 @@ function ListInput({ id, label, items, onChange }: { id: string; label: string; 
         value={draft}
         placeholder="Add..."
         onChange={(e) => setDraft(e.target.value)}
+        onBlur={add} /* typed but not Added is still an entry: Save must not drop it */
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
@@ -246,7 +247,8 @@ function SecretInput({
       >
         {isSet ? "Set" : "Not set"}
       </span>
-      <button type="button" onClick={() => setReplacing(true)} className={GHOST}>
+      {/* the field's id, so the banner can jump to an unset secret; aria-label keeps the field label from renaming it */}
+      <button id={id} type="button" aria-label="Replace…" onClick={() => setReplacing(true)} className={GHOST}>
         Replace…
       </button>
     </span>

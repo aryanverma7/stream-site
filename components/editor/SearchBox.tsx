@@ -35,12 +35,19 @@ export function SearchBox() {
 
   const pick = (h: Hit) => {
     setOpen(false);
+    input.current?.blur(); // focus left in the box would swallow the player's keys
     go(h);
   };
   const searching = q.trim().length >= 2;
 
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      onBlur={(e) => {
+        // focus leaving the box and its results (a click elsewhere) closes them
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+      }}
+    >
       <input
         ref={input}
         type="search"
@@ -67,7 +74,7 @@ export function SearchBox() {
           {!loading && !error && hits.length === 0 && <li className="px-3 py-2 text-sm text-dim">No matches</li>}
           {hits.slice(0, 50).map((h) => (
             <li key={`${h.kind}-${h.comment_id}-${h.snippet}`} role="option" aria-selected={false}>
-              <button type="button" onClick={() => pick(h)} className="block w-full px-3 py-2 text-left text-sm hover:bg-bezel-2">
+              <button type="button" onMouseDown={(e) => e.preventDefault() /* keep focus in the box until the click lands */} onClick={() => pick(h)} className="block w-full px-3 py-2 text-left text-sm hover:bg-bezel-2">
                 <span className="label mr-2 text-[10px] text-dim">{h.kind === "reply" ? "Reply" : "Comment"}</span>
                 v{h.version}
                 {h.start_s !== null && ` · ${formatTime(h.start_s)}`} · {h.snippet}

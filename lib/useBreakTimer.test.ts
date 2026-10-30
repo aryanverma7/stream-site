@@ -81,4 +81,31 @@ describe("useBreakTimer", () => {
     expect(result.current.state?.active).toBe(true);
     expect(result.current.error).toBeTruthy();
   });
+
+  it("does not poll while the tab is hidden or a start is in flight, and drops a poll that overlapped one", async () => {
+    let tick = () => {};
+    const schedule = (fn: () => void) => ((tick = fn), () => {});
+    let answerPoll!: (v: unknown) => void;
+    let answerPost!: (v: unknown) => void;
+    const fetchMock = vi.fn((_u: string, init?: { method?: string }) =>
+      init?.method === "POST" ? new Promise((r) => (answerPost = r)) : new Promise((r) => (answerPoll = r)),
+    );
+    global.fetch = asFetchMock(fetchMock);
+    const { result } = renderHook(() => useBreakTimer({ schedule }));
+    expect(fetchMock).toHaveBeenCalledTimes(1); // the mount read, still unanswered
+    const hidden = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    tick();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    hidden.mockRestore();
+    let started!: Promise<void>;
+    act(() => void (started = result.current.start(10, "brb")));
+    tick(); // busy: no poll
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      answerPost({ ok: true, json: async () => RUNNING });
+      await started;
+    });
+    await act(async () => answerPoll({ ok: true, json: async () => IDLE })); // the stale mount read lands late
+    expect(result.current.state?.active).toBe(true);
+  });
 });

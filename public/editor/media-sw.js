@@ -33,16 +33,28 @@ function fresh(m) {
   return !!m && linkFresh(m.link, Date.now());
 }
 
-/** Posts "need-link" to the page and waits (at most 15 s) for its "media" answer. */
-async function ask(id, clientId) {
+/**
+ * Posts "need-link" to the page and waits (at most 15 s) for its "media" answer.
+ * `need` is "info" when size and type are enough (a downloaded version may answer
+ * without a link), "link" when a Drive piece needs a real token.
+ */
+async function ask(id, clientId, need) {
+  var mine;
   var arrived = new Promise(function (resolve) {
+    mine = resolve;
     waiting.set(id, (waiting.get(id) || []).concat(resolve));
   });
+  var timer;
+  var timeout = new Promise(function (resolve) { timer = setTimeout(resolve, LINK_WAIT_MS); });
   var client = clientId ? await self.clients.get(clientId) : null;
   var targets = client ? [client] : await self.clients.matchAll({ type: "window" });
-  targets.forEach(function (c) { c.postMessage({ type: "need-link", iterationId: Number(id) }); });
-  var timeout = new Promise(function (resolve) { setTimeout(resolve, LINK_WAIT_MS); });
+  targets.forEach(function (c) { c.postMessage({ type: "need-link", iterationId: Number(id), need: need }); });
   await Promise.race([arrived, timeout]);
+  clearTimeout(timer);
+  // a timed-out wait leaves its resolver behind otherwise
+  var left = (waiting.get(id) || []).filter(function (r) { return r !== mine; });
+  if (left.length) waiting.set(id, left);
+  else waiting.delete(id);
   return media.get(id) || null;
 }
 
@@ -50,16 +62,18 @@ async function ask(id, clientId) {
 async function info(id, clientId, force) {
   var m = media.get(id);
   if (!force && fresh(m)) return m;
-  m = await ask(id, clientId);
+  m = await ask(id, clientId, "link");
   return fresh(m) ? m : null;
 }
 
-async function driveStream(id, clientId, m, piece) {
+async function driveStream(id, clientId, m, piece, signal) {
   for (var retried = false; ; retried = true) {
     var res = await fetch(m.link.url, {
       headers: { Authorization: "Bearer " + m.link.access_token, Range: "bytes=" + piece.from + "-" + piece.to },
+      signal: signal,
     });
     if (rangeAnswered(res.status, piece.from, piece.to, m.size)) return res.body;
+    if (res.body) res.body.cancel().catch(function () {}); // an unread error body would hold the connection
     if (res.status !== 401 || retried) throw new Error("Drive answered " + res.status);
     m = await info(id, clientId, true);
     if (!m) throw new Error("No playback link");
@@ -68,7 +82,7 @@ async function driveStream(id, clientId, m, piece) {
 
 async function serve(id, rangeHeader, clientId) {
   // size and mime are enough to plan; a token is only needed for a Drive piece
-  var m = media.get(id) || (await ask(id, clientId));
+  var m = media.get(id) || (await ask(id, clientId, "info"));
   if (!m) return new Response("Playback link unavailable", { status: 503 });
   var r = parseRange(rangeHeader, m.size);
   if (!r) return new Response(null, { status: 416, headers: { "Content-Range": "bytes */" + m.size } });
@@ -94,8 +108,10 @@ async function serve(id, rangeHeader, clientId) {
     if (!m) return new Response("Playback link unavailable", { status: 503 });
   }
 
+  // one controller per response: cancelling it aborts whichever Drive fetch is in flight
+  var abort = new AbortController();
   async function open(p) {
-    if (p.source === "drive") return driveStream(id, clientId, m, p);
+    if (p.source === "drive") return driveStream(id, clientId, m, p, abort.signal);
     var base = p.chunk * CHUNK_BYTES;
     var file = await (await dir.getFileHandle(chunkName(p.chunk))).getFile();
     return file.slice(p.from - base, p.to + 1 - base).stream();
@@ -114,11 +130,14 @@ async function serve(id, rangeHeader, clientId) {
         var chunk = await reader.read();
         if (!chunk.done) return ctl.enqueue(chunk.value);
         if (next >= pieces.length) return ctl.close();
-        reader = (await open(pieces[next++])).getReader();
+        var opened = (await open(pieces[next++])).getReader();
+        if (abort.signal.aborted) return opened.cancel(); // cancelled while it opened
+        reader = opened;
       }
     },
     cancel() {
-      return reader.cancel();
+      abort.abort();
+      return reader.cancel().catch(function () {});
     },
   });
   return new Response(body, {

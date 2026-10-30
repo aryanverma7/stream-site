@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { fireEvent, render } from "@testing-library/react";
+import { fireEvent, render, waitFor } from "@testing-library/react";
 import { CheckBadges, IterationCard, IterationDetails } from "./IterationCard";
 import type { Checks, Iteration } from "@/lib/useTape";
 import type { Tape } from "@/lib/useProject";
@@ -47,13 +47,46 @@ describe("IterationCard", () => {
   });
 });
 
+describe("IterationCard Cancel this upload", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it("an orphaned upload can be cancelled by either role after a confirm, then the tape refreshes", async () => {
+    const fetchMock = editorBackend({ "POST /iterations/2/abandon": { id: 2, status: "abandoned" } });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const onChanged = vi.fn();
+    const { getByRole } = render(<IterationCard iteration={it2({ status: "uploading" })} tape={tape} role="editor" onStatus={() => {}} locked={false} onChanged={onChanged} />);
+    const abandons = () => fetchMock.mock.calls.filter(([u, i]) => u === "/api/editor/iterations/2/abandon" && i?.method === "POST");
+    fireEvent.click(getByRole("button", { name: "Cancel this upload" }));
+    expect(abandons()).toHaveLength(0);
+    fireEvent.click(getByRole("button", { name: "Cancel this upload" }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(abandons()).toHaveLength(1);
+    expect(confirm).toHaveBeenCalledTimes(2);
+  });
+
+  it("is not offered on a ready version, nor for an upload this tab is sending", async () => {
+    editorBackend({ "/iterations/2": { comments: [] } });
+    const ready = render(<IterationCard iteration={it2()} tape={tape} role="admin" onStatus={() => {}} locked={false} />);
+    expect(ready.queryByRole("button", { name: "Cancel this upload" })).toBeNull();
+    ready.unmount();
+    localStorage.setItem("editor.uploads", JSON.stringify([{ tapeId: 5, projectId: 12, name: "x.mp4", size: 1, lastModified: 1, iterationId: 2, version: 2, uploadUrl: "u", sent: 0 }]));
+    vi.resetModules(); // the transfers store reads storage once
+    const { IterationCard: Card } = await import("./IterationCard");
+    const mine = render(<Card iteration={it2({ status: "uploading" })} tape={tape} role="admin" onStatus={() => {}} locked={false} />);
+    expect(mine.queryByRole("button", { name: "Cancel this upload" })).toBeNull();
+  });
+});
+
 describe("IterationCard Add comment", () => {
   it("sets the one-shot flag and goes to the version", () => {
     editorBackend({ "/iterations/2": { comments: [] } });
     sessionStorage.clear();
     const { getByRole } = render(<IterationCard iteration={it2()} tape={tape} role="editor" onStatus={() => {}} locked={false} />);
     fireEvent.click(getByRole("button", { name: "Add comment" }));
-    expect(sessionStorage.getItem("editor.openComposer")).toBe("1");
+    expect(sessionStorage.getItem("editor.openComposer")).toBe("2");
     expect(window.location.hash).toBe("#/p/12/t/5/v/2");
   });
 });

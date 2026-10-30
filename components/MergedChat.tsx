@@ -18,24 +18,52 @@ const PLATFORM_COLORS: Record<string, string> = {
  *
  * Only ever active during the Live section's live state, per spec Section
  * 7 - not a persistent element elsewhere on the page.
+ *
+ * A dropped socket (backend restart, tunnel blip) reconnects after 1 s,
+ * doubling to at most 30 s; a successful connect resets the delay.
  */
-export function MergedChat() {
+type Later = (fn: () => void, ms: number) => () => void;
+const later: Later = (fn, ms) => {
+  const t = setTimeout(fn, ms);
+  return () => clearTimeout(t);
+};
+const RETRY_MAX_MS = 30_000;
+
+export function MergedChat({ schedule = later }: { schedule?: Later }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/widgets?widget=chat`);
-
-    ws.onmessage = (event) => {
-      const parsed = parseChatMessage(event.data);
-      if (parsed) {
-        setMessages((prev) => [...prev.slice(-(MAX_MESSAGES - 1)), parsed]);
-      }
+    let ws: WebSocket;
+    let stopped = false;
+    let delay = 1000;
+    let cancelRetry = () => {};
+    const connect = () => {
+      ws = new WebSocket(`${protocol}//${window.location.host}/ws/widgets?widget=chat`);
+      ws.onopen = () => {
+        delay = 1000; // connected again: the next drop starts the backoff over
+      };
+      ws.onmessage = (event) => {
+        const parsed = parseChatMessage(event.data);
+        if (parsed) {
+          setMessages((prev) => [...prev.slice(-(MAX_MESSAGES - 1)), parsed]);
+        }
+      };
+      ws.onclose = () => {
+        if (stopped) return;
+        cancelRetry = schedule(connect, delay);
+        delay = Math.min(delay * 2, RETRY_MAX_MS);
+      };
     };
+    connect();
 
-    return () => ws.close();
-  }, []);
+    return () => {
+      stopped = true;
+      cancelRetry();
+      ws.close();
+    };
+  }, [schedule]);
 
   useEffect(() => {
     if (typeof scrollRef.current?.scrollTo === "function") {

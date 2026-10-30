@@ -29,10 +29,21 @@ const every = (fn: () => void, ms: number) => {
   return () => clearInterval(h);
 };
 
+export type SeenFn = () => Promise<{ previous_seen_at: number | null }>;
+const postSeen = (iterationId: number): SeenFn => () =>
+  editorApi<{ previous_seen_at: number | null }>(`/iterations/${iterationId}/seen`, { method: "POST" });
+
 export function useComments(
   iterationId: number,
   { role, username }: { role: "admin" | "editor"; username: string },
-  { schedule = every }: { schedule?: (fn: () => void, ms: number) => () => void } = {},
+  {
+    schedule = every,
+    seen,
+  }: {
+    schedule?: (fn: () => void, ms: number) => () => void;
+    /** Marks the version seen. The player passes one that POSTs once per version view, so a remount (Try again) keeps the first answer. */
+    seen?: SeenFn;
+  } = {},
 ) {
   const [comments, setComments] = useState<Comment[]>([]);
   // undefined: not known yet. null: first visit. A failed call shows nothing as new.
@@ -41,22 +52,27 @@ export function useComments(
   const [failed, setFailed] = useState<Failed[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // The "Not sent yet" placeholders are refreshed together with the list, so a sent
+  // comment never vanishes before it is back from the server.
   const reload = useCallback(async () => {
     try {
       const d = await editorApi<{ comments: Comment[] }>(`/iterations/${iterationId}`);
       setComments(d.comments.map((c) => ({ ...c, replies: c.replies ?? [] })));
+      setAll(queue.list());
     } catch {
       // keep what is on screen
     }
   }, [iterationId]);
 
+  const seenRef = useRef(seen);
   useEffect(() => {
-    editorApi<{ previous_seen_at: number | null }>(`/iterations/${iterationId}/seen`, { method: "POST" })
+    (seenRef.current ?? postSeen(iterationId))()
       .then((d) => setPreviousSeen(d.previous_seen_at))
       .catch(() => setPreviousSeen(Infinity));
     void Promise.resolve().then(reload);
   }, [iterationId, reload]);
 
+  const mineQueued = useCallback(() => queue.list().some((e) => e.username === username), [username]);
   const running = useRef(false);
   const again = useRef(false);
   const flushNow = useCallback(async () => {
@@ -85,27 +101,27 @@ export function useComments(
             }
             return "retry";
           }
-        });
+        }, username);
       } while (again.current);
     } finally {
       running.current = false;
-      setAll(queue.list());
+      if (!sent) setAll(queue.list());
     }
     if (sent) await reload();
-  }, [reload]);
+  }, [reload, username]);
 
   useEffect(() => {
     const online = () => void flushNow();
     window.addEventListener("online", online);
     const stop = schedule(() => {
-      if (document.visibilityState === "visible" && queue.list().length) void flushNow();
+      if (document.visibilityState === "visible" && mineQueued()) void flushNow();
     }, EVERY_MS);
-    if (queue.list().length) void Promise.resolve().then(flushNow);
+    if (mineQueued()) void Promise.resolve().then(flushNow);
     return () => {
       window.removeEventListener("online", online);
       stop();
     };
-  }, [flushNow, schedule]);
+  }, [flushNow, schedule, mineQueued]);
 
   const enqueueAndFlush = (e: queue.Entry) => {
     queue.enqueue(e);
@@ -129,16 +145,16 @@ export function useComments(
   return {
     role,
     comments,
-    unsent: all.filter((e) => e.kind === "reply" || e.iterationId === iterationId),
+    unsent: all.filter((e) => e.username === username && (e.kind === "reply" || e.iterationId === iterationId)),
     failed,
     error,
     dismissFailed: (id: string) => setFailed((f) => f.filter((x) => x.client_id !== id)),
     isNew: (item: { author: string; created_at: number }) =>
       previousSeen !== undefined && item.author !== username && item.created_at > (previousSeen ?? -Infinity),
     add: (draft: Draft) =>
-      enqueueAndFlush({ client_id: queue.newClientId(), kind: "comment", iterationId, payload: { ...draft }, created_at: Date.now() }),
+      enqueueAndFlush({ client_id: queue.newClientId(), kind: "comment", iterationId, payload: { ...draft }, created_at: Date.now(), username }),
     reply: (commentId: number, body: string) =>
-      enqueueAndFlush({ client_id: queue.newClientId(), kind: "reply", commentId, payload: { body }, created_at: Date.now() }),
+      enqueueAndFlush({ client_id: queue.newClientId(), kind: "reply", commentId, payload: { body }, created_at: Date.now(), username }),
     edit: (id: number, patch: { body?: string; kind?: Comment["kind"] }) => act(() => editorApi(`/comments/${id}`, { method: "PATCH", body: patch })),
     setResolved: (id: number, resolved: boolean) =>
       act(() => editorApi(`/iterations/${iterationId}/comments/${id}/resolved`, { method: "PUT", body: { resolved } })),

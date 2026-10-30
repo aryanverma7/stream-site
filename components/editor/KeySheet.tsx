@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 export const KEYS: [string, string][] = [
   ["Space / K", "Play or pause"],
   ["← / →", "Back / forward 5 s"],
@@ -15,14 +17,35 @@ export const KEYS: [string, string][] = [
   ["Esc", "Close the sheet or comment box"],
 ];
 
-/** The key list. Closing (Esc or ?) is usePlayerKeys's job; the button is for the pointer. */
+/**
+ * The key list. Closing (Esc or ?) is usePlayerKeys's job; the button is for the pointer.
+ * Focus moves into the sheet when it opens, Tab stays inside, and focus goes back on close.
+ */
 export function KeySheet({ onClose }: { onClose(): void }) {
+  const close = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null;
+    close.current?.focus();
+    return () => {
+      if (before?.isConnected) before.focus();
+    };
+  }, []);
   return (
-    <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" className="absolute inset-0 z-20 grid place-items-center bg-ink/80 p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Keyboard shortcuts"
+      className="absolute inset-0 z-20 grid place-items-center bg-ink/80 p-4"
+      onKeyDown={(e) => {
+        if (e.key !== "Tab") return;
+        e.preventDefault(); // Close is the sheet's only control
+        close.current?.focus();
+      }}
+    >
       <div className="max-h-full w-full max-w-md overflow-auto border border-seam bg-bezel p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="osd text-2xl">Keyboard shortcuts</h3>
-          <button type="button" onClick={onClose} className="label border border-seam px-2 py-1 text-[11px] hover:border-field">
+          <button ref={close} type="button" onClick={onClose} className="label border border-seam px-2 py-1 text-[11px] hover:border-field">
             Close
           </button>
         </div>

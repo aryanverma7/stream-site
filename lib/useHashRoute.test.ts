@@ -87,3 +87,11 @@ describe("useHashRoute", () => {
     expect(window.location.hash).toBe("#/home");
   });
 });
+
+it("writes seekS to at most 3 decimals with trailing zeros trimmed", () => {
+  const at = (seekS: number) => routeHash({ view: "iteration", projectId: 1, tapeId: 2, iterationId: 3, seekS });
+  expect(at(0.1 + 0.2)).toBe("#/p/1/t/2/v/3@0.3");
+  expect(at(12)).toBe("#/p/1/t/2/v/3@12");
+  expect(at(83.4567)).toBe("#/p/1/t/2/v/3@83.457");
+  expect(at(0.0000001)).toBe("#/p/1/t/2/v/3@0");
+});

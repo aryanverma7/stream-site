@@ -89,7 +89,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 export function ConfigEditor() {
   const editor = useConfigEditor();
-  const { config, loading, error, saveError, saveSuccess } = editor;
+  const { config, loading, error, saveError, saveSuccess, reloadFailed } = editor;
 
   return (
     <div className="border border-seam bg-bezel p-6">
@@ -121,7 +121,8 @@ export function ConfigEditor() {
 
       {error && <p className="text-sm text-rec">Couldn&apos;t load the config.</p>}
       {saveError && <p className="mb-2 text-sm text-rec">Save failed: {saveError}</p>}
-      {saveSuccess && <p className="mb-2 text-sm text-field">Saved.</p>}
+      {saveSuccess && !reloadFailed && <p className="mb-2 text-sm text-field">Saved.</p>}
+      {reloadFailed && <p className="mb-2 text-sm text-amber">Saved, but reloading the settings failed. Reload the page to see them.</p>}
       {loading && <p className="text-sm text-dim">Loading config...</p>}
 
       {!loading && !error && config && <SettingsEditor {...editor} config={config} />}

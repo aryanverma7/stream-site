@@ -61,41 +61,43 @@ export function ScrubBar({
 
   return (
     <div className="flex items-center gap-2">
-      <div
-        ref={bar}
-        role="slider"
-        tabIndex={0}
-        aria-label="Seek"
-        aria-valuemin={0}
-        aria-valuemax={Math.round(duration)}
-        aria-valuenow={Math.round(current)}
-        aria-valuetext={formatTime(current)}
-        onMouseDown={(e) => drag(e, e.shiftKey)}
-        onKeyDown={(e) => {
-          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-          e.preventDefault();
-          onSeek(Math.min(Math.max(current + (e.key === "ArrowLeft" ? -5 : 5), 0), duration));
-        }}
-        className="relative h-4 flex-1 cursor-pointer select-none bg-seam"
-      >
-        {size > 0 &&
-          downloaded.map(([a, b]) => (
-            <div
-              key={a}
-              data-downloaded
-              title="Downloaded (approx.)"
-              className="absolute inset-y-0 bg-dim/50"
-              style={{ left: `${pct((a / size) * duration)}%`, width: `${pct((b / size) * duration) - pct((a / size) * duration)}%` }}
-            />
-          ))}
-        <div className="absolute inset-y-0 left-0 bg-field/70" style={{ width: `${pct(current)}%` }} />
-        {sel && <div data-selection className="absolute inset-y-0 bg-amber/50" style={{ left: `${pct(sel[0])}%`, width: `${pct(sel[1]) - pct(sel[0])}%` }} />}
+      {/* the markers are siblings laid over the slider: a slider's children are not reachable controls */}
+      <div className="relative h-4 flex-1">
+        <div
+          ref={bar}
+          role="slider"
+          tabIndex={0}
+          aria-label="Seek"
+          aria-valuemin={0}
+          aria-valuemax={Math.round(duration)}
+          aria-valuenow={Math.round(current)}
+          aria-valuetext={formatTime(current)}
+          onMouseDown={(e) => drag(e, e.shiftKey)}
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+            e.preventDefault();
+            onSeek(Math.min(Math.max(current + (e.key === "ArrowLeft" ? -5 : 5), 0), duration));
+          }}
+          className="absolute inset-0 cursor-pointer select-none bg-seam"
+        >
+          {size > 0 &&
+            downloaded.map(([a, b]) => (
+              <div
+                key={a}
+                data-downloaded
+                title="Downloaded (approx.)"
+                className="absolute inset-y-0 bg-dim/50"
+                style={{ left: `${pct((a / size) * duration)}%`, width: `${pct((b / size) * duration) - pct((a / size) * duration)}%` }}
+              />
+            ))}
+          <div className="absolute inset-y-0 left-0 bg-field/70" style={{ width: `${pct(current)}%` }} />
+          {sel && <div data-selection className="absolute inset-y-0 bg-amber/50" style={{ left: `${pct(sel[0])}%`, width: `${pct(sel[1]) - pct(sel[0])}%` }} />}
+        </div>
         {markers.map((m) => (
           <button
             key={m.id}
             type="button"
             aria-label={`${KIND[m.kind] ?? "Comment"} at ${formatTime(m.start)}`}
-            onMouseDown={(e) => e.stopPropagation()}
             onClick={() => onSeek(m.start)}
             className={`absolute inset-y-0 min-w-1 ${TONE[m.kind] ?? "bg-amber"} ${m.active ? "opacity-100" : "opacity-40"}`}
             style={{ left: `${pct(m.start)}%`, width: m.end !== undefined ? `${pct(m.end) - pct(m.start)}%` : "4px" }}

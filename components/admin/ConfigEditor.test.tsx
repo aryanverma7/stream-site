@@ -128,6 +128,30 @@ describe("ConfigEditor", () => {
     expect(utils.getByText("admin_github_users")).toBeTruthy();
   });
 
+  it("jumps to an unset needed secret's Replace button", async () => {
+    const schema: Schema = {
+      ...SCHEMA,
+      fields: { ...SCHEMA.fields, streamlabs_access_token: { ...SCHEMA.fields.streamlabs_access_token, needed: true } },
+    };
+    mockBackend({ schema, config: { ...CONFIG, streamlabs_access_token: "" } });
+    const utils = await renderLoaded();
+    fireEvent.click(within(utils.getByRole("alert")).getByRole("button", { name: /Streamlabs access token/ }));
+    await waitFor(() => expect(document.activeElement).toBe(utils.getByRole("button", { name: "Replace…" })));
+  });
+
+  it("an entry typed in a list but not Added still counts, once the field is left", async () => {
+    const { puts } = mockBackend();
+    const utils = await renderLoaded();
+    openSection(utils, /Login & site/);
+    const box = utils.getByLabelText("Admin GitHub users");
+    fireEvent.change(box, { target: { value: "cutter" } });
+    fireEvent.blur(box);
+    expect(utils.getByText("1 unsaved change")).toBeTruthy();
+    fireEvent.click(utils.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(puts.length).toBe(1));
+    expect(puts[0]).toEqual({ admin_github_users: ["aryanverma7", "cutter"] });
+  });
+
   it("shows no banner when every needed setting is filled", async () => {
     mockBackend({
       schema: { ...SCHEMA, fields: { ...SCHEMA.fields, http_port: { ...SCHEMA.fields.http_port, needed: true } } },
