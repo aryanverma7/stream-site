@@ -21,9 +21,9 @@
  *      power reached 99, letting the React side handle the admin
  *      transition without touching the core animation logic at all.
  *   3. The room's colour: fog, floor and the hemisphere light's ground
- *      bounce are the site's VCR blue (#7aa0ff, which the
- *      scanline overlay darkens to about the --field token) instead of the
- *      CodePen's maroon, so the hero sits in the Security Feed world.
+ *      bounce are the site's red (#d80f1d, a step under the --field token,
+ *      with a deep-red ground bounce) instead of the CodePen's maroon, so
+ *      the hero sits in the Phantom Card world.
  *      These three literals must stay equal to Dragon.tsx's #world
  *      background, or the floor's far edge shows a seam.
  */
@@ -78,7 +78,7 @@ function init() {
 
   scene = new THREE.Scene();
   // ADDED FOR DUALBLADEX: room colour (was 0x652e37)
-  scene.fog = new THREE.Fog(0x7aa0ff, 350, 500);
+  scene.fog = new THREE.Fog(0xd80f1d, 350, 500);
 
   HEIGHT = window.innerHeight;
   WIDTH = window.innerWidth;
@@ -172,7 +172,7 @@ function handleTouchEnd(event) {
 
 function createLights() {
   // ADDED FOR DUALBLADEX: ground bounce matches the room (was 0xb3858c)
-  light = new THREE.HemisphereLight(0xffffff, 0x6a86c8, .8);
+  light = new THREE.HemisphereLight(0xffffff, 0x8f000b, .8);
 
   shadowLight = new THREE.DirectionalLight(0xffffff, .8);
   shadowLight.position.set(-100, 100, 50);
@@ -783,7 +783,7 @@ function createFloor() {
 
   // ADDED FOR DUALBLADEX: room colour (was 0X652e37)
   floor = new THREE.Mesh(new THREE.PlaneBufferGeometry(2000, 2000), new THREE.MeshBasicMaterial({
-    color: 0x7aa0ff
+    color: 0xd80f1d
   }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -36;

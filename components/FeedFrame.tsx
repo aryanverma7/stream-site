@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 /**
- * One monitor on the wall: an OSD strip naming the feed, then the picture.
- * Shared by the public site and the admin so a "feed" means the same
- * object everywhere.
+ * One panel on the page: a slanted black slab with a cut strip naming it,
+ * then the picture. Shared by the public site and the admin so a "feed"
+ * means the same object everywhere.
  */
 export function FeedFrame({
   label,
@@ -21,15 +21,15 @@ export function FeedFrame({
   children: ReactNode;
 }) {
   const strip = {
-    dark: "bg-bezel-2 text-phosphor",
+    dark: "bg-phosphor text-ink",
     field: "wallpaper",
-    alert: "bg-rec text-phosphor",
-    dim: "bg-bezel text-dim",
+    alert: "bg-rec text-ink",
+    dim: "bg-bezel-2 text-dim",
   }[tone];
 
   return (
-    <div className={`flex flex-col border border-seam bg-bezel shadow-[0_12px_32px_rgb(0_0_0_/_0.35)] ${className}`}>
-      <div className={`osd flex items-center justify-between gap-3 px-3 py-1.5 text-lg ${strip}`}>
+    <div className={`slab relative flex flex-col p-[3px] ${className}`}>
+      <div className={`osd strip-cut flex items-center justify-between gap-3 py-1.5 pl-3 pr-6 text-lg ${strip}`}>
         <span className="truncate">{label}</span>
         {right && <span className="flex shrink-0 items-center gap-2">{right}</span>}
       </div>

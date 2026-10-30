@@ -13,16 +13,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/*
           Loaded via a plain <link> rather than next/font/google, which
           fetches and self-hosts at BUILD TIME and needs network access the
-          build machine doesn't reliably have. Big Shoulders Stencil is the
-          display voice (hazmat and facility stencils), Archivo the UI face,
-          VT323 only for on-screen-display data, Martian Mono for logs and
-          config. The OBS widgets still use Chakra Petch/Rajdhani; the site
-          no longer does.
+          build machine doesn't reliably have. The same faces as the OBS
+          widgets: Anton for display, Archivo Black for tags and controls,
+          Bebas Neue for numbers and one of the ransom-note papers, Archivo
+          for reading, Martian Mono for logs and config.
         */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Big+Shoulders+Stencil+Display:wght@700;800;900&family=Martian+Mono:wght@400;500&family=VT323&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Archivo:wdth,wght@62..125,400..800&family=Bebas+Neue&family=Martian+Mono:wght@400;500&display=swap"
           rel="stylesheet"
         />
       </head>
