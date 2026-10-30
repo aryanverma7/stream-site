@@ -1,10 +1,12 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
+    // e2e/ is Playwright's (npm run test:e2e), not Vitest's
+    exclude: [...configDefaults.exclude, "e2e/**"],
   },
   resolve: {
     alias: {

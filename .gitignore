@@ -7,6 +7,9 @@ out/
 
 # Testing
 coverage/
+test-results/
+playwright-report/
+e2e/.media/
 
 # TypeScript
 *.tsbuildinfo
