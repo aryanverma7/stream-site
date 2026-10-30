@@ -5,6 +5,12 @@ import type { Checks, Iteration } from "@/lib/useTape";
 import type { Tape } from "@/lib/useProject";
 import { editorBackend } from "@/lib/testUtils";
 
+vi.mock("@/lib/mediaChecks", async (orig) => ({
+  ...(await orig<typeof import("@/lib/mediaChecks")>()),
+  measureMedia: vi.fn(async () => ({ width: 1920, height: 1080, duration_s: 10, fps: 60, bitrate_mbps: 55 })),
+  thumbnail: vi.fn(async () => "QUJD"),
+}));
+
 const it2 = (over: Partial<Iteration> = {}): Iteration => ({
   id: 2, tape_id: 5, version: 2, filename: "cut2.mp4", size: 1, status: "ready", drive_file_id: "FILE_2",
   uploaded_at: 100, created_at: 100, checks: { duration_s: 3725.4 } as Checks, has_thumbnail: false, ...over,
@@ -101,5 +107,41 @@ describe("IterationDetails", () => {
     expect(getByRole("link", { name: /Open in Drive/ }).getAttribute("href")).toBe("https://drive.google.com/file/d/FILE_2/view");
     expect(getByText("1:02:05")).toBeTruthy();
     expect(fetchMock.mock.calls.some(([u]) => String(u).includes("media-link"))).toBe(false);
+  });
+});
+
+describe("IterationCard Run checks", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it("a ready version with no checks offers Run checks: the same file is measured and PUT, then the tape refreshes", async () => {
+    const fetchMock = editorBackend({ "/iterations/2": { comments: [] }, "PUT /iterations/2/media": { id: 2 } });
+    const onChanged = vi.fn();
+    const { getByRole, getByLabelText, findByRole } = render(
+      <IterationCard iteration={it2({ checks: null, size: 5 })} tape={tape} role="editor" onStatus={() => {}} locked={false} onChanged={onChanged} />,
+    );
+    const input = getByLabelText("File for v2's checks") as HTMLInputElement;
+    const click = vi.spyOn(input, "click");
+    fireEvent.click(getByRole("button", { name: "Run checks" }));
+    expect(click).toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { files: [new File(["123"], "cut2.mp4")] } });
+    expect((await findByRole("alert")).textContent).toBe("That is not v2's file: pick cut2.mp4 (0.0 MB)");
+
+    fireEvent.change(input, { target: { files: [new File(["12345"], "cut2.mp4")] } });
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    const put = fetchMock.mock.calls.find(([u, i]) => u === "/api/editor/iterations/2/media" && i?.method === "PUT")!;
+    expect(JSON.parse(String(put[1]!.body))).toMatchObject({ thumbnail_b64: "QUJD", checks: { fps: { state: "pass", value: 60 } } });
+  });
+
+  it("is not offered when checks exist, nor on a version still uploading", () => {
+    editorBackend({ "/iterations/2": { comments: [] } });
+    const has = render(<IterationCard iteration={it2()} tape={tape} role="admin" onStatus={() => {}} locked={false} />);
+    expect(has.queryByRole("button", { name: "Run checks" })).toBeNull();
+    has.unmount();
+    const uploading = render(<IterationCard iteration={it2({ checks: null, status: "uploading" })} tape={tape} role="admin" onStatus={() => {}} locked={false} />);
+    expect(uploading.queryByRole("button", { name: "Run checks" })).toBeNull();
   });
 });
