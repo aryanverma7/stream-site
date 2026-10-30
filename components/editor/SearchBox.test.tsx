@@ -78,4 +78,45 @@ describe("SearchBox", () => {
     fireEvent.blur(hit, { relatedTarget: screen.getByText("elsewhere") });
     expect(screen.queryByRole("listbox")).toBeNull();
   });
+
+  it("arrow keys, Home and End move the active result, named by aria-activedescendant; Enter opens it", () => {
+    render(<SearchBox />);
+    const box = screen.getByLabelText("Search comments");
+    box.focus();
+    fireEvent.change(box, { target: { value: "jet" } });
+    expect(box.getAttribute("role")).toBe("combobox");
+    expect(box.getAttribute("aria-expanded")).toBe("true");
+    expect(box.getAttribute("aria-controls")).toBe(screen.getByRole("listbox").id);
+    expect(box.hasAttribute("aria-activedescendant")).toBe(false);
+    const options = screen.getAllByRole("option");
+    const selected = () => options.map((o) => o.getAttribute("aria-selected"));
+
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    expect(box.getAttribute("aria-activedescendant")).toBe(options[0].id);
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    expect(box.getAttribute("aria-activedescendant")).toBe(options[1].id);
+    expect(selected()).toEqual(["false", "true"]);
+    fireEvent.keyDown(box, { key: "ArrowDown" }); // wraps
+    expect(box.getAttribute("aria-activedescendant")).toBe(options[0].id);
+    fireEvent.keyDown(box, { key: "ArrowUp" }); // wraps back
+    expect(box.getAttribute("aria-activedescendant")).toBe(options[1].id);
+    fireEvent.keyDown(box, { key: "Home" });
+    expect(selected()).toEqual(["true", "false"]);
+    fireEvent.keyDown(box, { key: "End" });
+    expect(selected()).toEqual(["false", "true"]);
+    expect(document.activeElement).toBe(box);
+
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(window.location.hash).toBe("#/p/2/t/4/v/8");
+  });
+
+  it("typing again clears the active result", () => {
+    render(<SearchBox />);
+    const box = screen.getByLabelText("Search comments");
+    fireEvent.change(box, { target: { value: "jet" } });
+    fireEvent.keyDown(box, { key: "End" });
+    fireEvent.change(box, { target: { value: "jets" } });
+    expect(box.hasAttribute("aria-activedescendant")).toBe(false);
+    expect(screen.getAllByRole("option").every((o) => o.getAttribute("aria-selected") === "false")).toBe(true);
+  });
 });
