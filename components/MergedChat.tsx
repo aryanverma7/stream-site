@@ -20,7 +20,7 @@ const PLATFORM_COLORS: Record<string, string> = {
  * 7 - not a persistent element elsewhere on the page.
  *
  * A dropped socket (backend restart, tunnel blip) reconnects after 1 s,
- * doubling to at most 30 s; a message received resets the delay.
+ * doubling to at most 30 s; a successful connect resets the delay.
  */
 type Later = (fn: () => void, ms: number) => () => void;
 const later: Later = (fn, ms) => {
@@ -41,8 +41,10 @@ export function MergedChat({ schedule = later }: { schedule?: Later }) {
     let cancelRetry = () => {};
     const connect = () => {
       ws = new WebSocket(`${protocol}//${window.location.host}/ws/widgets?widget=chat`);
+      ws.onopen = () => {
+        delay = 1000; // connected again: the next drop starts the backoff over
+      };
       ws.onmessage = (event) => {
-        delay = 1000;
         const parsed = parseChatMessage(event.data);
         if (parsed) {
           setMessages((prev) => [...prev.slice(-(MAX_MESSAGES - 1)), parsed]);

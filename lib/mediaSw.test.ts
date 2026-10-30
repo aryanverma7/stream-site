@@ -95,7 +95,7 @@ describe("media-sw.js serve()", () => {
   it("asks the page for a link and answers 503 when none comes in time", async () => {
     const sw = load({ linkTimeout: true });
     const res = await sw.get("bytes=0-3");
-    expect(sw.page.postMessage).toHaveBeenCalledWith({ type: "need-link", iterationId: 7 });
+    expect(sw.page.postMessage).toHaveBeenCalledWith({ type: "need-link", iterationId: 7, need: "info" });
     expect(res.status).toBe(503);
   });
 
@@ -108,6 +108,7 @@ describe("media-sw.js serve()", () => {
     expect(res.status).toBe(206);
     expect(await res.text()).toBe("0123");
     expect(d.calls.map((c) => c.auth)).toEqual(["Bearer old", "Bearer new"]);
+    expect(sw.page.postMessage).toHaveBeenCalledWith({ type: "need-link", iterationId: 7, need: "link" });
   });
 
   it("cancelling the body aborts the Drive fetch in flight", async () => {

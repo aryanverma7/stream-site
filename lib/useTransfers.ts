@@ -236,15 +236,19 @@ export async function startUpload(
   try {
     if (entry?.abandoned) {
       // a cancelled version: the server puts it back to uploading with a fresh session
+      const revived = entry.iterationId;
       try {
-        const { upload_url } = await newSession(entry.iterationId);
-        if (signal.aborted) return;
+        const { upload_url } = await newSession(revived);
+        // Cancelled while /session put it back to uploading: abandon it again, as the create path does.
+        if (signal.aborted) return abandon(revived);
         entry = { ...entry, uploadUrl: upload_url, sent: 0, abandoned: false };
         patchStored(key, { uploadUrl: upload_url, sent: 0, abandoned: false });
         update(key, { sent: 0, state: "uploading" });
       } catch (err) {
-        if (!(err instanceof EditorApiError && err.status === 409)) throw err;
-        patchStored(key, null); // it was finished or deleted meanwhile: upload as a new version
+        if (signal.aborted) return abandon(revived); // the request may have landed before the cancel
+        // 409: finished meanwhile; 404: deleted. Either way upload as a new version.
+        if (!(err instanceof EditorApiError && (err.status === 409 || err.status === 404))) throw err;
+        patchStored(key, null);
         entry = undefined;
         update(key, { version: null, sent: 0, state: "uploading" });
       }

@@ -157,6 +157,13 @@ describe("downloadToOpfs", () => {
     expect(onRetry).toHaveBeenCalledWith("Drive is not connected");
   });
 
+  it("clears the waiting message as soon as the retried request succeeds", async () => {
+    fakeFetch([{ status: 503 }]);
+    const log: (string | null)[] = [];
+    await setup(MIB).run({ onRetry: (m) => log.push(m), onProgress: (p) => void (p.some(Boolean) && log.push("written")) });
+    expect(log).toEqual(["Drive error 503", null, "written"]);
+  });
+
   it("gives up after five short chunks in a row", async () => {
     const calls = fakeFetch(Array.from({ length: 6 }, () => ({ status: 206, size: 1 })));
     await expect(setup(MIB).run()).rejects.toBeInstanceOf(FatalMediaError);

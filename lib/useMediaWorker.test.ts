@@ -72,12 +72,30 @@ describe("useMediaWorker", () => {
     await waitFor(() => expect(result.current.ready).toBe(true));
     await act(() => result.current.provide(3, { projectId: 7, fileId: "F", size: 10, mime: "video/mp4", downloaded: true, getLink }));
     sw.controller.postMessage.mockClear();
-    act(() => sw.emit({ type: "need-link", iterationId: 3 }));
+    act(() => sw.emit({ type: "need-link", iterationId: 3, need: "info" }));
     await waitFor(() => expect(sw.controller.postMessage).toHaveBeenCalledTimes(1));
     expect(sw.controller.postMessage.mock.calls[0][0]).toMatchObject({ type: "media", iterationId: 3, link: null });
     await act(async () => give(link("bg")));
     await waitFor(() => expect(sw.controller.postMessage).toHaveBeenCalledTimes(2));
     expect(sw.controller.postMessage.mock.calls[1][0].link.access_token).toBe("bg");
+  });
+
+  it("a need for a Drive link on a downloaded version waits for a real link, never a null one", async () => {
+    const sw = fakeSw();
+    let give!: (l: ReturnType<typeof link>) => void;
+    const getLink = vi.fn(() => new Promise<ReturnType<typeof link>>((r) => (give = r)));
+    const { result } = renderHook(() => useMediaWorker());
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    await act(() => result.current.provide(3, { projectId: 7, fileId: "F", size: 10, mime: "video/mp4", downloaded: true, getLink }));
+    sw.controller.postMessage.mockClear();
+    await act(async () => {
+      sw.emit({ type: "need-link", iterationId: 3, need: "link" });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(sw.controller.postMessage).not.toHaveBeenCalled();
+    await act(async () => give(link("real")));
+    await waitFor(() => expect(sw.controller.postMessage).toHaveBeenCalledTimes(1));
+    expect(sw.controller.postMessage.mock.calls[0][0].link.access_token).toBe("real");
   });
 
   it("still tells the worker the size and type when the link fails, then reports the failure", async () => {

@@ -169,6 +169,46 @@ describe("useTransfers", () => {
     expect(stored()).toEqual([]);
   });
 
+  it("a cancelled version that is gone (404 from /session) is uploaded as a new version", async () => {
+    const mod = await fresh();
+    localStorage.setItem(
+      "editor.uploads",
+      JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0, abandoned: true }]),
+    );
+    const { api } = backend({
+      "POST /iterations/7/session": { status: 404, body: { error: "Not found" } },
+      "POST /tapes/5/iterations": { iteration_id: 8, version: 4, upload_url: "https://upload.example/s1" },
+      "POST /iterations/8/complete": { id: 8, status: "ready" },
+      "PUT /iterations/8/media": { id: 8 },
+    });
+    const { result } = renderHook(() => mod.useTransfers());
+    await act(() => mod.startUpload(target, file()));
+    expect(calls(api, "POST", "/tapes/5/iterations")).toHaveLength(1);
+    expect(result.current[0]).toMatchObject({ version: 4, state: "done" });
+  });
+
+  it("a cancel while a revive's /session is in flight abandons the version again", async () => {
+    const mod = await fresh();
+    localStorage.setItem(
+      "editor.uploads",
+      JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0, abandoned: true }]),
+    );
+    let answer!: (v: unknown) => void;
+    const { api } = backend({ "POST /iterations/7/abandon": { id: 7, status: "abandoned" } });
+    global.fetch = vi.fn((url: string, init?: RequestInit) =>
+      url === "/api/editor/iterations/7/session" ? new Promise((r) => (answer = r)) : api(url, init),
+    ) as unknown as typeof fetch;
+    const { result } = renderHook(() => mod.useTransfers());
+    const done = mod.startUpload(target, file());
+    await waitFor(() => expect(result.current).toHaveLength(1));
+    act(() => mod.cancelTransfer(result.current[0].key));
+    const before = calls(api, "POST", "/iterations/7/abandon").length;
+    answer({ ok: true, status: 200, json: async () => ({ upload_url: "https://upload.example/new" }) });
+    await act(() => done);
+    expect(calls(api, "POST", "/iterations/7/abandon").length).toBe(before + 1);
+    expect(stored()).toMatchObject([{ abandoned: true, uploadUrl: "https://upload.example/old" }]);
+  });
+
   it("a cancelled version the server no longer takes is uploaded as a new version", async () => {
     const mod = await fresh();
     localStorage.setItem(

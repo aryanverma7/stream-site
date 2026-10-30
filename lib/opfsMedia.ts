@@ -180,8 +180,8 @@ export type DownloadOpts = {
   root?: FileSystemDirectoryHandle;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
-  /** Called before each wait to retry, with what went wrong; progress means it is going again. */
-  onRetry?(message: string): void;
+  /** Called before each wait to retry, with what went wrong, and with null once a retried request succeeds. */
+  onRetry?(message: string | null): void;
 };
 
 /** getLink answers the backend gives for good (no file, not allowed, gone from Drive, not ready). */
@@ -269,6 +269,7 @@ export async function downloadToOpfs(opts: DownloadOpts): Promise<void> {
           throw new Error("Drive sent a short chunk");
         }
         blob = got;
+        if (n > 0) opts.onRetry?.(null); // through again: the waiting message goes before the write
       } catch (e) {
         if (signal.aborted || e instanceof FatalMediaError) throw e;
         opts.onRetry?.(e instanceof Error ? e.message : "Connection lost");
