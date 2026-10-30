@@ -63,7 +63,15 @@ export function useMediaWorker() {
     sw.addEventListener("message", onMessage);
     sw.register("/editor/media-sw.js", { scope: "/editor" })
       .then(() => sw.ready)
-      .then(() => sw.controller ?? new Promise((res) => sw.addEventListener("controllerchange", res, { once: true })))
+      .then(
+        (reg) =>
+          sw.controller ??
+          new Promise((res) => {
+            sw.addEventListener("controllerchange", res, { once: true });
+            // a shift+reload leaves an active worker not controlling the page: ask it to claim this one
+            reg?.active?.postMessage({ type: "claim" });
+          }),
+      )
       .then(() => live && setReady(true))
       .catch(() => live && setError(START_FAILED));
     return () => {

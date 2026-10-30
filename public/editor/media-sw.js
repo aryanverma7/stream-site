@@ -22,6 +22,12 @@ self.addEventListener("activate", function (e) {
 
 self.addEventListener("message", function (e) {
   var d = e.data;
+  if (d && d.type === "claim") {
+    // a shift+reload loads the page without a controller; the page asks to be taken over
+    var claimed = self.clients.claim();
+    if (e.waitUntil) e.waitUntil(claimed);
+    return;
+  }
   if (!d || d.type !== "media") return;
   var id = String(d.iterationId);
   var m = { projectId: d.projectId, fileId: d.fileId, size: d.size, mime: d.mime, link: d.link };

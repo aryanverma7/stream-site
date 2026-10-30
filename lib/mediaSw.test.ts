@@ -137,6 +137,14 @@ describe("media-sw.js serve()", () => {
     expect(await res.text()).toBe("0123");
   });
 
+  it("claims the page when it asks (a shift+reload left it uncontrolled)", async () => {
+    const sw = load();
+    const waitUntil = vi.fn();
+    sw.message({ type: "claim" }, waitUntil);
+    expect(sw.claim).toHaveBeenCalledTimes(1);
+    expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
+  });
+
   it("cancelling the body aborts the Drive fetch in flight", async () => {
     let signal: AbortSignal | undefined;
     const sw = load({

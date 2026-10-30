@@ -139,6 +139,21 @@ describe("useMediaWorker", () => {
     await waitFor(() => expect(result.current.ready).toBe(true));
   });
 
+  it("after a shift+reload (registered, active, no controller) asks the worker to claim the page, and is ready on controllerchange", async () => {
+    const sw = fakeSw();
+    const controller = sw.controller;
+    const active = { postMessage: vi.fn() };
+    (sw as { controller: unknown }).controller = null;
+    sw.ready = Promise.resolve({ active });
+    const { result } = renderHook(() => useMediaWorker());
+    await waitFor(() => expect(active.postMessage).toHaveBeenCalledWith({ type: "claim" }));
+    const onChange = sw.addEventListener.mock.calls.find((c) => c[0] === "controllerchange")![1];
+    expect(result.current.ready).toBe(false);
+    sw.controller = controller;
+    act(() => onChange({} as MessageEvent));
+    await waitFor(() => expect(result.current.ready).toBe(true));
+  });
+
   it("reports an unsupported browser", async () => {
     const { result } = renderHook(() => useMediaWorker());
     await waitFor(() => expect(result.current.error).toBe(NO_WORKER));
