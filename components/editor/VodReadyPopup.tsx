@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import type { BellItem, useBell } from "@/lib/useBell";
 import { routeHash } from "@/lib/useHashRoute";
 
@@ -41,8 +41,10 @@ export function VodReadyPopup({ bell }: { bell: ReturnType<typeof useBell> }) {
   };
 
   // On window in the capture phase, which runs before the bell's listener on
-  // document: stopping it here means one Esc closes only this dialog.
-  useEffect(() => {
+  // document: stopping it here means one Esc closes only this dialog. A layout
+  // effect, so the listener is in place in the same commit that shows the
+  // dialog: a passive effect runs a task later, and an Esc in between was lost.
+  useLayoutEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;

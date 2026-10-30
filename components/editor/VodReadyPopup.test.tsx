@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/react";
+import { createRoot } from "react-dom/client";
 import { Bell } from "./Bell";
+import { VodReadyPopup } from "./VodReadyPopup";
 import { editorBackend } from "@/lib/testUtils";
 
 const ev = (id: number, kind: string, project_id: number | null = id) => ({
@@ -54,6 +56,37 @@ describe("VodReadyPopup", () => {
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(queryByRole("dialog")).toBeNull();
     expect(queryByRole("link", { name: /Stream 9 VOD is ready/ })).toBeTruthy();
+  });
+
+  it("Esc works the moment the dialog is in the DOM, before any later task runs", async () => {
+    // A real (non-act) render: the dialog's DOM and its Esc listener must land in the same commit,
+    // or a key pressed right after it appears (what findByRole + keyDown does) is missed.
+    const g = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+    const prev = g.IS_REACT_ACT_ENVIRONMENT;
+    g.IS_REACT_ACT_ENVIRONMENT = false;
+    const markSeen = vi.fn(() => Promise.resolve());
+    const bell = { items: [ev(9, "vod_ready")], unseen: 1, loaded: true, markSeen };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      const pressed = new Promise<void>((done) => {
+        const mo = new MutationObserver(() => {
+          if (!host.querySelector('[role="dialog"]')) return;
+          mo.disconnect();
+          window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+          done();
+        });
+        mo.observe(host, { childList: true, subtree: true });
+      });
+      root.render(<VodReadyPopup bell={bell} />);
+      await pressed;
+      expect(markSeen).toHaveBeenCalledWith(9);
+    } finally {
+      root.unmount();
+      host.remove();
+      g.IS_REACT_ACT_ENVIRONMENT = prev;
+    }
   });
 
   it("counts several", async () => {
