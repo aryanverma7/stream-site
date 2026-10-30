@@ -5,7 +5,7 @@ import { formatTime, parseTime } from "@/lib/timecode";
 import type { Draft } from "@/lib/useComments";
 
 const field = "border border-seam bg-ink px-2 py-1 text-sm";
-const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-2 py-1 text-[11px] text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
 
 /**
  * New comment: timed (start, optional end) or general (no times).
@@ -58,7 +58,7 @@ export function CommentComposer({
   return (
     <form
       aria-label={start === null ? "General comment" : "Comment"}
-      className="space-y-2 border border-field bg-bezel p-3"
+      className="slab relative space-y-2 p-3"
       onSubmit={(ev) => {
         ev.preventDefault();
         submit();

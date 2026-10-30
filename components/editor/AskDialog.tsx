@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 /**
@@ -52,7 +53,9 @@ export function useAsk() {
     },
     [open],
   );
-  const dialog = open ? <AskDialog {...open} onClose={close} /> : null;
+  // Portalled to <body>: a slanted panel (.slab) is its own stacking context,
+  // and a dialog rendered inside one would be painted under the panels after it.
+  const dialog = open ? createPortal(<AskDialog {...open} onClose={close} />, document.body) : null;
   return { dialog, confirm, prompt };
 }
 
@@ -132,9 +135,9 @@ function AskDialog({
           e.preventDefault();
           if (!empty) onClose(isPrompt ? value : "");
         }}
-        className={`dialog-in w-full max-w-md space-y-4 border bg-bezel p-5 ${danger ? "border-rec" : "border-seam"}`}
+        className={`dialog-in slab relative w-full max-w-md space-y-4 p-6 ${danger ? "slab-alert" : ""}`}
       >
-        <h3 id={titleId} className="stencil text-3xl text-phosphor">
+        <h3 id={titleId} className="stencil tilt text-4xl text-phosphor">
           {title}
         </h3>
         {message && (
@@ -148,7 +151,7 @@ function AskDialog({
             aria-label={label}
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            className="w-full border border-seam bg-ink px-3 py-2 text-sm text-phosphor focus:border-field focus:outline-none"
+            className="w-full border-2 border-seam bg-ink px-3 py-2 text-sm text-phosphor focus:border-phosphor focus:outline-none"
           />
         )}
         <div className="flex justify-end gap-2">
@@ -156,14 +159,14 @@ function AskDialog({
             ref={cancelRef}
             type="button"
             onClick={() => onClose(null)}
-            className="label border border-seam px-4 py-2 text-sm text-phosphor transition-colors hover:border-field"
+            className="menu-pop label border-2 border-phosphor bg-ink px-4 py-2 text-sm text-phosphor hover:bg-phosphor hover:text-ink"
           >
             {cancelLabel}
           </button>
           <button
             type="submit"
             disabled={empty}
-            className={`label border px-4 py-2 text-sm text-ink transition-opacity disabled:opacity-40 ${danger ? "border-rec bg-rec" : "border-field bg-field"}`}
+            className={`menu-pop label border-2 px-4 py-2 text-sm text-ink shadow-[4px_4px_0_var(--phosphor)] disabled:opacity-40 ${danger ? "border-rec bg-rec" : "border-field bg-field"}`}
           >
             {confirmLabel}
           </button>

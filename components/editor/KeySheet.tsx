@@ -35,17 +35,17 @@ export function KeySheet({ onClose }: { onClose(): void }) {
       role="dialog"
       aria-modal="true"
       aria-label="Keyboard shortcuts"
-      className="absolute inset-0 z-20 grid place-items-center bg-ink/80 p-4"
+      className="dialog-backdrop absolute inset-0 z-20 grid place-items-center bg-ink/80 p-4"
       onKeyDown={(e) => {
         if (e.key !== "Tab") return;
         e.preventDefault(); // Close is the sheet's only control
         close.current?.focus();
       }}
     >
-      <div className="max-h-full w-full max-w-md overflow-auto border border-seam bg-bezel p-4">
+      <div className="dialog-in slab-flat max-h-full w-full max-w-md overflow-auto p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="osd text-2xl">Keyboard shortcuts</h3>
-          <button ref={close} type="button" onClick={onClose} className="label border border-seam px-2 py-1 text-[11px] hover:border-field">
+          <h3 className="stencil tilt text-2xl">Keyboard shortcuts</h3>
+          <button ref={close} type="button" onClick={onClose} className="menu-pop label border-2 border-phosphor px-2 py-1 text-[11px] hover:bg-phosphor hover:text-ink">
             Close
           </button>
         </div>

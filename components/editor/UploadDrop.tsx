@@ -47,7 +47,7 @@ export function UploadDrop({
         setOver(false);
         take(e.dataTransfer.files);
       }}
-      className={`space-y-1 border border-dashed p-4 text-sm focus-within:outline focus-within:outline-2 focus-within:outline-field ${
+      className={`space-y-1 border-2 border-dashed p-4 text-sm focus-within:outline focus-within:outline-3 focus-within:outline-phosphor ${
         over ? "border-field bg-bezel-2" : "border-seam bg-bezel"
       } ${disabled ? "opacity-40" : ""}`}
     >

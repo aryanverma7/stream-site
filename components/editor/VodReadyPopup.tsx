@@ -58,22 +58,23 @@ export function VodReadyPopup({ bell }: { bell: ReturnType<typeof useBell> }) {
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4">
-      <div role="dialog" aria-modal="true" aria-labelledby="vod-ready-title" className="w-full max-w-md space-y-4 border border-field bg-bezel p-5 text-phosphor">
-        <h3 id="vod-ready-title" className="stencil text-3xl">
+    <div className="dialog-backdrop fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="vod-ready-title" className="dialog-in bubble bubble-paper w-full max-w-md space-y-4 p-6">
+        <span aria-hidden className="burst float-right -mr-2 -mt-2 ml-3 inline-block px-3 font-[family-name:var(--font-stencil)] text-4xl text-phosphor">!</span>
+        <h3 id="vod-ready-title" className="stencil tilt text-4xl text-ink">
           {ready.length === 1 ? "1 new upload is ready" : `${ready.length} new uploads are ready`}
         </h3>
         <ul className="space-y-1">
           {ready.map((i) => (
             <li key={i.id}>
-              <a href={routeHash({ view: "project", projectId: i.project_id! })} onClick={dismiss} className="font-bold hover:underline">
+              <a href={routeHash({ view: "project", projectId: i.project_id! })} onClick={dismiss} className="font-bold text-ink underline decoration-field decoration-2 hover:text-field-deep">
                 {i.summary}
               </a>
             </li>
           ))}
         </ul>
         <div className="flex justify-end">
-          <button autoFocus type="button" onClick={dismiss} className="label border border-seam px-4 py-2 text-sm hover:border-field">
+          <button autoFocus type="button" onClick={dismiss} className="menu-pop label border-2 border-ink bg-ink px-4 py-2 text-sm text-phosphor hover:bg-field hover:text-ink">
             Dismiss
           </button>
         </div>

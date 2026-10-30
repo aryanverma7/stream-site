@@ -48,7 +48,7 @@ const readFlag = (k: string) => {
     return null;
   }
 };
-const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-2 py-1 text-[11px] text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
 const gb = (n: number) => (n / 1024 ** 3).toFixed(1);
 
 type Loaded = { iteration: Iteration; position_s: number | null };
@@ -123,7 +123,7 @@ export function ReviewPlayer(props: ReviewPlayerProps) {
   if (error)
     return (
       <section className="space-y-3">
-        <h2 tabIndex={-1} className="stencil text-4xl">
+        <h2 tabIndex={-1} className="stencil tilt slam text-4xl">
           This version could not be opened
         </h2>
         <p className="text-rec">{error}</p>
@@ -343,7 +343,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
   return (
     <section ref={area} className="space-y-3">
       <header className="flex flex-wrap items-center gap-3">
-        <h2 tabIndex={-1} className="stencil text-4xl">
+        <h2 tabIndex={-1} className="stencil tilt slam text-4xl">
           Version {it.version}
         </h2>
         <CheckBadges checks={it.checks} />
@@ -362,12 +362,12 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
         )}
       </header>
 
-      {toast && <p role="status" className="text-amber">{toast}</p>}
+      {toast && <p role="status" className="toast-in border-2 border-amber px-3 py-1.5 text-amber">{toast}</p>}
 
       {/* the comments show while the version loads too, so fix notes can be read before playback */}
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {!started && (
-          <div className="space-y-3 self-start border border-seam bg-bezel p-4">
+          <div className="slab relative space-y-3 self-start p-4">
             <div className="flex items-center gap-3">
               {ring}
               <p>
@@ -405,7 +405,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
         )}
 
         {started && (
-          <div ref={box} className="relative space-y-2 bg-ink">
+          <div ref={box} className="relative space-y-2 border-2 border-phosphor bg-ink p-2 shadow-[8px_8px_0_var(--field-deep)]">
             <video
               key={videoKey}
               ref={video}

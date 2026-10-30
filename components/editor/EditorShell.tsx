@@ -17,6 +17,7 @@ import { HomeView } from "./HomeView";
 import { FixListView } from "./FixListView";
 import { TodoView } from "./TodoView";
 import { StorageView } from "./StorageView";
+import { Ransom } from "../Hero";
 
 const DELETED = "That was deleted or never existed";
 
@@ -132,10 +133,12 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
   const inProjects = ["projects", "project", "tape", "iteration"].includes(route.view);
   return (
     <div className="flex min-h-screen flex-col bg-ink text-phosphor">
-      <header className="wallpaper flex flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        <div className="flex items-baseline gap-3">
-          <h1 className="stencil text-3xl">DualBladeX</h1>
-          <span className="osd hidden text-xl sm:inline">Editor</span>
+      <header className="wallpaper relative z-30 flex flex-wrap items-center justify-between gap-4 border-b-4 border-ink px-4 py-3 sm:px-6">
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl">
+            <Ransom text="DualBladeX" />
+          </h1>
+          <span className="tag hidden bg-ink text-sm text-phosphor sm:inline-block">Editor</span>
         </div>
         <div className="flex items-center gap-4">
           {me && <SearchBox />}
@@ -143,7 +146,7 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
           <form method="post" action="/auth/logout">
             <button
               type="submit"
-              className="border border-ink/40 px-3 py-1.5 text-xs font-bold uppercase tracking-widest hover:bg-ink hover:text-phosphor"
+              className="menu-pop label whitespace-nowrap border-2 border-ink px-3 py-1.5 text-xs text-ink hover:bg-ink hover:text-phosphor"
             >
               Log out
             </button>
@@ -152,7 +155,7 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
       </header>
 
       {me && (
-        <nav aria-label="Editor sections" className="flex gap-1 overflow-x-auto border-b border-seam bg-bezel px-2 py-2 sm:px-4">
+        <nav aria-label="Editor sections" className="flex gap-2 overflow-x-auto border-b-2 border-phosphor bg-ink px-3 py-3 sm:px-5">
           {sections.map((s) => {
             const active = s.to.view === "projects" ? inProjects : s.to.view === route.view;
             return (
@@ -160,8 +163,8 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
                 key={s.label}
                 href={routeHash(s.to)}
                 aria-current={active ? "true" : undefined}
-                className={`shrink-0 px-3 py-2 text-sm font-bold uppercase tracking-[0.08em] ${
-                  active ? "bg-field text-ink" : "text-phosphor hover:bg-bezel-2"
+                className={`menu-pop label shrink-0 px-3 py-2 text-sm ${
+                  active ? "menu-on" : "text-phosphor hover:bg-field hover:text-ink"
                 }`}
               >
                 {s.label}
@@ -173,7 +176,7 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
               href={me.brand_kit_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="ml-auto shrink-0 px-3 py-2 text-sm font-bold uppercase tracking-[0.08em] text-dim hover:text-phosphor"
+              className="menu-pop label ml-auto shrink-0 px-3 py-2 text-sm text-dim hover:text-phosphor"
             >
               Brand kit ↗
             </a>
@@ -184,7 +187,7 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
       <main className="min-w-0 flex-1 overflow-hidden px-3 py-5 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl space-y-4">
           {/* Always mounted, so the notice is announced when its text appears. */}
-          <p role="status" className={notice?.arrived ? "border border-amber px-3 py-2 text-amber" : "sr-only"}>
+          <p role="status" className={notice?.arrived ? "toast-in border-2 border-amber bg-ink px-3 py-2 text-amber shadow-[4px_4px_0_var(--amber)]" : "sr-only"}>
             {notice?.arrived ? notice.text : ""}
           </p>
           {error && <p className="text-rec">{error}</p>}
@@ -192,7 +195,7 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
           {me && (
             <>
               {inProjects && <Breadcrumb route={route} names={names} />}
-              <div key={viewKey} ref={viewRef} className={zoom.dir}>
+              <div key={viewKey} ref={viewRef} className={`${zoom.dir} wipe`}>
                 <RouteView route={route} me={me} />
               </div>
             </>

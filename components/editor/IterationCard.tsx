@@ -37,7 +37,7 @@ export function CheckBadges({ checks }: { checks: Checks | null }) {
         const state = c && STATES.includes(c.state as CheckState) ? (c.state as CheckState) : "unknown";
         const value = c?.value === undefined || c?.value === null ? "not measured" : String(c.value);
         return (
-          <span key={key} title={`${label}: ${value}`} className={`label border px-1.5 py-0.5 text-[10px] ${TONE[state]}`}>
+          <span key={key} title={`${label}: ${value}`} className={`label inline-block -skew-x-6 border-2 px-1.5 py-0.5 text-[10px] ${TONE[state]}`}>
             {label} {state}
           </span>
         );
@@ -57,7 +57,7 @@ export function Thumbnail({ iteration }: { iteration: Iteration }) {
     // eslint-disable-next-line @next/next/no-img-element -- static export, backend-served JPEG
     <img src={`/api/editor/iterations/${iteration.id}/thumbnail`} alt="" className="aspect-video w-full bg-ink object-cover" />
   ) : (
-    <div className="noise aspect-video w-full opacity-30" aria-hidden />
+    <div className="noise aspect-video w-full opacity-15" aria-hidden />
   );
 }
 
@@ -80,7 +80,7 @@ function CommentSummary({ iterationId }: { iterationId: number }) {
   return <span className="text-xs text-dim">{text}</span>;
 }
 
-const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-2 py-1 text-[11px] text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
 
 /**
  * One version on a tape. Its menu opens on hover (and keyboard focus) on a
@@ -133,7 +133,7 @@ export function IterationCard({
   const canRunChecks = ready && !iteration.checks && !sendingHere;
   const play = routeHash({ view: "iteration", projectId: tape.project_id, tapeId: tape.id, iterationId: iteration.id });
   return (
-    <article className="group relative border border-seam bg-bezel">
+    <article className="slab slab-sm group relative p-[3px]">
       <Thumbnail iteration={iteration} />
       <div className="space-y-2 p-3">
         <div className="flex items-baseline justify-between gap-2">
@@ -236,12 +236,12 @@ export function IterationDetails({ iterationId }: { iterationId: number }) {
 
   return (
     <section className="space-y-4">
-      <h2 tabIndex={-1} className="stencil text-4xl">
+      <h2 tabIndex={-1} className="stencil tilt slam text-4xl">
         {it ? `Version ${it.version}` : "Version"}
       </h2>
       {error && <p className="text-rec">{error}</p>}
       {it && (
-        <div className="grid gap-4 border border-seam bg-bezel p-4 sm:grid-cols-[minmax(0,24rem)_1fr]">
+        <div className="slab relative grid gap-4 p-4 sm:grid-cols-[minmax(0,24rem)_1fr]">
           <Thumbnail iteration={it} />
           <div className="space-y-3 text-sm">
             <p className="font-mono break-all">{it.filename}</p>

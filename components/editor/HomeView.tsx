@@ -10,8 +10,8 @@ import { DeleteDialog } from "./DeleteDialog";
 import { PendingDelete } from "./PendingDelete";
 import { DownloadLink, OpenInDrive } from "./DriveLinks";
 
-const btn = "label border border-seam px-3 py-1.5 text-xs text-phosphor hover:border-field disabled:opacity-40";
-const card = "flex flex-wrap items-center gap-3 border border-seam bg-bezel px-4 py-3";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-3 py-1.5 text-xs text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
+const card = "slab slab-sm relative flex flex-wrap items-center gap-3 px-4 py-3";
 
 type HomeProject = HomeData["vods_ready"][number];
 
@@ -41,7 +41,7 @@ export function HomeView({ role, username }: { role: "admin" | "editor"; usernam
 
   return (
     <section className="space-y-6">
-      <h2 tabIndex={-1} className="stencil text-4xl">
+      <h2 tabIndex={-1} className="stencil tilt slam text-4xl">
         Home
       </h2>
       {error && (
@@ -83,7 +83,7 @@ export function HomeView({ role, username }: { role: "admin" | "editor"; usernam
               {toConfirm.map((p) => (
                 <li key={p.id} className={card}>
                   <ProjectLink p={p} />
-                  <button type="button" onClick={() => setDeleting(p)} className={`${btn} ml-auto border-rec text-rec`}>
+                  <button type="button" onClick={() => setDeleting(p)} className={`${btn} ml-auto border-rec! text-rec! hover:bg-rec! hover:text-ink!`}>
                     Confirm delete
                   </button>
                 </li>

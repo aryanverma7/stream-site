@@ -6,7 +6,7 @@ import { routeHash } from "@/lib/useHashRoute";
 import type { Comment, CommentsApi } from "@/lib/useComments";
 import type { Entry } from "@/lib/unsentQueue";
 
-const btn = "label border border-seam px-2 py-0.5 text-[10px] text-phosphor hover:border-field";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-2 py-0.5 text-[10px] text-phosphor hover:bg-phosphor hover:text-ink";
 const KIND: Record<string, string> = { fix: "Fix", keep: "Keep", question: "Question" };
 const TONE: Record<string, string> = { fix: "text-rec", keep: "text-signal", question: "text-amber" };
 
@@ -43,7 +43,7 @@ export function CommentItem({
   );
 
   return (
-    <li data-comment={c.id} aria-current={active ? "true" : undefined} className={`space-y-1 border p-2 text-sm ${active ? "border-field bg-field/10" : "border-seam"}`}>
+    <li data-comment={c.id} aria-current={active ? "true" : undefined} className={`bubble space-y-1.5 p-2.5 text-sm ${active ? "bubble-on" : ""}`}>
       <div className="flex flex-wrap items-center gap-2">
         {canResolve ? (
           <input type="checkbox" aria-label={`Resolve comment by ${c.author}`} checked={c.resolved} onChange={(e) => void cm.setResolved(c.id, e.target.checked)} />
@@ -73,7 +73,7 @@ export function CommentItem({
         <p className="whitespace-pre-wrap break-words">{c.body}</p>
       ) : (
         <div className="space-y-1">
-          <textarea aria-label="Edit comment" className="h-16 w-full border border-seam bg-ink p-1" value={editing} onChange={(e) => setEditing(e.target.value)} />
+          <textarea aria-label="Edit comment" className="h-16 w-full border-2 border-seam bg-ink p-1 focus:border-phosphor focus:outline-none" value={editing} onChange={(e) => setEditing(e.target.value)} />
           <button
             type="button"
             className={btn}
@@ -94,7 +94,7 @@ export function CommentItem({
         </button>
       )}
       {(c.replies.length > 0 || pendingReplies.length > 0) && (
-        <ul className="space-y-1 border-l border-seam pl-2">
+        <ul className="space-y-1 border-l-2 border-field-deep pl-2">
           {c.replies.map((r) => (
             <li key={r.id}>
               <span className="text-dim">{r.author}</span> {cm.isNew(r) && <span className="label text-amber">New</span>}
@@ -118,7 +118,7 @@ export function CommentItem({
           setReply("");
         }}
       >
-        <input aria-label={`Reply to ${c.author}`} placeholder="Reply" className="min-w-0 flex-1 border border-seam bg-ink px-1" value={reply} onChange={(e) => setReply(e.target.value)} />
+        <input aria-label={`Reply to ${c.author}`} placeholder="Reply" className="min-w-0 flex-1 border-2 border-seam bg-ink px-1 focus:border-phosphor focus:outline-none" value={reply} onChange={(e) => setReply(e.target.value)} />
         <button type="submit" className={btn}>
           Reply
         </button>

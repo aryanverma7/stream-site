@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { routeHash } from "@/lib/useHashRoute";
 import { cancelTransfer, dismissNotice, dismissTransfer, refreshLocks, refreshStored, useSpaceNotices, useTransfers, type SpaceNotice, type Transfer } from "@/lib/useTransfers";
 
-const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-2 py-1 text-[11px] text-phosphor hover:bg-phosphor hover:text-ink";
 
 function stateText(t: Transfer, pct: number): string {
   switch (t.state) {
@@ -41,7 +41,7 @@ function Toast({ n }: { n: SpaceNotice }) {
     <div
       role="status"
       aria-live="polite"
-      className={`toast-in flex items-start gap-3 border bg-bezel p-3 text-xs ${n.warn ? "border-amber text-amber" : "border-seam text-phosphor"}`}
+      className={`toast-in slab-flat flex items-start gap-3 p-3 text-xs ${n.warn ? "border-amber! text-amber" : "text-phosphor"}`}
     >
       <p className="min-w-0 flex-1">{n.text}</p>
       <button type="button" aria-label="Close notice" onClick={() => dismissNotice(n.id)} className={btn}>
@@ -98,9 +98,9 @@ export function TransfersPanel() {
     {toasts}
     <aside
       aria-label="Transfers"
-      className="fixed bottom-3 right-3 z-40 max-h-[60vh] w-[min(24rem,calc(100vw-1.5rem))] space-y-2 overflow-y-auto border border-seam bg-bezel p-3 text-phosphor"
+      className="toast-in slab-flat fixed bottom-4 right-4 z-40 max-h-[60vh] w-[min(24rem,calc(100vw-2rem))] space-y-2 overflow-y-auto p-3 text-phosphor"
     >
-      <h2 className="label text-xs text-dim">Transfers</h2>
+      <h2 className="tag bg-phosphor text-xs text-ink shadow-none">Transfers</h2>
       <ul className="space-y-3">
         {transfers.map((t) => {
           const pct = t.size > 0 ? Math.floor((t.sent / t.size) * 100) : 0;
@@ -125,10 +125,10 @@ export function TransfersPanel() {
                   )
                 )}
               </div>
-              <div className="h-1 bg-ink" aria-hidden>
-                <div className={`h-1 ${t.state === "failed" ? "bg-rec" : "bg-field"}`} style={{ width: `${pct}%` }} />
+              <div className="h-2 -skew-x-12 border border-seam bg-ink" aria-hidden>
+                <div className={`h-full ${t.state === "failed" ? "bg-rec" : t.state === "done" ? "bg-signal" : "bg-field"}`} style={{ width: `${pct}%` }} />
               </div>
-              <p className={`text-xs ${t.state === "failed" ? "text-rec" : t.state === "done" ? "text-signal" : "text-dim"}`}>
+              <p className={`text-xs ${t.state === "failed" ? "text-rec" : t.state === "done" ? "burst label ml-3 inline-block px-1 text-phosphor" : "text-dim"}`}>
                 {stateText(t, pct)}
               </p>
               {t.spaceNote && <p className="text-xs text-dim">{t.spaceNote}</p>}

@@ -8,9 +8,9 @@ import { PendingDelete } from "./PendingDelete";
 import { DeleteDialog } from "./DeleteDialog";
 import { useAsk } from "./AskDialog";
 
-const btn = "label border border-seam px-3 py-1.5 text-xs text-phosphor hover:border-field disabled:opacity-40";
-const del = `${btn} border-rec text-rec`;
-const panel = "space-y-2 border border-seam bg-bezel p-4";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-3 py-1.5 text-xs text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
+const del = `${btn} border-rec! text-rec! hover:bg-rec! hover:text-ink!`;
+const panel = "slab relative space-y-2 p-4";
 
 export const size = (b: number | null) => (b === null ? "?" : b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${(b / 1e6).toFixed(1)} MB`);
 const when = (t: number | null) => (t === null ? "never" : new Date(t * 1000).toLocaleString());
@@ -43,7 +43,7 @@ export function StorageView({ username }: { username: string }) {
   const discord = storage?.discord;
   return (
     <section className="space-y-6">
-      <h2 tabIndex={-1} className="stencil text-4xl">
+      <h2 tabIndex={-1} className="stencil tilt slam text-4xl">
         Storage
       </h2>
       {(error || storage?.drive_error) && (
@@ -102,7 +102,7 @@ export function StorageView({ username }: { username: string }) {
           <h3 className="label text-sm text-dim">Pending deletes</h3>
           <ul className="grid gap-2">
             {deletions.pending.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center gap-3 border border-seam bg-bezel px-4 py-3">
+              <li key={r.id} className="slab slab-sm relative flex flex-wrap items-center gap-3 px-4 py-3">
                 <span className="font-bold">{r.label}</span>
                 <span className="text-xs text-dim">by {r.requested_by}</span>
                 <PendingDelete request={r} onUndo={deletions.undo} me={me} />

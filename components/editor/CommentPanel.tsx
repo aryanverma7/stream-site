@@ -64,7 +64,7 @@ export function CommentPanel({
               type="button"
               aria-selected={tab === t}
               onClick={() => setTab(t)}
-              className={`label border px-2 py-0.5 text-[10px] ${tab === t ? "border-field text-phosphor" : "border-seam text-dim"}`}
+              className={`menu-pop label px-2 py-0.5 text-[10px] ${tab === t ? "menu-on" : "border border-seam text-dim hover:text-phosphor"}`}
             >
               {t}
             </button>
@@ -73,7 +73,7 @@ export function CommentPanel({
       </div>
       {cm.error && <p role="alert" className="text-rec">{cm.error}</p>}
       {cm.failed.map((f) => (
-        <p key={f.client_id} role="alert" className="border border-rec p-2 text-rec">
+        <p key={f.client_id} role="alert" className="border-2 border-rec p-2 text-rec">
           Not sent: {f.message}
           <span className="block whitespace-pre-wrap break-words text-dim">{f.body}</span>
           <button type="button" className="label text-[10px] underline" onClick={() => cm.dismissFailed(f.client_id)}>
@@ -82,7 +82,7 @@ export function CommentPanel({
         </p>
       ))}
       {cm.legacy.length > 0 && (
-        <section aria-label="Unsent from before an update" className="space-y-2 border border-amber p-2 text-sm">
+        <section aria-label="Unsent from before an update" className="space-y-2 border-2 border-amber p-2 text-sm">
           <h4 className="label text-[11px] text-amber">Unsent from before an update</h4>
           <ul className="space-y-2">
             {cm.legacy.map((e) => (
@@ -92,10 +92,10 @@ export function CommentPanel({
                 </span>
                 <p className="whitespace-pre-wrap break-words">{String(e.payload.body ?? "")}</p>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => void cm.sendLegacyAsMe(e.client_id)} className="label border border-field px-2 py-0.5 text-[10px] text-phosphor transition-colors hover:bg-field/20">
+                  <button type="button" onClick={() => void cm.sendLegacyAsMe(e.client_id)} className="menu-pop label border-2 border-field px-2 py-0.5 text-[10px] text-phosphor hover:bg-field hover:text-ink">
                     Send as me
                   </button>
-                  <button type="button" onClick={() => cm.discardLegacy(e.client_id)} className="label border border-seam px-2 py-0.5 text-[10px] text-dim transition-colors hover:border-rec hover:text-rec">
+                  <button type="button" onClick={() => cm.discardLegacy(e.client_id)} className="menu-pop label border-2 border-seam px-2 py-0.5 text-[10px] text-dim hover:border-rec hover:text-rec">
                     Discard
                   </button>
                 </div>
@@ -104,11 +104,11 @@ export function CommentPanel({
           </ul>
         </section>
       )}
-      <ul ref={list} onWheel={touch} onTouchMove={touch} onPointerDown={touch} className="max-h-[60vh] space-y-2 overflow-auto">
+      <ul ref={list} onWheel={touch} onTouchMove={touch} onPointerDown={touch} className="max-h-[60vh] space-y-5 overflow-auto pb-4 pl-0.5 pr-2 pt-1">
         {cm.unsent
           .filter((e) => e.kind === "comment")
           .map((e) => (
-            <li key={e.client_id} className="border border-amber p-2 text-sm opacity-80">
+            <li key={e.client_id} className="bubble border-amber! p-2 text-sm opacity-80">
               <span className="label text-amber">Not sent yet</span> <span className="text-dim">written {new Date(e.created_at).toLocaleTimeString()}</span>
               <p className="whitespace-pre-wrap break-words">{String(e.payload.body)}</p>
             </li>
