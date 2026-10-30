@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, fireEvent, waitFor, act } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { EditorShell } from "./EditorShell";
 import { asFetchMock } from "@/lib/testUtils";
 import { keepOnlyProject } from "@/lib/opfsMedia";
@@ -79,6 +80,19 @@ describe("EditorShell", () => {
     await waitFor(() => expect(keepOnlyProject).toHaveBeenCalledWith(12));
     act(() => void (window.location.hash = "#/home"));
     await waitFor(() => expect(keepOnlyProject).toHaveBeenLastCalledWith(null));
+  });
+
+  it("does not delete the deep link's project while the static page hydrates", async () => {
+    backend({ "/me": ADMIN, "/projects/12": PROJECT });
+    window.location.hash = "#/p/12";
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(<EditorShell />); // the export's HTML: the server snapshot, no hash
+    document.body.appendChild(container);
+    vi.mocked(keepOnlyProject).mockClear();
+    render(<EditorShell />, { container, hydrate: true });
+    await waitFor(() => expect(keepOnlyProject).toHaveBeenCalledWith(12));
+    expect(keepOnlyProject).not.toHaveBeenCalledWith(null);
+    container.remove();
   });
 
   it("renders the breadcrumb with names, and Esc zooms out one level", async () => {
