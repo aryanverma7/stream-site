@@ -29,8 +29,8 @@ const COMMON_FPS = [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60];
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 /**
- * Frame rate >= 59.5 passes and >= 29.5 warns, so 59.94 and 29.97 count as
- * 60 and 30. Bitrate is the whole file's (audio included), hence the "≈".
+ * Only 60 fps passes (the streamer's rule): >= 59.9, so 59.94 counts as 60;
+ * anything lower, 29.97 and 30 included, fails. Bitrate is the whole file's (audio included), hence the "≈".
  */
 export function grade(m: Measure, kind: "tape" | "reel"): GradedChecks {
   const [tw, th] = TARGET[kind];
@@ -39,7 +39,7 @@ export function grade(m: Measure, kind: "tape" | "reel"): GradedChecks {
     resolution: sized
       ? { state: m.width! >= tw && m.height! >= th ? "pass" : "warn", value: `${m.width}x${m.height}` }
       : { state: "unknown", value: null },
-    fps: { state: m.fps === null ? "unknown" : m.fps >= 59.5 ? "pass" : m.fps >= 29.5 ? "warn" : "fail", value: m.fps },
+    fps: { state: m.fps === null ? "unknown" : m.fps >= 59.9 ? "pass" : "fail", value: m.fps },
     bitrate:
       m.bitrate_mbps === null
         ? { state: "unknown", value: null }
