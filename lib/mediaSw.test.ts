@@ -25,11 +25,12 @@ function load({ onDisk = [], fetch, linkTimeout = false }: Opts = {}) {
     },
   };
   const page = { postMessage: vi.fn() };
+  const claim = vi.fn(async () => {});
   const ctx: Record<string, unknown> = {
     self: {
       addEventListener: (t: string, f: (e: unknown) => void) => listeners.set(t, f),
       skipWaiting() {},
-      clients: { claim: async () => {}, get: async () => page, matchAll: async () => [page] },
+      clients: { claim, get: async () => page, matchAll: async () => [page] },
       location: { origin: "https://site" },
     },
     navigator: { storage: { getDirectory: async () => ({ getDirectoryHandle: async (n: string) => (n === "it-1-7-F" ? versionDir : Promise.reject(new Error("no"))) }) } },
@@ -42,7 +43,7 @@ function load({ onDisk = [], fetch, linkTimeout = false }: Opts = {}) {
   vm.createContext(ctx);
   vm.runInContext(readFileSync(join(dir, "media-sw.js"), "utf8"), ctx);
   ctx.CHUNK_BYTES = 4;
-  const message = (data: unknown) => listeners.get("message")!({ data });
+  const message = (data: unknown, waitUntil?: (p: Promise<unknown>) => void) => listeners.get("message")!({ data, waitUntil });
   const get = (range: string | null) => {
     let answer: Promise<Response> | undefined;
     listeners.get("fetch")!({
@@ -52,7 +53,7 @@ function load({ onDisk = [], fetch, linkTimeout = false }: Opts = {}) {
     });
     return answer!;
   };
-  return { message, get, page };
+  return { message, get, page, claim };
 }
 
 const info = (link: unknown) => ({ type: "media", iterationId: 7, projectId: 1, fileId: "F", size: FILE.length, mime: "video/mp4", link });
@@ -109,6 +110,39 @@ describe("media-sw.js serve()", () => {
     expect(await res.text()).toBe("0123");
     expect(d.calls.map((c) => c.auth)).toEqual(["Bearer old", "Bearer new"]);
     expect(sw.page.postMessage).toHaveBeenCalledWith({ type: "need-link", iterationId: 7, need: "link" });
+  });
+
+  it("a wait for a Drive link ignores an answer with no link and takes the real one after it", async () => {
+    const d = drive();
+    const sw = load({ fetch: d.f });
+    sw.message(info(null)); // a downloaded version: size and type, no token
+    sw.page.postMessage.mockImplementation(() =>
+      queueMicrotask(() => {
+        sw.message(info(null)); // the page's quick "info" answer
+        setTimeout(() => sw.message(info(fresh("real"))), 0);
+      }),
+    );
+    const res = await sw.get("bytes=0-3");
+    expect(sw.page.postMessage).toHaveBeenCalledWith({ type: "need-link", iterationId: 7, need: "link" });
+    expect(res.status).toBe(206);
+    expect(await res.text()).toBe("0123");
+    expect(d.calls.map((c) => c.auth)).toEqual(["Bearer real"]);
+  });
+
+  it("an info wait ends on any answer, link or not", async () => {
+    const sw = load({ onDisk: [0] });
+    sw.page.postMessage.mockImplementation(() => queueMicrotask(() => sw.message(info(null))));
+    const res = await sw.get("bytes=0-3");
+    expect(res.status).toBe(206);
+    expect(await res.text()).toBe("0123");
+  });
+
+  it("claims the page when it asks (a shift+reload left it uncontrolled)", async () => {
+    const sw = load();
+    const waitUntil = vi.fn();
+    sw.message({ type: "claim" }, waitUntil);
+    expect(sw.claim).toHaveBeenCalledTimes(1);
+    expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
   });
 
   it("cancelling the body aborts the Drive fetch in flight", async () => {

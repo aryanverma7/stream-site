@@ -45,15 +45,17 @@ describe("StorageView", () => {
         return { sane: true };
       },
     });
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
-    const { findByRole, queryByRole } = render(<StorageView username="aryan" />);
+    const { findByRole, queryByRole, getByRole } = render(<StorageView username="aryan" />);
     const button = await findByRole("button", { name: "Trust the clock again" });
     const resets = () => fetchMock.mock.calls.filter(([u]) => u === "/api/editor/scheduler/reset-clock").length;
 
     fireEvent.click(button);
-    expect(confirm).toHaveBeenCalledTimes(1);
+    expect((await findByRole("alertdialog", { name: "Trust the clock again?" })).textContent).toMatch("at most an hour from now");
+    fireEvent.click(getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(queryByRole("alertdialog")).toBeNull());
     expect(resets()).toBe(0);
     fireEvent.click(button);
+    fireEvent.click(await findByRole("button", { name: "Trust the clock" }));
     await waitFor(() => expect(queryByRole("button", { name: "Trust the clock again" })).toBeNull());
     expect(resets()).toBe(1);
   });

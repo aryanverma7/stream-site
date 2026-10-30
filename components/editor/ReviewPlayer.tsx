@@ -242,13 +242,13 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
 
   const uploaded = !!it.drive_file_id;
   const canWatchNow = media.state !== "complete" && (media.state !== "error" || storageOnly);
-  // V pressed while playing: carry on in this version once it can start
+  // V pressed while playing: carry on in this version, but only if it is fully downloaded; one still
+  // loading opens paused with Start watching now, since streaming it is the person's call, not V's
   useEffect(() => {
     if (!wantResume.current || started || !worker.ready || !uploaded || media.state === "checking") return;
-    if (media.state !== "complete" && !canWatchNow) return;
     wantResume.current = false;
-    void Promise.resolve().then(startWatching); // off the effect's synchronous path
-  }, [started, worker.ready, uploaded, media.state, canWatchNow, startWatching]);
+    if (media.state === "complete") void Promise.resolve().then(startWatching); // off the effect's synchronous path
+  }, [started, worker.ready, uploaded, media.state, startWatching]);
 
   const leaveFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen?.()?.catch(() => {});

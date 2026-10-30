@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { routeHash } from "@/lib/useHashRoute";
-import { cancelTransfer, dismissNotice, dismissTransfer, refreshStored, useSpaceNotices, useTransfers, type SpaceNotice, type Transfer } from "@/lib/useTransfers";
+import { cancelTransfer, dismissNotice, dismissTransfer, refreshLocks, refreshStored, useSpaceNotices, useTransfers, type SpaceNotice, type Transfer } from "@/lib/useTransfers";
 
 const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field";
 
@@ -20,6 +20,8 @@ function stateText(t: Transfer, pct: number): string {
       return "Checking the file";
     case "paused":
       return `${pct}% sent - paused, drop ${t.name} again on its tape to continue`;
+    case "elsewhere":
+      return `Uploading in another tab · ${pct}%`;
     case "done":
       return "Done";
     case "failed":
@@ -28,6 +30,7 @@ function stateText(t: Transfer, pct: number): string {
 }
 
 const NOTICE_MS = 8000;
+const LOCK_POLL_MS = 5000;
 
 function Toast({ n }: { n: SpaceNotice }) {
   useEffect(() => {
@@ -63,6 +66,13 @@ export function TransfersPanel() {
   useEffect(() => {
     void refreshStored();
   }, []);
+  // Another tab may start or finish one of the stored uploads at any time.
+  const stored = transfers.some((t) => t.state === "paused" || t.state === "elsewhere");
+  useEffect(() => {
+    if (!stored) return;
+    const h = setInterval(() => void refreshLocks(), LOCK_POLL_MS);
+    return () => clearInterval(h);
+  }, [stored]);
 
   const sending = transfers.some((t) => ["uploading", "offline", "retrying", "checking"].includes(t.state));
   useEffect(() => {
@@ -103,6 +113,10 @@ export function TransfersPanel() {
                   <button type="button" aria-label={`Dismiss ${t.name}`} onClick={() => dismissTransfer(t.key)} className={btn}>
                     ×
                   </button>
+                ) : t.state === "waiting" ? (
+                  <span className="label text-[11px] text-dim">Finishing…</span>
+                ) : t.state === "elsewhere" ? (
+                  <span className="label text-[11px] text-dim">Another tab</span>
                 ) : (
                   t.state !== "checking" && (
                     <button type="button" aria-label={`Cancel ${t.name}`} onClick={() => cancelTransfer(t.key)} className={btn}>

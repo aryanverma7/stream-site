@@ -16,9 +16,40 @@ import { grade, measureMedia, thumbnail } from "./mediaChecks";
  * kept, hidden, until the same file revives it), never shown or logged.
  */
 const KEY = "editor.uploads";
-// ponytail: no cross-tab lock. Tabs share these entries but not live state,
-// so two tabs dropping the same file at once both send into one session.
-// Add a BroadcastChannel/Web Locks claim per key if that ever happens.
+
+/*
+ * Tabs share the stored entries but not live state. A running upload holds
+ * the exclusive Web Lock `upload-<iterationId>` for as long as it runs, so
+ * another tab shows that entry as "elsewhere" (no Cancel, which would abandon
+ * the version under the sending tab) and will not start sending it too.
+ * Without navigator.locks there is no claim (one tab's view, as before).
+ */
+type UploadLocks = {
+  request(name: string, o: { ifAvailable: true }, cb: (lock: unknown) => Promise<void>): Promise<void>;
+  query(): Promise<{ held?: { name?: string }[] }>;
+};
+const uploadLocks = () => (typeof navigator === "undefined" ? undefined : (navigator as unknown as { locks?: UploadLocks }).locks);
+export const uploadLock = (iterationId: number) => `upload-${iterationId}`;
+
+/** Takes the upload's lock until the returned release is called; null when another tab holds it. */
+function claimUpload(iterationId: number): Promise<(() => void) | null> {
+  const locks = uploadLocks();
+  if (!locks) return Promise.resolve(() => {});
+  return new Promise((resolve) => {
+    let release = () => {};
+    const done = new Promise<void>((r) => (release = r));
+    locks
+      .request(uploadLock(iterationId), { ifAvailable: true }, async (lock) => {
+        if (!lock) return resolve(null);
+        resolve(release);
+        await done;
+      })
+      .catch(() => resolve(() => {})); // a broken Locks API must not stop uploads
+  });
+}
+
+/** Iteration ids of stored entries whose lock another tab holds (from the last refreshLocks). */
+let elsewhere = new Set<number>();
 
 interface Stored {
   tapeId: number;
@@ -34,7 +65,7 @@ interface Stored {
   abandoned?: boolean;
 }
 
-export type TransferState = "uploading" | "offline" | "retrying" | "waiting" | "checking" | "paused" | "done" | "failed";
+export type TransferState = "uploading" | "offline" | "retrying" | "waiting" | "checking" | "paused" | "elsewhere" | "done" | "failed";
 export interface Transfer {
   key: string;
   tapeId: number;
@@ -140,7 +171,7 @@ function getSnapshot(): Transfer[] {
         version: s.version,
         sent: s.sent,
         speed: null,
-        state: "paused",
+        state: elsewhere.has(s.iterationId) ? "elsewhere" : "paused",
         message: null,
       })),
   ];
@@ -219,6 +250,18 @@ export async function startUpload(
   });
   emit();
 
+  const lock: { release: (() => void) | null } = { release: null };
+  /** False (and the row gone) when another tab is sending this version. */
+  const claim = async (iterationId: number) => {
+    lock.release?.();
+    lock.release = await claimUpload(iterationId);
+    if (lock.release) return true;
+    elsewhere = new Set(elsewhere).add(iterationId);
+    live.delete(key);
+    emit();
+    return false;
+  };
+
   let last: { t: number; sent: number } | null = null;
   const send = (url: string) =>
     resumableUpload(file, url, {
@@ -234,6 +277,8 @@ export async function startUpload(
     });
 
   try {
+    if (entry && !(await claim(entry.iterationId))) return;
+    if (signal.aborted) return;
     if (entry?.abandoned) {
       // a cancelled version: the server puts it back to uploading with a fresh session
       const revived = entry.iterationId;
@@ -276,6 +321,7 @@ export async function startUpload(
       });
       // Cancelled while the version was being created: never write its session URL back.
       if (signal.aborted) return abandon(r.iteration_id);
+      await claim(r.iteration_id); // brand new: no other tab can hold it
       entry = {
         tapeId, projectId, name: file.name, size: file.size, lastModified: file.lastModified,
         iterationId: r.iteration_id, version: r.version, uploadUrl: r.upload_url, sent: 0,
@@ -319,6 +365,7 @@ export async function startUpload(
   } catch (e) {
     if (!signal.aborted) update(key, { state: "failed", speed: null, message: describe(e) });
   } finally {
+    lock.release?.();
     if (controllers.get(key) === ctl) controllers.delete(key);
   }
 }
@@ -336,10 +383,14 @@ function abandon(iterationId: number) {
 /**
  * Stops sending and abandons the version. Its stored entry stays, marked
  * abandoned and hidden, so dropping the same file again revives that version
- * through /session rather than creating the next one.
+ * through /session rather than creating the next one. Refused while
+ * "waiting": the bytes are already on Google, so abandoning would orphan
+ * the finished file; a version nobody wants is deleted like any other.
  */
 export function cancelTransfer(key: string) {
+  if (live.get(key)?.state === "waiting") return;
   const entry = load().find((s) => keyOf(s.tapeId, s) === key);
+  if (!live.has(key) && entry && elsewhere.has(entry.iterationId)) return; // another tab's to cancel
   if (entry) abandon(entry.iterationId);
   controllers.get(key)?.abort();
   controllers.delete(key);
@@ -359,6 +410,21 @@ export function dismissTransfer(key: string) {
  * server's reconcile job finished it, or it was deleted - so the panel
  * stops asking for a file nobody needs to send.
  */
+/** Re-reads which stored uploads another tab is sending (and the stored list itself, which other tabs change). */
+export async function refreshLocks() {
+  const locks = uploadLocks();
+  let held = new Set<string>();
+  if (locks) {
+    try {
+      held = new Set(((await locks.query()).held ?? []).map((l) => l.name ?? ""));
+    } catch {
+      /* treat as nothing held */
+    }
+  }
+  elsewhere = new Set(load().filter((s) => !live.has(keyOf(s.tapeId, s)) && held.has(uploadLock(s.iterationId))).map((s) => s.iterationId));
+  emit();
+}
+
 export async function refreshStored() {
   for (const s of load()) {
     const key = keyOf(s.tapeId, s);
@@ -370,5 +436,5 @@ export async function refreshStored() {
       if (e instanceof EditorApiError && e.status === 404) patchStored(key, null);
     }
   }
-  emit();
+  await refreshLocks();
 }

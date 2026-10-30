@@ -9,7 +9,7 @@ const c = (over: Partial<Comment>): Comment => ({
 });
 const api = (comments: Comment[], over: Partial<CommentsApi> = {}): CommentsApi =>
   ({
-    role: "admin", comments, unsent: [], failed: [], error: null, dismissFailed: vi.fn(),
+    role: "admin", comments, unsent: [], legacy: [], failed: [], error: null, dismissFailed: vi.fn(), sendLegacyAsMe: vi.fn(), discardLegacy: vi.fn(),
     isNew: (i: { author: string; created_at: number }) => i.author !== "me" && i.created_at > 150,
     add: vi.fn(), reply: vi.fn(), edit: vi.fn(), setResolved: vi.fn(), reload: vi.fn(), ...over,
   }) as unknown as CommentsApi;
@@ -93,5 +93,19 @@ describe("CommentPanel", () => {
     panel(api([], { unsent: [{ client_id: "z", kind: "comment", iterationId: 7, payload: { body: "queued" }, created_at: 1 }] }));
     expect(screen.getByText("Not sent yet")).toBeInTheDocument();
     expect(screen.getByText("queued")).toBeInTheDocument();
+  });
+
+  it("shows entries from before an update with Send as me and Discard, as plain text", () => {
+    const sendLegacyAsMe = vi.fn();
+    const discardLegacy = vi.fn();
+    const legacy = [{ client_id: "z", kind: "comment", iterationId: 7, payload: { body: "<b>old</b>" }, created_at: 1 }];
+    panel(api([], { legacy, sendLegacyAsMe, discardLegacy } as unknown as Partial<CommentsApi>));
+    const box = screen.getByRole("region", { name: "Unsent from before an update" });
+    expect(within(box).getByText("<b>old</b>")).toBeInTheDocument();
+    expect(box.querySelector("b")).toBeNull();
+    fireEvent.click(within(box).getByRole("button", { name: "Send as me" }));
+    expect(sendLegacyAsMe).toHaveBeenCalledWith("z");
+    fireEvent.click(within(box).getByRole("button", { name: "Discard" }));
+    expect(discardLegacy).toHaveBeenCalledWith("z");
   });
 });

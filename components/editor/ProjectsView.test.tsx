@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { render, fireEvent, waitFor, within } from "@testing-library/react";
+import { act, render, fireEvent, waitFor, within } from "@testing-library/react";
 import { ProjectsView } from "./ProjectsView";
 import { editorBackend } from "@/lib/testUtils";
 
@@ -40,12 +40,15 @@ describe("ProjectsView", () => {
     const fetchMock = base({
       "POST /clips/combine": { status: 400, body: { error: "Reel 60 already has a version - clips can only be combined before that" } },
     });
-    vi.spyOn(window, "prompt").mockReturnValue("Best of October");
     const { findByLabelText, getByLabelText, getByRole, findByRole } = render(<ProjectsView role="editor" username="cutter" />);
 
     fireEvent.click(await findByLabelText("Select Clip 3"));
     fireEvent.click(getByLabelText("Select Clip 4"));
     fireEvent.click(getByRole("button", { name: /Combine/ }));
+    const field = await findByLabelText("Name for the combined reel");
+    expect(getByRole("button", { name: "Combine" })).toBeDisabled();
+    fireEvent.change(field, { target: { value: "  Best of October " } });
+    fireEvent.click(getByRole("button", { name: "Combine" }));
 
     expect((await findByRole("alert")).textContent).toMatch("already has a version");
     const call = fetchMock.mock.calls.find(([u]) => u === "/api/editor/clips/combine")!;
@@ -122,6 +125,32 @@ describe("ProjectsView", () => {
     expect(getAllByRole("button", { name: "Delete clip file" })).toHaveLength(1); // Clip 4's
   });
 
+  it("a clip whose file delete goes live is unselectable, marked Being deleted, and drops out of the Combine count", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval"] });
+    try {
+      let pending: unknown[] = [];
+      base({
+        "/projects": { projects: [clip(5, 50, 62), clip(4, 40, 61), clip(3, 20, 60)] },
+        "/projects/5": { tapes: [reel(62, 5, [5])] },
+        "/deletions": () => ({ pending }),
+      });
+      const { findByLabelText, getByLabelText, getByRole, findByText } = render(<ProjectsView role="admin" username="aryan" />);
+      fireEvent.click(await findByLabelText("Select Clip 3"));
+      fireEvent.click(getByLabelText("Select Clip 4"));
+      fireEvent.click(getByLabelText("Select Clip 5"));
+      expect(getByRole("button", { name: "Combine 3" })).toBeTruthy();
+      pending = [{ ...limbo(5), kind: "vod" }];
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
+      const box = getByLabelText("Select Clip 5") as HTMLInputElement;
+      expect(box.disabled).toBe(true);
+      expect(box.checked).toBe(false);
+      expect(within((await findByText("Being deleted")).closest("li") as HTMLElement).getByLabelText("Select Clip 5")).toBe(box);
+      expect(getByRole("button", { name: "Combine 2" })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("hides Rename and the VOD delete from the editor before their download", async () => {
     base();
     const { findByRole, queryByRole } = render(<ProjectsView role="editor" username="cutter" />);
@@ -132,9 +161,12 @@ describe("ProjectsView", () => {
 
   it("shows the streamer Rename, and a refusal from the server", async () => {
     base({ "PATCH /projects/12": { status: 403, body: { error: "Only the streamer can do this." } } });
-    vi.spyOn(window, "prompt").mockReturnValue("New name");
-    const { findByRole } = render(<ProjectsView role="admin" username="aryan" />);
+    const { findByRole, findByLabelText } = render(<ProjectsView role="admin" username="aryan" />);
     fireEvent.click(await findByRole("button", { name: "Rename" }));
+    const field = (await findByLabelText("New name")) as HTMLInputElement;
+    expect(field.value).toBe("Ranked grind");
+    fireEvent.change(field, { target: { value: "New name" } });
+    fireEvent.submit(field.form!);
     expect((await findByRole("alert")).textContent).toBe("Only the streamer can do this.");
   });
 

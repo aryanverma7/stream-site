@@ -8,12 +8,13 @@ vi.mock("@/lib/useTransfers", () => ({
   useSpaceNotices: () => store.notices,
   dismissNotice: vi.fn(),
   refreshStored: vi.fn(async () => {}),
+  refreshLocks: vi.fn(async () => {}),
   cancelTransfer: vi.fn(),
   dismissTransfer: vi.fn(),
 }));
 
 import { TransfersPanel } from "./TransfersPanel";
-import { cancelTransfer, dismissNotice, dismissTransfer, refreshStored } from "@/lib/useTransfers";
+import { cancelTransfer, dismissNotice, dismissTransfer, refreshLocks, refreshStored } from "@/lib/useTransfers";
 
 const MB = 1e6;
 const t = (over: Partial<Transfer>): Transfer => ({
@@ -72,6 +73,21 @@ describe("TransfersPanel", () => {
     expect(beforeUnloadBlocked()).toBe(false);
   });
 
+  it("shows an upload another tab is sending without Cancel, and re-checks the locks every 5 s", () => {
+    vi.useFakeTimers();
+    store.list = [t({ state: "elsewhere" })];
+    const { getByText, queryByRole } = render(<TransfersPanel />);
+    expect(getByText("Uploading in another tab · 62%")).toBeTruthy();
+    expect(getByText("Another tab")).toBeTruthy();
+    expect(queryByRole("button", { name: "Cancel jett.mp4" })).toBeNull();
+    expect(queryByRole("link", { name: "Open tape" })).toBeNull();
+    expect(beforeUnloadBlocked()).toBe(false);
+    expect(refreshLocks).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(5000);
+    expect(refreshLocks).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
+
   it("shows percent and speed while sending, and asks before the page is closed", () => {
     store.list = [t({ speed: 12.34 * MB })];
     const { getByText, unmount } = render(<TransfersPanel />);
@@ -91,6 +107,13 @@ describe("TransfersPanel", () => {
     const { getByText } = render(<TransfersPanel />);
     expect(getByText(text)).toBeTruthy();
     expect(beforeUnloadBlocked()).toBe(prompts);
+  });
+
+  it("offers no Cancel once the bytes are on Google (waiting for the Mac Mini), only Finishing…", () => {
+    store.list = [t({ state: "waiting", sent: 100 * MB })];
+    const { queryByRole, getByText } = render(<TransfersPanel />);
+    expect(queryByRole("button", { name: "Cancel jett.mp4" })).toBeNull();
+    expect(getByText("Finishing…")).toBeTruthy();
   });
 
   it("asks before the page is closed while the file is being checked (checks and thumbnail not sent yet)", () => {

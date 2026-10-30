@@ -46,6 +46,9 @@ function save(entries: Entry[]) {
 
 export const enqueue = (e: Entry) => save([...list(), e]);
 export const remove = (clientId: string) => save(list().filter((e) => e.client_id !== clientId));
+/** Gives an entry saved before entries had a username to `username`, so their flush sends it. Never re-owns a named entry. */
+export const claim = (clientId: string, username: string) =>
+  save(list().map((e) => (e.client_id === clientId && !e.username ? { ...e, username } : e)));
 
 /** `username`'s entries, oldest first; stops at the first "retry" so order is kept. Others' entries wait for their own login. */
 export async function flush(send: (e: Entry) => Promise<Outcome>, username: string): Promise<void> {

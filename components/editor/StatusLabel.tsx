@@ -1,6 +1,7 @@
 "use client";
 
 import type { TapeStatus } from "@/lib/useProject";
+import { useAsk } from "./AskDialog";
 
 export const STATUS_LABELS: Record<TapeStatus, string> = {
   cutting: "Cutting",
@@ -20,7 +21,7 @@ export function StatusLabel({ status }: { status: TapeStatus }) {
   return <span className={`label border px-2 py-0.5 text-[11px] ${TONE[status]}`}>{STATUS_LABELS[status]}</span>;
 }
 
-export const finalPrompt = (name: string) => `Mark ${name} Final? You'll download it, then its files are deleted.`;
+const FINAL_MESSAGE = "You'll download it, then its files are deleted.";
 
 /**
  * A tape's status picker. The editor never gets `final` to choose and
@@ -41,25 +42,29 @@ export function StatusSelect({
   onChange: (status: TapeStatus) => void;
   disabled?: boolean;
 }) {
+  const ask = useAsk();
   if (role !== "admin" && status === "final") return <StatusLabel status={status} />;
   const options = (Object.keys(STATUS_LABELS) as TapeStatus[]).filter((s) => role === "admin" || s !== "final");
   return (
-    <select
-      aria-label="Status"
-      value={status}
-      disabled={disabled}
-      onChange={(e) => {
-        const next = e.target.value as TapeStatus;
-        if (next === "final" && !window.confirm(finalPrompt(name))) return;
-        onChange(next);
-      }}
-      className="border border-seam bg-ink px-2 py-1.5 text-sm text-phosphor disabled:opacity-40"
-    >
-      {options.map((s) => (
-        <option key={s} value={s}>
-          {STATUS_LABELS[s]}
-        </option>
-      ))}
-    </select>
+    <>
+      <select
+        aria-label="Status"
+        value={status}
+        disabled={disabled}
+        onChange={async (e) => {
+          const next = e.target.value as TapeStatus;
+          if (next === "final" && !(await ask.confirm({ title: `Mark ${name} Final?`, message: FINAL_MESSAGE, confirmLabel: "Mark Final" }))) return;
+          onChange(next);
+        }}
+        className="border border-seam bg-ink px-2 py-1.5 text-sm text-phosphor disabled:opacity-40"
+      >
+        {options.map((s) => (
+          <option key={s} value={s}>
+            {STATUS_LABELS[s]}
+          </option>
+        ))}
+      </select>
+      {ask.dialog}
+    </>
   );
 }

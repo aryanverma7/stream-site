@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { duration, editorApi } from "@/lib/editorApi";
 import { routeHash } from "@/lib/useHashRoute";
 import { useTransfers } from "@/lib/useTransfers";
+import { useRunChecks } from "@/lib/useRunChecks";
 import type { Checks, CheckState, Iteration } from "@/lib/useTape";
 import type { Tape, TapeStatus } from "@/lib/useProject";
 import { StatusSelect } from "./StatusLabel";
 import { DownloadLink, OpenInDrive } from "./DriveLinks";
+import { useAsk } from "./AskDialog";
 
 const CHECKS = [
   ["resolution", "Resolution"],
@@ -102,13 +104,21 @@ export function IterationCard({
   onChanged?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const ask = useAsk();
   const [cancelError, setCancelError] = useState<string | null>(null);
   const ready = iteration.status === "ready";
   // An upload this tab is sending has its own Cancel in the Transfers panel; the card's is for an orphan
   // (closed tab, other computer), which otherwise blocks the tape's deletes for 8 days.
   const sendingHere = useTransfers().some((t) => t.tapeId === tape.id && t.version === iteration.version && t.state !== "done" && t.state !== "failed");
   const cancelUpload = async () => {
-    if (!window.confirm(`Cancel the upload of v${iteration.version}? Dropping the same file again later picks it up.`)) return;
+    const yes = await ask.confirm({
+      title: `Cancel the upload of v${iteration.version}?`,
+      message: "Dropping the same file again later picks it up.",
+      confirmLabel: "Cancel upload",
+      cancelLabel: "Keep it",
+      danger: true,
+    });
+    if (!yes) return;
     setCancelError(null);
     try {
       await editorApi(`/iterations/${iteration.id}/abandon`, { method: "POST" });
@@ -117,6 +127,10 @@ export function IterationCard({
       setCancelError(e instanceof Error ? e.message : "Could not cancel the upload");
     }
   };
+  // No checks on a ready version: its tab closed while checking, or reconcile completed it. Pick the file again.
+  const checks = useRunChecks(iteration, tape.kind, onChanged);
+  const picker = useRef<HTMLInputElement>(null);
+  const canRunChecks = ready && !iteration.checks && !sendingHere;
   const play = routeHash({ view: "iteration", projectId: tape.project_id, tapeId: tape.id, iterationId: iteration.id });
   return (
     <article className="group relative border border-seam bg-bezel">
@@ -131,6 +145,31 @@ export function IterationCard({
           </button>
         </div>
         <CheckBadges checks={iteration.checks} />
+        {canRunChecks && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className={btn} disabled={checks.running} onClick={() => picker.current?.click()}>
+              {checks.running ? "Checking…" : "Run checks"}
+            </button>
+            <span className="text-[11px] text-dim">Pick {iteration.filename} again; it stays on this computer.</span>
+            <input
+              ref={picker}
+              type="file"
+              accept="video/*"
+              hidden
+              aria-label={`File for v${iteration.version}'s checks`}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = ""; // the same file can be picked again after a refusal
+                if (f) void checks.run(f);
+              }}
+            />
+          </div>
+        )}
+        {checks.error && (
+          <p role="alert" className="text-xs text-rec">
+            {checks.error}
+          </p>
+        )}
         {ready && <CommentSummary iterationId={iteration.id} />}
         {cancelError && (
           <p role="alert" className="text-xs text-rec">
@@ -172,6 +211,7 @@ export function IterationCard({
           )}
         </div>
       </div>
+      {ask.dialog}
     </article>
   );
 }

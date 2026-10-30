@@ -17,10 +17,11 @@ describe("grade", () => {
     expect(grade(m({ width: 1280, height: 720 }), "tape").resolution.state).toBe("warn");
   });
 
-  it("grades frame rate: 59.94 pass, 29.97 warn, 24 fail", () => {
+  it("grades frame rate: only 60 passes (59.94 counts), 50, 30, 29.97 and 24 fail", () => {
+    expect(grade(m({ fps: 60 }), "tape").fps.state).toBe("pass");
     expect(grade(m({ fps: 59.94 }), "tape").fps.state).toBe("pass");
-    expect(grade(m({ fps: 29.97 }), "tape").fps.state).toBe("warn");
-    expect(grade(m({ fps: 24 }), "tape").fps.state).toBe("fail");
+    expect(grade(m({ fps: 59.9 }), "reel").fps.state).toBe("pass");
+    for (const fps of [59.5, 50, 30, 29.97, 24]) expect(grade(m({ fps }), "tape").fps.state).toBe("fail");
   });
 
   it("fails a 40 Mbps bitrate", () => {

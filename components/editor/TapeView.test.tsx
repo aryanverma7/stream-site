@@ -55,15 +55,19 @@ describe("TapeView", () => {
 
   it("asks the streamer before marking Final, and sends it only on yes", async () => {
     const fetchMock = base("in_review");
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
-    const { findByRole, getAllByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
+    const { findByRole, getAllByRole, getByRole, queryByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
     await findByRole("heading", { name: "Jett dash" });
 
     fireEvent.change(statusSelect(getAllByRole), { target: { value: "final" } });
-    expect(confirm).toHaveBeenCalledWith("Mark Jett dash Final? You'll download it, then its files are deleted.");
+    const dialog = await findByRole("alertdialog", { name: "Mark Jett dash Final?" });
+    expect(dialog.textContent).toMatch("You'll download it, then its files are deleted.");
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(queryByRole("alertdialog")).toBeNull());
     expect(fetchMock.mock.calls.some(([, i]) => i?.method === "PATCH")).toBe(false);
 
     fireEvent.change(statusSelect(getAllByRole), { target: { value: "final" } });
+    fireEvent.click(await findByRole("button", { name: "Mark Final" }));
+    expect(getByRole("heading", { name: "Jett dash" })).toBeTruthy();
     await findByRole("link", { name: "Download Final" });
     const patch = fetchMock.mock.calls.find(([, i]) => i?.method === "PATCH")!;
     expect(JSON.parse(String(patch[1]!.body))).toEqual({ status: "final" });
@@ -90,9 +94,10 @@ describe("TapeView", () => {
 
   it("lets the streamer start over on the latest version after a confirm", async () => {
     const fetchMock = base("changes_asked", { "POST /iterations/2/start-over": { resolved: 1 } });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { findByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
     fireEvent.click(await findByRole("button", { name: "Start over on v2" }));
+    expect(fetchMock.mock.calls.some(([u]) => u === "/api/editor/iterations/2/start-over")).toBe(false);
+    fireEvent.click(await findByRole("button", { name: "Start over" }));
     await waitFor(() =>
       expect(fetchMock.mock.calls.some(([u, i]) => u === "/api/editor/iterations/2/start-over" && i?.method === "POST")).toBe(true),
     );

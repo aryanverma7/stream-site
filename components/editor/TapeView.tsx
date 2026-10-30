@@ -9,6 +9,7 @@ import { StatusSelect } from "./StatusLabel";
 import { IterationCard } from "./IterationCard";
 import { PendingDelete } from "./PendingDelete";
 import { DeleteDialog } from "./DeleteDialog";
+import { useAsk } from "./AskDialog";
 import { UploadDrop } from "./UploadDrop";
 import { DownloadLink, OpenInDrive } from "./DriveLinks";
 
@@ -65,6 +66,7 @@ export function TapeView({
   const deletions = useDeletions(() => refresh());
   const me = { username, role };
   const [actionError, setActionError] = useState<string | null>(null);
+  const ask = useAsk();
   // null = not being edited, so the field shows the server's value.
   const [name, setName] = useState<string | null>(null);
   const [notes, setNotes] = useState<string | null>(null);
@@ -181,8 +183,14 @@ export function TapeView({
       {isAdmin && latest && (
         <button
           type="button"
-          onClick={() => {
-            if (!window.confirm(`Start over on v${latest.version}? Every open comment on it is marked resolved.`)) return;
+          onClick={async () => {
+            const yes = await ask.confirm({
+              title: `Start over on v${latest.version}?`,
+              message: "Every open comment on it is marked resolved.",
+              confirmLabel: "Start over",
+              danger: true,
+            });
+            if (!yes) return;
             run(() => editorApi(`/iterations/${latest.id}/start-over`, { method: "POST" }).then(refresh));
           }}
           className={btn}
@@ -217,6 +225,7 @@ export function TapeView({
           }}
         />
       )}
+      {ask.dialog}
     </section>
   );
 }

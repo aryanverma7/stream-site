@@ -11,7 +11,7 @@ importScripts("/editor/media-range.js");
 
 var LINK_WAIT_MS = 15000;
 var media = new Map(); // iterationId (string) -> {projectId, fileId, size, mime, link}
-var waiting = new Map(); // iterationId -> [resolve]
+var waiting = new Map(); // iterationId -> [{resolve, need}]
 
 self.addEventListener("install", function () {
   self.skipWaiting();
@@ -22,11 +22,25 @@ self.addEventListener("activate", function (e) {
 
 self.addEventListener("message", function (e) {
   var d = e.data;
+  if (d && d.type === "claim") {
+    // a shift+reload loads the page without a controller; the page asks to be taken over
+    var claimed = self.clients.claim();
+    if (e.waitUntil) e.waitUntil(claimed);
+    return;
+  }
   if (!d || d.type !== "media") return;
   var id = String(d.iterationId);
-  media.set(id, { projectId: d.projectId, fileId: d.fileId, size: d.size, mime: d.mime, link: d.link });
-  (waiting.get(id) || []).forEach(function (resolve) { resolve(); });
-  waiting.delete(id);
+  var m = { projectId: d.projectId, fileId: d.fileId, size: d.size, mime: d.mime, link: d.link };
+  media.set(id, m);
+  // an "info" waiter is satisfied by any answer; a "link" one only by a usable token, so a
+  // downloaded version's quick link:null answer does not end a wait for Drive
+  var left = (waiting.get(id) || []).filter(function (w) {
+    if (w.need === "link" && !fresh(m)) return true;
+    w.resolve();
+    return false;
+  });
+  if (left.length) waiting.set(id, left);
+  else waiting.delete(id);
 });
 
 function fresh(m) {
@@ -41,8 +55,8 @@ function fresh(m) {
 async function ask(id, clientId, need) {
   var mine;
   var arrived = new Promise(function (resolve) {
-    mine = resolve;
-    waiting.set(id, (waiting.get(id) || []).concat(resolve));
+    mine = { resolve: resolve, need: need };
+    waiting.set(id, (waiting.get(id) || []).concat(mine));
   });
   var timer;
   var timeout = new Promise(function (resolve) { timer = setTimeout(resolve, LINK_WAIT_MS); });
@@ -52,7 +66,7 @@ async function ask(id, clientId, need) {
   await Promise.race([arrived, timeout]);
   clearTimeout(timer);
   // a timed-out wait leaves its resolver behind otherwise
-  var left = (waiting.get(id) || []).filter(function (r) { return r !== mine; });
+  var left = (waiting.get(id) || []).filter(function (w) { return w !== mine; });
   if (left.length) waiting.set(id, left);
   else waiting.delete(id);
   return media.get(id) || null;

@@ -146,11 +146,26 @@ export function useComments(
     role,
     comments,
     unsent: all.filter((e) => e.username === username && (e.kind === "reply" || e.iterationId === iterationId)),
+    // Saved before entries had a username: nobody's flush sends them, so the person decides.
+    legacy: all.filter((e) => !e.username && (e.kind === "reply" ? comments.some((c) => c.id === e.commentId) : e.iterationId === iterationId)),
+    sendLegacyAsMe: (clientId: string) => {
+      queue.claim(clientId, username);
+      setAll(queue.list());
+      return flushNow();
+    },
+    discardLegacy: (clientId: string) => {
+      queue.remove(clientId);
+      setAll(queue.list());
+    },
     failed,
     error,
     dismissFailed: (id: string) => setFailed((f) => f.filter((x) => x.client_id !== id)),
-    isNew: (item: { author: string; created_at: number }) =>
-      previousSeen !== undefined && item.author !== username && item.created_at > (previousSeen ?? -Infinity),
+    // an edit since the last visit is news too (only the author can edit; replies have no updated_at)
+    isNew: (item: { author: string; created_at: number; updated_at?: number }) =>
+      previousSeen !== undefined &&
+      item.author !== username &&
+      (item.created_at > (previousSeen ?? -Infinity) ||
+        (item.updated_at !== undefined && item.updated_at !== item.created_at && item.updated_at > (previousSeen ?? -Infinity))),
     add: (draft: Draft) =>
       enqueueAndFlush({ client_id: queue.newClientId(), kind: "comment", iterationId, payload: { ...draft }, created_at: Date.now(), username }),
     reply: (commentId: number, body: string) =>

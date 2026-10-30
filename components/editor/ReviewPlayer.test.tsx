@@ -383,7 +383,7 @@ describe("ReviewPlayer", () => {
       expect(mediaSpy.mock.calls.every((c) => c[0] === null)).toBe(true);
     });
 
-    it("V while playing opens the other version playing at the same time", async () => {
+    it("V while playing opens the other version playing at the same time, when that one is fully downloaded", async () => {
       withTape(tapeOf([5, 2, "ready"], [7, 3, "ready"]));
       await open();
       loaded(await watch());
@@ -392,6 +392,7 @@ describe("ReviewPlayer", () => {
       fireEvent.keyDown(document.body, { key: "v" });
       expect(sessionStorage.getItem("editor.resumePlaying")).toMatch(/^5:\d+$/);
       cleanup();
+      media.state = "complete";
       play.mockClear();
       worker.provide.mockClear();
       editorBackend({ "/iterations/5": { iteration: { ...IT, id: 5, version: 2 }, comments: [], position_s: 100 }, ...tapeOf([5, 2, "ready"], [7, 3, "ready"]) });
@@ -402,6 +403,27 @@ describe("ReviewPlayer", () => {
       loaded(await waitFor(() => document.querySelector("video") as HTMLVideoElement));
       await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
       expect(time).toBe(12.5);
+    });
+
+    it("V while playing opens a partner that is still downloading paused, with Start watching now", async () => {
+      withTape(tapeOf([5, 2, "ready"], [7, 3, "ready"]));
+      await open();
+      loaded(await watch());
+      paused = false;
+      time = 12.5;
+      fireEvent.keyDown(document.body, { key: "v" });
+      cleanup();
+      play.mockClear();
+      worker.provide.mockClear();
+      editorBackend({ "/iterations/5": { iteration: { ...IT, id: 5, version: 2 }, comments: [], position_s: 100 }, ...tapeOf([5, 2, "ready"], [7, 3, "ready"]) });
+      render(<ReviewPlayer projectId={1} tapeId={2} iterationId={5} seekS={12.5} role="editor" username="cutter" />);
+      await screen.findByText("Version 2");
+      await waitFor(() => expect(sessionStorage.getItem("editor.resumePlaying")).toBeNull());
+      await new Promise((r) => setTimeout(r, 20));
+      expect(worker.provide).not.toHaveBeenCalled();
+      expect(document.querySelector("video")).toBeNull();
+      expect(screen.getByRole("button", { name: "Start watching now" })).toBeEnabled();
+      expect(play).not.toHaveBeenCalled();
     });
 
     it("V while paused does not set the resume flag", async () => {

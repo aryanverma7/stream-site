@@ -47,6 +47,17 @@ describe("HomeView", () => {
     expect(queryByRole("link", { name: "Download VOD" })).toBeNull();
   });
 
+  it("hides every project in project-delete limbo, even if the backend still lists it", async () => {
+    const del = (id: number, target_id: number) => ({ id, kind: "project", target_id, label: "x", requested_by: "aryan", delete_at: 1, remaining_seconds: 600, status: "pending" });
+    editorBackend({ "/home": HOME, "/deletions": { pending: [del(1, 1), del(2, 2), del(3, 3)] } });
+    const { findByText, queryByRole } = render(<HomeView role="editor" username="cutter" />);
+    await findByText("Nothing new.");
+    expect(await findByText("Nothing to confirm.")).toBeTruthy();
+    expect(await findByText("No open comments.")).toBeTruthy();
+    expect(queryByRole("link", { name: "Stream 1" })).toBeNull();
+    expect(queryByRole("link", { name: "Jett dash" })).toBeNull();
+  });
+
   it("Confirm delete opens the dialog against the VOD's file name", async () => {
     const fetchMock = editorBackend({ "/home": HOME, "POST /deletions": { request_id: 1 } });
     const { findByRole, getByLabelText, getByRole } = render(<HomeView role="editor" username="cutter" />);
