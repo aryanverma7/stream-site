@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { editorBackend } from "./testUtils";
 
@@ -440,5 +440,81 @@ describe("useTransfers", () => {
     });
     act(() => mod.dismissTransfer(result.current[0].key));
     expect(result.current).toEqual([]);
+  });
+
+  describe("one upload per version across tabs (Web Locks)", () => {
+    /** navigator.locks with exclusive locks; `other` names are held by another tab. */
+    function fakeLocks(other: string[] = []) {
+      const held = new Set(other);
+      const seen: string[] = [];
+      const locks = {
+        held,
+        seen,
+        request: vi.fn(async (name: string, _o: { ifAvailable: true }, cb: (lock: unknown) => Promise<void>) => {
+          if (held.has(name)) return cb(null);
+          held.add(name);
+          seen.push(name);
+          try {
+            await cb({ name });
+          } finally {
+            held.delete(name);
+          }
+        }),
+        query: vi.fn(async () => ({ held: [...held].map((name) => ({ name })) })),
+      };
+      Object.defineProperty(navigator, "locks", { configurable: true, value: locks });
+      return locks;
+    }
+    afterEach(() => void delete (navigator as unknown as { locks?: unknown }).locks);
+    const old = { tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/s1", sent: 8 * MiB };
+
+    it("a running upload holds upload-<iterationId> and lets go when it ends", async () => {
+      const locks = fakeLocks();
+      const mod = await fresh();
+      let heldWhileSending = false;
+      backend({
+        "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" },
+        "POST /iterations/7/complete": () => {
+          heldWhileSending = locks.held.has("upload-7");
+          return { id: 7, status: "ready" };
+        },
+        "PUT /iterations/7/media": { id: 7 },
+      });
+      await act(() => mod.startUpload(target, file()));
+      expect(heldWhileSending).toBe(true);
+      expect(locks.seen).toEqual(["upload-7"]);
+      await waitFor(() => expect(locks.held.size).toBe(0));
+    });
+
+    it("an entry another tab is sending shows as elsewhere: no cancel, and the same file is not sent twice", async () => {
+      fakeLocks(["upload-7"]);
+      localStorage.setItem("editor.uploads", JSON.stringify([old]));
+      const mod = await fresh();
+      const { result } = renderHook(() => mod.useTransfers());
+      expect(result.current[0].state).toBe("paused");
+      await act(() => mod.refreshLocks());
+      expect(result.current[0]).toMatchObject({ state: "elsewhere", version: 3 });
+
+      const { api, googleCalls } = backend({});
+      act(() => mod.cancelTransfer(result.current[0].key));
+      expect(calls(api, "POST", "/iterations/7/abandon")).toEqual([]);
+      expect(stored()[0].abandoned).toBeUndefined();
+
+      await act(() => mod.startUpload(target, file()));
+      expect(googleCalls).toEqual([]);
+      expect(api.mock.calls).toEqual([]);
+      expect(result.current).toEqual([expect.objectContaining({ state: "elsewhere" })]);
+    });
+
+    it("once the other tab lets go, the entry is paused again and can be resumed here", async () => {
+      const locks = fakeLocks(["upload-7"]);
+      localStorage.setItem("editor.uploads", JSON.stringify([old]));
+      const mod = await fresh();
+      const { result } = renderHook(() => mod.useTransfers());
+      await act(() => mod.refreshLocks());
+      locks.held.clear();
+      await act(() => mod.refreshLocks());
+      expect(result.current[0].state).toBe("paused");
+    });
   });
 });
