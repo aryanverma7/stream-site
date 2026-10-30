@@ -11,11 +11,11 @@ import {
 } from "@/lib/settingsModel";
 
 export const INPUT =
-  "border border-seam bg-ink px-3 py-1.5 text-sm text-phosphor focus:border-field focus:outline-none";
+  "border-2 border-seam bg-ink px-3 py-1.5 text-sm text-phosphor hover:border-dim focus:border-phosphor focus:outline-none";
 export const BUTTON =
-  "wallpaper px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.08em] hover:bg-field-hot disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-field";
+  "wallpaper label px-3 py-1.5 text-xs disabled:opacity-40";
 const GHOST =
-  "border border-seam px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-dim hover:text-phosphor focus-visible:outline focus-visible:outline-2 focus-visible:outline-field";
+  "menu-pop label border-2 border-phosphor bg-ink px-3 py-1.5 text-xs text-phosphor hover:bg-phosphor hover:text-ink";
 
 type Props = {
   id: string;
@@ -308,7 +308,7 @@ export function AddSetting({
   };
 
   return (
-    <fieldset aria-label="Add setting" className="flex w-full flex-col gap-2 border border-seam bg-ink p-4 text-sm">
+    <fieldset aria-label="Add setting" className="slab slab-sm relative flex w-full flex-col gap-2 p-4 text-sm">
       <div className="flex flex-wrap gap-3">
         <label className="flex flex-col gap-1 text-xs text-dim">
           Key

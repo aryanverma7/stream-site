@@ -6,14 +6,14 @@ export function LogViewer() {
   const { lines, loading, error, refresh } = useAdminLogs(200);
 
   return (
-    <div className="border border-seam bg-bezel p-6">
+    <div className="slab relative p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="stencil text-4xl text-phosphor">Backend Logs</h3>
+        <h3 className="stencil tilt text-4xl text-phosphor">Backend Logs</h3>
         <button
           type="button"
           onClick={refresh}
           disabled={loading}
-          className="label border border-seam px-3 py-1.5 text-xs text-field transition-colors hover:border-field disabled:opacity-40"
+          className="menu-pop label border-2 border-phosphor bg-ink px-3 py-1.5 text-xs text-phosphor shadow-[3px_3px_0_var(--field-deep)] hover:bg-phosphor hover:text-ink disabled:opacity-40"
         >
           {loading ? "Refreshing..." : "Refresh"}
         </button>
@@ -26,7 +26,7 @@ export function LogViewer() {
       )}
 
       {lines.length > 0 && (
-        <pre className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-all bg-ink p-4 font-mono text-[11.5px] leading-relaxed text-phosphor/85">
+        <pre className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-all border-2 border-seam bg-ink p-4 font-mono text-[11.5px] leading-relaxed text-phosphor/85">
           {lines.join("\n")}
         </pre>
       )}

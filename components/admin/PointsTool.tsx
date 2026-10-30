@@ -29,21 +29,21 @@ export function PointsTool() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="border border-seam bg-bezel p-6">
-        <h3 className="stencil mb-3 text-4xl text-phosphor">Check Balance</h3>
+      <div className="slab relative p-6">
+        <h3 className="stencil tilt mb-4 text-4xl text-phosphor">Check Balance</h3>
         <div className="flex gap-2">
           <input
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="username"
-            className="flex-1 border border-seam bg-ink px-3 py-2 text-sm text-phosphor focus:border-field focus:outline-none"
+            className="flex-1 border-2 border-seam bg-ink px-3 py-2 text-sm text-phosphor hover:border-dim focus:border-phosphor focus:outline-none"
           />
           <button
             type="button"
             onClick={() => checkBalance(username)}
             disabled={balanceLoading || !username}
-            className="wallpaper px-4 py-2 text-xs font-extrabold uppercase tracking-[0.08em] hover:bg-field-hot disabled:opacity-40"
+            className="wallpaper label px-4 py-2 text-xs disabled:opacity-40"
           >
             {balanceLoading ? "Checking..." : "Check"}
           </button>
@@ -57,8 +57,8 @@ export function PointsTool() {
         )}
       </div>
 
-      <div className="border border-seam bg-bezel p-6">
-        <h3 className="stencil mb-3 text-4xl text-phosphor">Grant Points (testing)</h3>
+      <div className="slab relative p-6">
+        <h3 className="stencil tilt mb-4 text-4xl text-phosphor">Grant Points (testing)</h3>
         <p className="mb-3 max-w-prose text-[13px] leading-snug text-dim">
           Uses the exact same backend function the real Streamlabs Tips listener
           will call - this exercises the real code path, not a simulation.
@@ -69,19 +69,19 @@ export function PointsTool() {
             value={grantUsername}
             onChange={(e) => setGrantUsername(e.target.value)}
             placeholder="username"
-            className="flex-1 border border-seam bg-ink px-3 py-2 text-sm text-phosphor focus:border-field focus:outline-none"
+            className="flex-1 border-2 border-seam bg-ink px-3 py-2 text-sm text-phosphor hover:border-dim focus:border-phosphor focus:outline-none"
           />
           <input
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-24 border border-seam bg-ink px-3 py-2 text-sm text-phosphor focus:border-field focus:outline-none"
+            className="w-24 border-2 border-seam bg-ink px-3 py-2 text-sm text-phosphor hover:border-dim focus:border-phosphor focus:outline-none"
           />
           <button
             type="button"
             onClick={() => grantPoints(grantUsername, Number(amount))}
             disabled={grantLoading || !grantUsername || !amount}
-            className="wallpaper px-4 py-2 text-xs font-extrabold uppercase tracking-[0.08em] hover:bg-field-hot disabled:opacity-40"
+            className="wallpaper label px-4 py-2 text-xs disabled:opacity-40"
           >
             {grantLoading ? "Granting..." : "Grant"}
           </button>

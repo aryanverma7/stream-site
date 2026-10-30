@@ -7,14 +7,15 @@ import { ConfigEditor } from "./ConfigEditor";
 import { PointsTool } from "./PointsTool";
 import { AgentPicker } from "./AgentPicker";
 import { BreakControl } from "./BreakControl";
+import { Ransom } from "../Hero";
 
 type Tab = "status" | "break" | "agent" | "points" | "logs" | "config";
 
 /**
  * Channels, ordered by how often they're reached for mid-stream: the wall,
  * then the two things set between rounds (break, agent), then the desk
- * tools. Numbered because a monitor wall's channels are numbered - the
- * number is how you find it again, not decoration.
+ * tools. Numbered because the number is how you find it again, not
+ * decoration.
  */
 const TABS: { id: Tab; label: string; hint: string }[] = [
   { id: "status", label: "Status", hint: "The wall" },
@@ -47,22 +48,24 @@ export function AdminDashboard() {
 
   return (
     <div className="flex min-h-screen flex-col bg-ink text-phosphor">
-      <header className="wallpaper flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        <div className="flex items-baseline gap-3">
-          <h1 className="stencil text-3xl">DualBladeX</h1>
-          <span className="osd hidden text-xl sm:inline">Control room</span>
+      <header className="wallpaper relative flex items-center justify-between gap-4 border-b-4 border-ink px-4 py-3 sm:px-6">
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl">
+            <Ransom text="DualBladeX" />
+          </h1>
+          <span className="tag hidden bg-ink text-sm text-phosphor sm:inline-block">Control room</span>
         </div>
         <div className="flex items-center gap-4">
-          <a href="/editor" className="text-xs font-bold uppercase tracking-widest hover:underline">
+          <a href="/editor" className="menu-pop label px-2 py-1 text-xs hover:bg-ink hover:text-phosphor">
             Editor app
           </a>
-          <p className="osd flex items-center gap-2 text-xl tabular-nums">
+          <p className="osd flex items-center gap-2 bg-ink px-2 py-0.5 text-xl tabular-nums text-phosphor">
             {clock || " "}
           </p>
           <form method="post" action="/auth/logout">
             <button
               type="submit"
-              className="border border-seam px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-dim hover:text-phosphor focus-visible:outline focus-visible:outline-2 focus-visible:outline-field"
+              className="menu-pop label whitespace-nowrap border-2 border-ink px-3 py-1.5 text-xs text-ink hover:bg-ink hover:text-phosphor"
             >
               Log out
             </button>
@@ -73,7 +76,7 @@ export function AdminDashboard() {
       <div className="flex flex-1 flex-col lg:flex-row">
         <nav
           aria-label="Dashboard sections"
-          className="sticky top-0 z-20 flex gap-1 overflow-x-auto border-b border-seam bg-bezel px-2 py-2 lg:h-screen lg:self-start lg:w-56 lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r lg:px-3 lg:py-4"
+          className="sticky top-0 z-20 flex gap-2 overflow-x-auto border-b-2 border-phosphor bg-ink px-3 py-3 lg:h-screen lg:self-start lg:w-60 lg:shrink-0 lg:flex-col lg:gap-1.5 lg:overflow-visible lg:border-b-0 lg:border-r-2 lg:px-4 lg:py-6"
         >
           {TABS.map((tab, i) => {
             const active = activeTab === tab.id;
@@ -83,15 +86,17 @@ export function AdminDashboard() {
                 type="button"
                 aria-current={active ? "page" : undefined}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex shrink-0 items-center gap-3 px-3 py-2 text-left transition-colors lg:py-2.5 ${
-                  active ? "bg-field text-ink" : "text-phosphor hover:bg-bezel-2"
+                className={`menu-pop flex shrink-0 items-center gap-3 px-3 py-2 text-left lg:py-2.5 ${
+                  active ? "menu-on" : "text-phosphor hover:bg-field hover:text-ink [&:hover_span]:text-ink"
                 }`}
               >
-                <span className={`osd text-lg ${active ? "text-ink" : "text-dim"}`}>
-                  CH{i + 1}
+                {/* The channel number keeps its old accessible name (CH1...); the 01 is how it looks. */}
+                <span className="sr-only">CH{i + 1}</span>
+                <span aria-hidden className={`osd text-2xl ${active ? "text-field-deep" : "text-field"}`}>
+                  {String(i + 1).padStart(2, "0")}
                 </span>
                 <span className="flex flex-col">
-                  <span className="text-sm font-bold uppercase tracking-[0.08em]">{tab.label}</span>
+                  <span className="label text-sm">{tab.label}</span>
                   <span className={`hidden text-xs lg:block ${active ? "text-ink/75" : "text-dim"}`}>
                     {tab.hint}
                   </span>
@@ -101,7 +106,7 @@ export function AdminDashboard() {
           })}
         </nav>
 
-        <main key={activeTab} className="crt-on min-w-0 flex-1 px-3 py-5 sm:px-6 lg:px-8 lg:py-8">
+        <main key={activeTab} className="crt-on wipe min-w-0 flex-1 px-3 py-5 sm:px-6 lg:px-8 lg:py-8">
           <div className="mx-auto max-w-6xl">
             {activeTab === "status" && <StatusPanel />}
             {activeTab === "logs" && <LogViewer />}

@@ -17,8 +17,8 @@ export function AgentPicker() {
   const [typed, setTyped] = useState("");
 
   return (
-    <div className="border border-seam bg-bezel p-6">
-      <h3 className="stencil mb-4 text-4xl text-phosphor">Agent</h3>
+    <div className="slab relative p-6">
+      <h3 className="stencil tilt mb-5 text-4xl text-phosphor">Agent</h3>
 
       <p className="mb-4 max-w-prose text-[13px] leading-snug text-dim">
         Sets how many credits are reserved for abilities each round, which decides
@@ -55,10 +55,10 @@ export function AgentPicker() {
             type="button"
             onClick={() => setAgent(agent.name)}
             disabled={saving}
-            className={`px-3 py-1.5 text-xs uppercase tracking-widest disabled:opacity-40 ${
+            className={`menu-pop label px-3 py-1.5 text-xs disabled:opacity-40 ${
               agent.name === current
-                ? "bg-field text-ink"
-                : "bg-ink text-dim hover:text-phosphor"
+                ? "menu-on"
+                : "border border-seam bg-ink text-phosphor hover:bg-field hover:text-ink [&:hover_span]:text-ink"
             }`}
           >
             {agent.name}
@@ -74,7 +74,7 @@ export function AgentPicker() {
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
           placeholder="another agent"
-          className="flex-1 border border-seam bg-ink px-3 py-2 text-sm text-phosphor"
+          className="flex-1 border-2 border-seam bg-ink px-3 py-2 text-sm text-phosphor hover:border-dim focus:border-phosphor focus:outline-none"
         />
         <button
           type="button"
@@ -83,7 +83,7 @@ export function AgentPicker() {
             setTyped("");
           }}
           disabled={saving || !typed.trim()}
-          className="wallpaper px-4 py-2 text-xs font-extrabold uppercase tracking-[0.08em] hover:bg-field-hot disabled:opacity-40"
+          className="wallpaper label px-4 py-2 text-xs disabled:opacity-40"
         >
           {saving ? "Setting..." : "Set"}
         </button>

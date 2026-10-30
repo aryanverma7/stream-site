@@ -169,7 +169,7 @@ function CreditPredictionBlock({ prediction }: { prediction: CreditPrediction | 
   return (
     <div>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="stencil text-5xl tabular-nums text-field">
+        <span className="stencil text-5xl tabular-nums text-phosphor">
           {hasReading ? `${CREDS}${predicted_credits}` : "No reading yet"}
         </span>
         <span className="label text-xs text-dim">
@@ -208,7 +208,7 @@ function CreditPredictionBlock({ prediction }: { prediction: CreditPrediction | 
           {prediction.votable_weapons.map((weapon) => (
             <span
               key={weapon}
-              className="border border-seam bg-ink px-2 py-1 text-xs font-semibold text-phosphor"
+              className="-skew-x-6 border border-seam bg-ink px-2 py-1 text-xs font-semibold text-phosphor"
             >
               {weapon}{" "}
               <span className="tabular-nums text-dim">
@@ -247,14 +247,16 @@ function RouletteBlock({ roulette }: { roulette: RouletteStatus | null | undefin
     const total = Object.values(active.wheel_shares).reduce((sum, share) => sum + share, 0);
     return (
       <div>
-        <p className="osd text-2xl text-field">
+        <p className="osd slam text-3xl text-field">
           Voting open · {Math.round(active.seconds_elapsed)}s in
         </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {leaders.map(([weapon, share]) => (
+          {leaders.map(([weapon, share], i) => (
             <span
               key={weapon}
-              className="border border-seam bg-ink px-2 py-1 text-xs font-semibold text-phosphor"
+              className={`-skew-x-6 border-2 px-2 py-1 text-xs font-semibold ${
+                i === 0 ? "border-phosphor bg-phosphor text-ink shadow-[3px_3px_0_var(--field-deep)] [&_.text-dim]:text-ink" : "border-seam bg-ink text-phosphor"
+              }`}
             >
               {weapon}{" "}
               <span className="tabular-nums text-dim">
@@ -287,8 +289,8 @@ function RouletteBlock({ roulette }: { roulette: RouletteStatus | null | undefin
   return (
     <div>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="stencil text-6xl text-field">{result.winner}</span>
-        <span className="label bg-field px-2 py-1 text-xs text-ink">
+        <span key={result.winner} className="burst inline-block stencil shadow-ink mx-4 mb-8 mt-3 text-6xl text-phosphor">{result.winner}</span>
+        <span key={forcedBuy.phase ?? "none"} className="tag slam bg-phosphor text-xs text-ink">
           {/*
             The badge's own state machine, which runs on a different clock
             from the result: queued for the next buy phase, active for the
@@ -438,11 +440,11 @@ function buildFeeds(status: AdminStatus): Feed[] {
 }
 
 const STRIP: Record<FeedState, string> = {
-  up: "bg-bezel-2 text-phosphor",
+  up: "bg-phosphor text-ink",
   warn: "bg-amber text-ink",
-  down: "bg-rec text-phosphor",
-  off: "bg-bezel text-dim",
-  unknown: "bg-bezel text-dim",
+  down: "bg-rec text-ink",
+  off: "bg-bezel-2 text-dim",
+  unknown: "bg-bezel-2 text-dim",
 };
 
 const STRIP_WORD: Record<FeedState, string> = {
@@ -457,16 +459,16 @@ function FeedTile({ feed, index }: { feed: Feed; index: number }) {
   return (
     <section
       aria-label={feed.name}
-      className={`flex flex-col border bg-bezel ${
-        feed.state === "down" ? "border-rec" : feed.state === "unknown" ? "border-dashed border-seam" : "border-seam"
+      className={`slab slab-sm relative flex flex-col p-[3px] ${
+        feed.state === "down" ? "slab-alert" : feed.state === "warn" ? "slab-warn" : feed.state === "unknown" ? "[&::before]:border-dashed [&::before]:border-seam" : ""
       }`}
     >
-      <div className={`osd flex items-center justify-between gap-3 px-3 py-1.5 text-lg ${STRIP[feed.state]}`}>
+      <div className={`osd strip-cut flex items-center justify-between gap-3 py-1.5 pl-3 pr-6 text-lg ${STRIP[feed.state]}`}>
         <span className="truncate">
           {feed.name}
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
-          {feed.state === "down" && <span className="rec-dot inline-block h-2 w-2 rounded-full bg-phosphor" aria-hidden />}
+          {feed.state === "down" && <span className="rec-dot inline-block h-2 w-2 rounded-full bg-ink" aria-hidden />}
           {STRIP_WORD[feed.state]}
         </span>
       </div>
@@ -495,8 +497,8 @@ export function Summary({ feeds }: { feeds: Feed[] }) {
 
   return (
     <div
-      className={`relative flex flex-wrap items-center gap-x-6 gap-y-2 py-3 pl-24 pr-4 sm:pl-28 ${
-        lost.length > 0 ? "bg-rec text-phosphor" : warn.length > 0 ? "bg-amber text-ink" : "wallpaper"
+      className={`slam relative flex -rotate-1 flex-wrap items-center gap-x-6 gap-y-2 border-2 border-ink py-3 pl-24 pr-4 shadow-[6px_6px_0_var(--phosphor)] sm:pl-28 ${
+        lost.length > 0 ? "bg-rec text-ink" : warn.length > 0 ? "bg-amber text-ink" : "wallpaper"
       }`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- static export, local sticker */}
@@ -505,7 +507,7 @@ export function Summary({ feeds }: { feeds: Feed[] }) {
         alt=""
         className="sticker absolute -top-3 left-3 w-16 rotate-[-8deg] sm:w-20"
       />
-      <p className="stencil text-4xl">
+      <p className={`stencil no-shadow text-4xl ${tone === "ok" ? "burst burst-white px-2" : ""}`}>
         {lost.length > 0
           ? `${lost.length} feed${lost.length === 1 ? "" : "s"} lost`
           : warn.length > 0
@@ -534,7 +536,7 @@ export function StatusPanel() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h3 className="stencil text-5xl text-phosphor">System Status</h3>
+        <h3 className="stencil tilt text-5xl text-phosphor">System Status</h3>
         <div className="flex items-center gap-3">
           <span className="label text-xs text-dim">
             Auto every {Math.round(STATUS_POLL_INTERVAL_MS / 1000)}s
@@ -543,7 +545,7 @@ export function StatusPanel() {
             type="button"
             onClick={refresh}
             disabled={loading}
-            className="label border border-seam px-3 py-1.5 text-xs text-field transition-colors hover:border-field disabled:opacity-40"
+            className="menu-pop label border-2 border-phosphor bg-ink px-3 py-1.5 text-xs text-phosphor shadow-[3px_3px_0_var(--field-deep)] hover:bg-phosphor hover:text-ink disabled:opacity-40"
           >
             {loading ? "Refreshing..." : "Refresh"}
           </button>
@@ -556,7 +558,7 @@ export function StatusPanel() {
         answers are still the most useful thing on screen.
       */}
       {error && (
-        <p className="border border-rec bg-rec/10 px-4 py-3 text-sm text-rec">
+        <p className="border-2 border-rec bg-rec/10 px-4 py-3 text-sm font-semibold text-rec">
           {status
             ? "Couldn't reach the backend on the last check - the values below are from before that."
             : "Couldn't reach the backend - try refreshing."}
@@ -567,14 +569,14 @@ export function StatusPanel() {
 
       {status && (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <section aria-label="Forced buy" className="border border-seam bg-bezel">
-            <p className="osd wallpaper px-3 py-1.5 text-lg">Forced buy</p>
+          <section aria-label="Forced buy" className="slab relative p-[3px]">
+            <p className="osd wallpaper strip-cut py-1.5 pl-3 pr-6 text-lg">Forced buy</p>
             <div className="px-4 py-4">
               <RouletteBlock roulette={status.roulette} />
             </div>
           </section>
-          <section aria-label="Next-round credits" className="border border-seam bg-bezel">
-            <p className="osd wallpaper px-3 py-1.5 text-lg">Next-round credits</p>
+          <section aria-label="Next-round credits" className="slab relative p-[3px]">
+            <p className="osd wallpaper strip-cut py-1.5 pl-3 pr-6 text-lg">Next-round credits</p>
             <div className="px-4 py-4">
               <CreditPredictionBlock prediction={status.credit_prediction} />
             </div>
@@ -587,8 +589,8 @@ export function StatusPanel() {
           {feeds.map((feed, i) => (
             <FeedTile key={feed.name} feed={feed} index={i} />
           ))}
-          <section aria-label="Widget connections" className="flex flex-col border border-seam bg-bezel">
-            <p className="osd bg-bezel-2 px-3 py-1.5 text-lg text-phosphor">
+          <section aria-label="Widget connections" className="slab slab-sm relative flex flex-col p-[3px]">
+            <p className="osd strip-cut bg-phosphor py-1.5 pl-3 pr-6 text-lg text-ink">
               Widget connections
             </p>
             <div className="px-4 py-3 text-sm">

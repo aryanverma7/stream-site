@@ -39,7 +39,7 @@ function ConnectRow({
   needed: string;
 }) {
   return (
-    <div className="mb-4 border border-seam bg-ink px-4 py-3">
+    <div className="slab slab-sm relative mb-5 px-4 py-3">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-phosphor">{name}</p>
@@ -54,7 +54,7 @@ function ConnectRow({
         {!connected && hasCredentials && (
           <a
             href={href}
-            className="wallpaper px-4 py-1.5 text-xs font-extrabold uppercase tracking-[0.08em] hover:bg-field-hot"
+            className="wallpaper label px-4 py-1.5 text-xs"
           >
             Connect {name}
           </a>
@@ -92,8 +92,8 @@ export function ConfigEditor() {
   const { config, loading, error, saveError, saveSuccess, reloadFailed } = editor;
 
   return (
-    <div className="border border-seam bg-bezel p-6">
-      <h3 className="stencil mb-4 text-4xl text-phosphor">Settings</h3>
+    <div className="slab relative p-6">
+      <h3 className="stencil tilt mb-5 text-4xl text-phosphor">Settings</h3>
 
       {config && <ConnectRow
         name="Streamlabs"
@@ -121,7 +121,7 @@ export function ConfigEditor() {
 
       {error && <p className="text-sm text-rec">Couldn&apos;t load the config.</p>}
       {saveError && <p className="mb-2 text-sm text-rec">Save failed: {saveError}</p>}
-      {saveSuccess && !reloadFailed && <p className="mb-2 text-sm text-field">Saved.</p>}
+      {saveSuccess && !reloadFailed && <p className="burst label mb-4 ml-6 mt-2 inline-block px-2 py-1 text-sm text-phosphor">Saved.</p>}
       {reloadFailed && <p className="mb-2 text-sm text-amber">Saved, but reloading the settings failed. Reload the page to see them.</p>}
       {loading && <p className="text-sm text-dim">Loading config...</p>}
 
@@ -134,7 +134,7 @@ export function ConfigEditor() {
 function MissingSettings({ keys, schema, onJump }: { keys: string[]; schema: Schema; onJump: (key: string) => void }) {
   if (!keys.length) return null;
   return (
-    <div role="alert" className="mb-4 border border-rec bg-rec/10 px-4 py-3">
+    <div role="alert" className="slab slab-sm slab-alert relative mb-5 px-4 py-3">
       <p className="text-sm font-bold text-rec">
         {keys.length === 1 ? "1 important setting is empty" : `${keys.length} important settings are empty`}
       </p>
@@ -257,8 +257,8 @@ function SettingsEditor({ config, schema: rawSchema, schemaMissing, saving, save
             {meta.label}
           </label>
           <code className="font-mono text-[11px] text-dim">{key}</code>
-          {isChanged && <span className="text-[10px] font-bold uppercase tracking-widest text-field">Changed</span>}
-          {missing.includes(key) && <span className="text-[10px] font-bold uppercase tracking-widest text-rec">Needed</span>}
+          {isChanged && <span className="tag bg-field text-[10px] text-ink shadow-none">Changed</span>}
+          {missing.includes(key) && <span className="tag bg-phosphor text-[10px] text-rec">Needed</span>}
         </div>
         {meta.description && <p className="mb-2 max-w-prose text-[13px] leading-snug text-dim">{meta.description}</p>}
         <FieldInput
@@ -321,7 +321,7 @@ function SettingsEditor({ config, schema: rawSchema, schemaMissing, saving, save
         )}
 
         {newFields.length > 0 && (
-          <ul className="mb-4 border border-seam bg-ink px-4 py-2 text-sm">
+          <ul className="mb-4 border-2 border-seam bg-ink px-4 py-2 text-sm">
             {newFields.map((n) => (
               <li key={n.key} className="flex items-center justify-between gap-2 py-1">
                 <span>
@@ -363,7 +363,7 @@ function SettingsEditor({ config, schema: rawSchema, schemaMissing, saving, save
               value={raw}
               onChange={(e) => setRaw(e.target.value)}
               spellCheck={false}
-              className="h-[60vh] w-full resize-y border border-seam bg-ink p-4 font-mono text-[12px] leading-relaxed text-phosphor focus:border-field focus:outline-none"
+              className="h-[60vh] w-full resize-y border-2 border-seam bg-ink p-4 font-mono text-[12px] leading-relaxed text-phosphor focus:border-phosphor focus:outline-none"
             />
             <button type="button" onClick={handleRawSave} disabled={saving} className={`${BUTTON} mt-2`}>
               {saving ? "Saving..." : "Save raw JSON"}
@@ -374,7 +374,7 @@ function SettingsEditor({ config, schema: rawSchema, schemaMissing, saving, save
             {searching && visible.length === 0 && <p className="text-sm text-dim">No settings match.</p>}
             {visible.map((g) => (
               <section key={g.section} className="mb-4">
-                <h4 className="stencil mb-1 text-2xl text-phosphor">{g.section}</h4>
+                <h4 className="stencil tilt mb-2 mt-2 text-3xl text-phosphor">{g.section}</h4>
                 <div className="divide-y divide-seam">{g.keys.map(row)}</div>
               </section>
             ))}
@@ -382,7 +382,7 @@ function SettingsEditor({ config, schema: rawSchema, schemaMissing, saving, save
         )}
 
         {changeCount > 0 && (
-          <div className="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center justify-between gap-3 border border-seam bg-ink px-4 py-3">
+          <div className="sticky bottom-2 z-10 mt-4 flex flex-wrap items-center justify-between gap-3 border-2 border-phosphor bg-ink px-4 py-3 shadow-[5px_5px_0_var(--field-deep)]">
             <p className={`text-sm ${errorCount ? "text-rec" : "text-phosphor"}`}>
               {plural(changeCount, "unsaved change") +
                 (errorCount ? ` · ${plural(errorCount, "error")} to fix before saving` : "")}
@@ -391,7 +391,7 @@ function SettingsEditor({ config, schema: rawSchema, schemaMissing, saving, save
               <button
                 type="button"
                 onClick={reset}
-                className="border border-seam px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-dim hover:text-phosphor focus-visible:outline focus-visible:outline-2 focus-visible:outline-field"
+                className="menu-pop label border-2 border-phosphor px-4 py-1.5 text-xs text-phosphor hover:bg-phosphor hover:text-ink"
               >
                 Discard
               </button>
@@ -412,8 +412,8 @@ function SectionButton({ active, onClick, children }: { active: boolean; onClick
       type="button"
       onClick={onClick}
       aria-current={active ? "true" : undefined}
-      className={`flex items-center justify-between gap-2 border px-3 py-1.5 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-field ${
-        active ? "border-field bg-ink text-phosphor" : "border-seam text-dim hover:text-phosphor"
+      className={`menu-pop flex items-center justify-between gap-2 px-3 py-1.5 text-left text-sm font-semibold ${
+        active ? "menu-on [&_.text-dim]:text-ink" : "text-phosphor hover:bg-field hover:text-ink [&:hover_.text-dim]:text-ink"
       }`}
     >
       {children}
