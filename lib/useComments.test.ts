@@ -42,6 +42,15 @@ describe("useComments", () => {
     expect(result.current.isNew({ author: "me", created_at: 200 })).toBe(false);
   });
 
+  it("isNew counts someone else's edit since the last visit, never one's own or an older one", async () => {
+    editorBackend({ "/iterations/7": { comments: [c({})] }, "POST /iterations/7/seen": { previous_seen_at: 150 } });
+    const { result } = renderHook(() => useComments(7, { role: "editor", username: "me" }, { schedule: noTimer }));
+    await waitFor(() => expect(result.current.isNew({ author: "x", created_at: 100, updated_at: 200 })).toBe(true));
+    expect(result.current.isNew({ author: "x", created_at: 100, updated_at: 120 })).toBe(false);
+    expect(result.current.isNew({ author: "x", created_at: 100, updated_at: 100 })).toBe(false);
+    expect(result.current.isNew({ author: "me", created_at: 100, updated_at: 200 })).toBe(false);
+  });
+
   it("surfaces a 403 on resolve, and drops a 4xx send with the message", async () => {
     editorBackend({
       "/iterations/7": { comments: [] },
