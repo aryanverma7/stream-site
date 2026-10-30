@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { enqueue, flush, list, newClientId, remove, type Entry } from "./unsentQueue";
+import { claim, enqueue, flush, list, newClientId, remove, type Entry } from "./unsentQueue";
 
 const e = (id: string, username = "me"): Entry => ({ client_id: id, kind: "comment", iterationId: 1, payload: { body: id }, created_at: 1, username });
 
@@ -70,5 +70,13 @@ describe("unsentQueue", () => {
 
   it("makes 32-hex client ids", () => {
     expect(newClientId()).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it("claim names an unnamed entry, never re-owns a named one", () => {
+    enqueue({ client_id: "a", kind: "comment", iterationId: 1, payload: {}, created_at: 1 });
+    enqueue({ client_id: "b", kind: "comment", iterationId: 1, payload: {}, created_at: 2, username: "streamer" });
+    claim("a", "cutter");
+    claim("b", "cutter");
+    expect(list().map((e) => e.username)).toEqual(["cutter", "streamer"]);
   });
 });

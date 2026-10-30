@@ -81,6 +81,29 @@ export function CommentPanel({
           </button>
         </p>
       ))}
+      {cm.legacy.length > 0 && (
+        <section aria-label="Unsent from before an update" className="space-y-2 border border-amber p-2 text-sm">
+          <h4 className="label text-[11px] text-amber">Unsent from before an update</h4>
+          <ul className="space-y-2">
+            {cm.legacy.map((e) => (
+              <li key={e.client_id} className="space-y-1 border-t border-seam pt-2 first:border-t-0 first:pt-0">
+                <span className="text-dim">
+                  {e.kind === "reply" ? "Reply" : "Comment"} written {new Date(e.created_at).toLocaleString()}
+                </span>
+                <p className="whitespace-pre-wrap break-words">{String(e.payload.body ?? "")}</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => void cm.sendLegacyAsMe(e.client_id)} className="label border border-field px-2 py-0.5 text-[10px] text-phosphor transition-colors hover:bg-field/20">
+                    Send as me
+                  </button>
+                  <button type="button" onClick={() => cm.discardLegacy(e.client_id)} className="label border border-seam px-2 py-0.5 text-[10px] text-dim transition-colors hover:border-rec hover:text-rec">
+                    Discard
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <ul ref={list} onWheel={touch} onTouchMove={touch} onPointerDown={touch} className="max-h-[60vh] space-y-2 overflow-auto">
         {cm.unsent
           .filter((e) => e.kind === "comment")

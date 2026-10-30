@@ -146,6 +146,17 @@ export function useComments(
     role,
     comments,
     unsent: all.filter((e) => e.username === username && (e.kind === "reply" || e.iterationId === iterationId)),
+    // Saved before entries had a username: nobody's flush sends them, so the person decides.
+    legacy: all.filter((e) => !e.username && (e.kind === "reply" ? comments.some((c) => c.id === e.commentId) : e.iterationId === iterationId)),
+    sendLegacyAsMe: (clientId: string) => {
+      queue.claim(clientId, username);
+      setAll(queue.list());
+      return flushNow();
+    },
+    discardLegacy: (clientId: string) => {
+      queue.remove(clientId);
+      setAll(queue.list());
+    },
     failed,
     error,
     dismissFailed: (id: string) => setFailed((f) => f.filter((x) => x.client_id !== id)),

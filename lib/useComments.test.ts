@@ -121,4 +121,32 @@ describe("useComments", () => {
     expect(result.current.failed[0].message).toBe("client_id already used");
     expect(JSON.parse(localStorage.getItem("editor.unsent")!).map((e: { username: string }) => e.username)).toEqual(["streamer"]);
   });
+
+  it("offers entries saved before the username field as legacy; Send as me sends them as me, Discard drops them", async () => {
+    const A = "a".repeat(32), B = "b".repeat(32), R = "c".repeat(32), X = "d".repeat(32);
+    localStorage.setItem("editor.unsent", JSON.stringify([
+      { client_id: A, kind: "comment", iterationId: 7, payload: { kind: "fix", body: "old one", start_s: 1, end_s: null }, created_at: 1 },
+      { client_id: B, kind: "comment", iterationId: 7, payload: { body: "old two" }, created_at: 2 },
+      { client_id: R, kind: "reply", commentId: 1, payload: { body: "old reply" }, created_at: 3 },
+      { client_id: X, kind: "comment", iterationId: 8, payload: { body: "other version" }, created_at: 4 },
+    ]));
+    const back = editorBackend({
+      "/iterations/7": { comments: [c({})] },
+      "POST /iterations/7/seen": { previous_seen_at: null },
+      "POST /iterations/7/comments": { id: 2 },
+    });
+    const { result } = renderHook(() => useComments(7, { role: "editor", username: "cutter" }, { schedule: noTimer }));
+    await waitFor(() => expect(result.current.legacy.map((e) => e.client_id)).toEqual([A, B, R]));
+    const posts = () => back.mock.calls.filter((x) => x[1]?.method === "POST" && String(x[0]).endsWith("/comments"));
+    expect(posts()).toHaveLength(0); // nobody's flush sends them on its own
+    expect(result.current.unsent).toHaveLength(0);
+
+    await act(() => result.current.sendLegacyAsMe(A));
+    expect(posts()).toHaveLength(1);
+    expect(JSON.parse(String(posts()[0][1]!.body))).toEqual({ kind: "fix", body: "old one", start_s: 1, end_s: null, client_id: A });
+    act(() => result.current.discardLegacy(B));
+    await waitFor(() => expect(result.current.legacy.map((e) => e.client_id)).toEqual([R]));
+    expect(JSON.parse(localStorage.getItem("editor.unsent")!).map((e: { client_id: string }) => e.client_id)).toEqual([R, X]);
+    expect(posts()).toHaveLength(1);
+  });
 });
