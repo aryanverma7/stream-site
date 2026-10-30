@@ -52,6 +52,9 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [deleting, setDeleting] = useState<Project | null>(null);
+  // A clip with any live delete (its file, or the whole project) cannot be combined; the server refuses it.
+  const liveDelete = (id: number) => deletions.find("vod", id) ?? deletions.find("project", id);
+  const chosen = selected.filter((id) => !liveDelete(id));
 
   async function run(action: () => Promise<unknown>) {
     setActionError(null);
@@ -74,7 +77,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
     const name = window.prompt("Name for the combined reel")?.trim();
     if (!name) return;
     run(async () => {
-      await editorApi("/clips/combine", { method: "POST", body: { project_ids: selected.filter((id) => !deletions.find("project", id)), name } });
+      await editorApi("/clips/combine", { method: "POST", body: { project_ids: chosen, name } });
       setSelected([]);
       await refresh();
     });
@@ -124,8 +127,8 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
       <div className="space-y-2">
         <div className="flex items-center gap-3">
           <h3 className="label text-sm text-dim">Clips</h3>
-          <button type="button" disabled={selected.length < 2} onClick={combine} className={`${btn} ml-auto`}>
-            Combine{selected.length >= 2 ? ` ${selected.length}` : ""}
+          <button type="button" disabled={chosen.length < 2} onClick={combine} className={`${btn} ml-auto`}>
+            Combine{chosen.length >= 2 ? ` ${chosen.length}` : ""}
           </button>
         </div>
         {clips.length === 0 && <p className="text-sm text-dim">No clips yet.</p>}
@@ -133,8 +136,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
           {clips.map((c) => {
             const reel = c.reel_tape_id === null ? undefined : reels[c.reel_tape_id];
             const combined = !!reel && reel.source_project_ids.length >= 2;
-            const limbo = deletions.find("project", c.id);
-            const pending = deletions.find("vod", c.id) ?? limbo;
+            const pending = liveDelete(c.id);
             // The server refuses both while any clip involved is being deleted.
             const reelLocked = !!reel && reel.source_project_ids.some((id) => deletions.find("project", id));
             return (
@@ -142,10 +144,11 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
                 <input
                   type="checkbox"
                   aria-label={`Select ${c.name}`}
-                  disabled={!!limbo}
-                  checked={selected.includes(c.id) && !limbo}
+                  disabled={!!pending}
+                  checked={selected.includes(c.id) && !pending}
                   onChange={(e) => setSelected((s) => (e.target.checked ? [...s, c.id] : s.filter((id) => id !== c.id)))}
                 />
+                {pending && <span className="label text-[11px] text-dim">Being deleted</span>}
                 <a href={routeHash({ view: "project", projectId: c.id })} className="font-bold hover:underline">
                   {c.name}
                 </a>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { render, fireEvent, waitFor, within } from "@testing-library/react";
+import { act, render, fireEvent, waitFor, within } from "@testing-library/react";
 import { ProjectsView } from "./ProjectsView";
 import { editorBackend } from "@/lib/testUtils";
 
@@ -120,6 +120,32 @@ describe("ProjectsView", () => {
     expect((c3.getByRole("button", { name: "Download clip" }) as HTMLButtonElement).disabled).toBe(true);
     expect(c3.queryByRole("button", { name: "Delete clip file" })).toBeNull();
     expect(getAllByRole("button", { name: "Delete clip file" })).toHaveLength(1); // Clip 4's
+  });
+
+  it("a clip whose file delete goes live is unselectable, marked Being deleted, and drops out of the Combine count", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval"] });
+    try {
+      let pending: unknown[] = [];
+      base({
+        "/projects": { projects: [clip(5, 50, 62), clip(4, 40, 61), clip(3, 20, 60)] },
+        "/projects/5": { tapes: [reel(62, 5, [5])] },
+        "/deletions": () => ({ pending }),
+      });
+      const { findByLabelText, getByLabelText, getByRole, findByText } = render(<ProjectsView role="admin" username="aryan" />);
+      fireEvent.click(await findByLabelText("Select Clip 3"));
+      fireEvent.click(getByLabelText("Select Clip 4"));
+      fireEvent.click(getByLabelText("Select Clip 5"));
+      expect(getByRole("button", { name: "Combine 3" })).toBeTruthy();
+      pending = [{ ...limbo(5), kind: "vod" }];
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
+      const box = getByLabelText("Select Clip 5") as HTMLInputElement;
+      expect(box.disabled).toBe(true);
+      expect(box.checked).toBe(false);
+      expect(within((await findByText("Being deleted")).closest("li") as HTMLElement).getByLabelText("Select Clip 5")).toBe(box);
+      expect(getByRole("button", { name: "Combine 2" })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("hides Rename and the VOD delete from the editor before their download", async () => {
