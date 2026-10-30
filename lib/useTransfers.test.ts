@@ -272,6 +272,32 @@ describe("useTransfers", () => {
     await waitFor(() => expect(calls(api, "POST", "/iterations/7/abandon")).toHaveLength(1));
   });
 
+  it("a cancel while waiting for the Mac Mini is refused: the file is on Google, abandoning would orphan it", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const mod = await fresh();
+      let down = true;
+      const { api } = backend({
+        "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" },
+        "POST /iterations/7/complete": () => (down ? { status: 502, body: { error: "Bad gateway" } } : { id: 7, status: "ready" }),
+        "POST /iterations/7/abandon": { id: 7, status: "abandoned" },
+        "PUT /iterations/7/media": { id: 7 },
+      });
+      const { result } = renderHook(() => mod.useTransfers());
+      const done = mod.startUpload(target, file());
+      for (let i = 0; i < 50 && result.current[0]?.state !== "waiting"; i++) await act(() => vi.advanceTimersByTimeAsync(10));
+      expect(result.current[0].state).toBe("waiting");
+      act(() => mod.cancelTransfer(result.current[0].key));
+      down = false;
+      await act(() => vi.advanceTimersByTimeAsync(5000));
+      await act(() => done);
+      expect(calls(api, "POST", "/iterations/7/abandon")).toHaveLength(0);
+      expect(result.current[0].state).toBe("done");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("a failed abandon never undoes the cancel", async () => {
     const mod = await fresh();
     backend({ "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" }, "POST /iterations/7/abandon": { status: 409, body: { error: "This version is not uploading" } } }, { hold: 8 * MiB });

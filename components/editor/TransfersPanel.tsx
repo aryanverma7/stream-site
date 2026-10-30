@@ -103,6 +103,8 @@ export function TransfersPanel() {
                   <button type="button" aria-label={`Dismiss ${t.name}`} onClick={() => dismissTransfer(t.key)} className={btn}>
                     ×
                   </button>
+                ) : t.state === "waiting" ? (
+                  <span className="label text-[11px] text-dim">Finishing…</span>
                 ) : (
                   t.state !== "checking" && (
                     <button type="button" aria-label={`Cancel ${t.name}`} onClick={() => cancelTransfer(t.key)} className={btn}>

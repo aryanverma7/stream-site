@@ -336,9 +336,12 @@ function abandon(iterationId: number) {
 /**
  * Stops sending and abandons the version. Its stored entry stays, marked
  * abandoned and hidden, so dropping the same file again revives that version
- * through /session rather than creating the next one.
+ * through /session rather than creating the next one. Refused while
+ * "waiting": the bytes are already on Google, so abandoning would orphan
+ * the finished file; a version nobody wants is deleted like any other.
  */
 export function cancelTransfer(key: string) {
+  if (live.get(key)?.state === "waiting") return;
   const entry = load().find((s) => keyOf(s.tapeId, s) === key);
   if (entry) abandon(entry.iterationId);
   controllers.get(key)?.abort();

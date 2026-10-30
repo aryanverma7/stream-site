@@ -93,6 +93,13 @@ describe("TransfersPanel", () => {
     expect(beforeUnloadBlocked()).toBe(prompts);
   });
 
+  it("offers no Cancel once the bytes are on Google (waiting for the Mac Mini), only Finishing…", () => {
+    store.list = [t({ state: "waiting", sent: 100 * MB })];
+    const { queryByRole, getByText } = render(<TransfersPanel />);
+    expect(queryByRole("button", { name: "Cancel jett.mp4" })).toBeNull();
+    expect(getByText("Finishing…")).toBeTruthy();
+  });
+
   it("asks before the page is closed while the file is being checked (checks and thumbnail not sent yet)", () => {
     store.list = [t({ state: "checking" })];
     const { getByText } = render(<TransfersPanel />);
