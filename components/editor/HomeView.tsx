@@ -33,6 +33,11 @@ export function HomeView({ role, username }: { role: "admin" | "editor"; usernam
   const deletions = useDeletions(() => refresh());
   const me = { username, role };
   const [deleting, setDeleting] = useState<HomeProject | null>(null);
+  // The server leaves limbo projects out already; an older backend may not.
+  const live = (projectId: number) => !deletions.find("project", projectId);
+  const vodsReady = home?.vods_ready.filter((p) => live(p.id)) ?? [];
+  const toConfirm = home?.deletes_to_confirm.filter((p) => live(p.id)) ?? [];
+  const openTapes = home?.open_tapes.filter((o) => live(o.tape.project_id)) ?? [];
 
   return (
     <section className="space-y-6">
@@ -48,9 +53,9 @@ export function HomeView({ role, username }: { role: "admin" | "editor"; usernam
         <>
           <div className="space-y-2">
             <h3 className="label text-sm text-dim">Ready to download</h3>
-            {home.vods_ready.length === 0 && <p className="text-sm text-dim">Nothing new.</p>}
+            {vodsReady.length === 0 && <p className="text-sm text-dim">Nothing new.</p>}
             <ul className="grid gap-2">
-              {home.vods_ready.map((p) => {
+              {vodsReady.map((p) => {
                 const pending = deletions.find("vod", p.id);
                 return (
                   <li key={p.id} className={card}>
@@ -73,9 +78,9 @@ export function HomeView({ role, username }: { role: "admin" | "editor"; usernam
 
           <div className="space-y-2">
             <h3 className="label text-sm text-dim">Downloaded - delete from Drive?</h3>
-            {home.deletes_to_confirm.length === 0 && <p className="text-sm text-dim">Nothing to confirm.</p>}
+            {toConfirm.length === 0 && <p className="text-sm text-dim">Nothing to confirm.</p>}
             <ul className="grid gap-2">
-              {home.deletes_to_confirm.map((p) => (
+              {toConfirm.map((p) => (
                 <li key={p.id} className={card}>
                   <ProjectLink p={p} />
                   <button type="button" onClick={() => setDeleting(p)} className={`${btn} ml-auto border-rec text-rec`}>
@@ -88,9 +93,9 @@ export function HomeView({ role, username }: { role: "admin" | "editor"; usernam
 
           <div className="space-y-2">
             <h3 className="label text-sm text-dim">Open comments</h3>
-            {home.open_tapes.length === 0 && <p className="text-sm text-dim">No open comments.</p>}
+            {openTapes.length === 0 && <p className="text-sm text-dim">No open comments.</p>}
             <ul className="grid gap-2">
-              {home.open_tapes.map((o) => (
+              {openTapes.map((o) => (
                 <li key={o.tape.id} className={card}>
                   <span className="text-sm text-dim">{o.project_name}</span>
                   <a href={routeHash({ view: "tape", projectId: o.tape.project_id, tapeId: o.tape.id })} className="font-bold hover:underline">
