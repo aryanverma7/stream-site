@@ -11,10 +11,11 @@ export type Route =
   | { view: "projects" | "home" | "fixes" | "storage" | "todo" }
   | { view: "project"; projectId: number }
   | { view: "tape"; projectId: number; tapeId: number }
-  | { view: "iteration"; projectId: number; tapeId: number; iterationId: number; seekS?: number };
+  /** `vsId`: side-by-side compare with that version on the right. */
+  | { view: "iteration"; projectId: number; tapeId: number; iterationId: number; seekS?: number; vsId?: number };
 
 const TOP = { "": "projects", home: "home", fixes: "fixes", storage: "storage", todo: "todo" } as const;
-const NESTED = /^#\/p\/(\d+)(?:\/t\/(\d+)(?:\/v\/(\d+)(?:@(\d+(?:\.\d+)?))?)?)?$/;
+const NESTED = /^#\/p\/(\d+)(?:\/t\/(\d+)(?:\/v\/(\d+)(?:\/vs\/(\d+))?(?:@(\d+(?:\.\d+)?))?)?)?$/;
 
 /** Anything unrecognised is the projects list, never an error page. */
 export function parseHash(hash: string): Route {
@@ -28,10 +29,12 @@ export function parseHash(hash: string): Route {
   if (bad(projectId) || (m[2] !== undefined && bad(tapeId)) || (m[3] !== undefined && bad(iterationId))) {
     return { view: "projects" };
   }
-  const seekS = Number(m[4]);
+  const vsId = Number(m[4]);
+  const vs = m[4] !== undefined && !bad(vsId) && vsId !== iterationId;
+  const seekS = Number(m[5]);
   if (m[2] === undefined) return { view: "project", projectId };
   if (m[3] === undefined) return { view: "tape", projectId, tapeId };
-  return { view: "iteration", projectId, tapeId, iterationId, ...(Number.isFinite(seekS) && seekS >= 0 && { seekS }) };
+  return { view: "iteration", projectId, tapeId, iterationId, ...(vs && { vsId }), ...(Number.isFinite(seekS) && seekS >= 0 && { seekS }) };
 }
 
 /** Milliseconds at most, no trailing zeros: 222.5, 12, never 12.300000000000001 or 1e-7. */
@@ -46,7 +49,7 @@ export function routeHash(route: Route): string {
     case "tape":
       return `#/p/${route.projectId}/t/${route.tapeId}`;
     case "iteration":
-      return `#/p/${route.projectId}/t/${route.tapeId}/v/${route.iterationId}${route.seekS !== undefined ? `@${seconds(route.seekS)}` : ""}`;
+      return `#/p/${route.projectId}/t/${route.tapeId}/v/${route.iterationId}${route.vsId ? `/vs/${route.vsId}` : ""}${route.seekS !== undefined ? `@${seconds(route.seekS)}` : ""}`;
     default:
       return `#/${route.view}`;
   }
@@ -56,6 +59,8 @@ export function routeHash(route: Route): string {
 export function parentRoute(route: Route): Route | null {
   switch (route.view) {
     case "iteration":
+      // Esc out of side-by-side lands on the left version, not the tape
+      if (route.vsId) return { view: "iteration", projectId: route.projectId, tapeId: route.tapeId, iterationId: route.iterationId };
       return { view: "tape", projectId: route.projectId, tapeId: route.tapeId };
     case "tape":
       return { view: "project", projectId: route.projectId };

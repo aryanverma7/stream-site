@@ -452,6 +452,14 @@ describe("ReviewPlayer", () => {
       expect(sessionStorage.getItem("editor.resumePlaying")).toBeNull();
     });
 
+    it("Shift+V opens side by side with the partner", async () => {
+      withTape(tapeOf([5, 2, "ready"], [7, 3, "ready"]));
+      await open();
+      expect(await screen.findByRole("link", { name: "Side by side" })).toHaveAttribute("href", "#/p/1/t/2/v/7/vs/5");
+      fireEvent.keyDown(document.body, { key: "V", shiftKey: true });
+      expect(window.location.hash).toBe("#/p/1/t/2/v/7/vs/5");
+    });
+
     it("V with no earlier version shows a toast and stays", async () => {
       withTape(tapeOf([7, 3, "ready"]));
       await open();

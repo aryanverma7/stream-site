@@ -8,6 +8,7 @@ import { Breadcrumb } from "./Breadcrumb";
 import { ProjectsView } from "./ProjectsView";
 import { ProjectView } from "./ProjectView";
 import { TapeView } from "./TapeView";
+import { CompareView } from "./CompareView";
 import { ReviewPlayer } from "./ReviewPlayer";
 import { isTyping } from "@/lib/isTyping";
 import { keepOnlyProject } from "@/lib/opfsMedia";
@@ -32,6 +33,7 @@ function RouteView({ route, me }: { route: Route; me: EditorMe }) {
     case "tape":
       return <TapeView projectId={route.projectId} tapeId={route.tapeId} role={me.role} username={me.username} />;
     case "iteration":
+      if (route.vsId) return <CompareView projectId={route.projectId} tapeId={route.tapeId} leftId={route.iterationId} rightId={route.vsId} />;
       return <ReviewPlayer projectId={route.projectId} tapeId={route.tapeId} iterationId={route.iterationId} seekS={route.seekS} role={me.role} username={me.username} />;
     case "home":
       return <HomeView role={me.role} username={me.username} />;

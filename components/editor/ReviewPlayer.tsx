@@ -319,6 +319,11 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
       }
       window.location.hash = routeHash({ view: "iteration", projectId, tapeId, iterationId: partner.id, ...(at !== undefined && { seekS: Math.round(at * 100) / 100 }) });
     },
+    sideBySide: () => {
+      if (!tapeReady) return;
+      if (!partner) return setToast("No earlier version to compare");
+      window.location.hash = routeHash({ view: "iteration", projectId, tapeId, iterationId: it.id, vsId: partner.id });
+    },
     help: () => setSheet((s) => !s),
     escape: () => {
       if (composer) setComposer(null);
@@ -359,6 +364,11 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
           <span className="label text-[11px] text-dim">
             Comparing v{Math.min(it.version, partner.version)} ↔ v{Math.max(it.version, partner.version)} · V to switch
           </span>
+        )}
+        {partner && (
+          <a className={btn} href={routeHash({ view: "iteration", projectId, tapeId, iterationId: it.id, vsId: partner.id })}>
+            Side by side
+          </a>
         )}
         {it.drive_file_id && (
           <>
