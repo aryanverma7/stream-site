@@ -15,6 +15,8 @@ import { SPEEDS, downloadedRanges, fpsOf, mimeOf, startPosition } from "@/lib/pl
 import { CheckBadges } from "./IterationCard";
 import { DownloadLink, OpenInDrive } from "./DriveLinks";
 import { DownloadRing } from "./DownloadRing";
+import { PlaybackBar, playbackProblem } from "./PlaybackBar";
+import { ExportMarkers } from "./ExportMarkers";
 import { ScrubBar, type Marker } from "./ScrubBar";
 import { KeySheet } from "./KeySheet";
 import { CommentPanel } from "./CommentPanel";
@@ -24,8 +26,9 @@ const SAVE_EVERY_MS = 10_000;
 const REPLY_WAIT_MS = 4_000;
 const OPEN_COMPOSER = "editor.openComposer";
 const RESUME_PLAYING = "editor.resumePlaying";
+const OPEN_CHECKLIST = "editor.openChecklist";
 const RESUME_WITHIN_MS = 30_000;
-const FLAGS = [OPEN_COMPOSER, RESUME_PLAYING];
+const FLAGS = [OPEN_COMPOSER, RESUME_PLAYING, OPEN_CHECKLIST];
 
 /**
  * The one-shot flags hold the version they are for ("<iterationId>", the
@@ -141,10 +144,10 @@ export function ReviewPlayer(props: ReviewPlayerProps) {
     );
   // after a version switch the old version's data must not render under the new id
   if (!data || data.iteration.id !== iterationId) return <p className="osd text-xl text-dim">Loading…</p>;
-  return <Watch key={`${iterationId}-${attempt}`} {...props} data={data} retry={() => setAttempt(attempt + 1)} partner={partner} tapeReady={tapeReady} seen={seen} />;
+  return <Watch key={`${iterationId}-${attempt}`} {...props} data={data} retry={() => setAttempt(attempt + 1)} partner={partner} tapeReady={tapeReady} seen={seen} tapeName={tape?.name ?? "Tape"} />;
 }
 
-function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Date.now, data, retry, partner, tapeReady, seen }: ReviewPlayerProps & { data: Loaded; retry(): void; partner: Iteration | null; tapeReady: boolean; seen: SeenFn }) {
+function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Date.now, data, retry, partner, tapeReady, seen, tapeName }: ReviewPlayerProps & { data: Loaded; retry(): void; partner: Iteration | null; tapeReady: boolean; seen: SeenFn; tapeName: string }) {
   const it = data.iteration;
   const media = useMediaFile(it.drive_file_id && tapeReady ? { id: it.id, drive_file_id: it.drive_file_id, size: it.size } : null, projectId, partner?.id ?? null);
   const [toast, setToast] = useState<string | null>(null);
@@ -156,6 +159,8 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
   // One-shot flags, read once at mount: the card menu's Add comment, and V pressed while playing.
   // Each counts only for the version it names (and resume only for 30 s).
   const wantComposer = useRef(false);
+  // read at render, before the effect below drops the flag, so the panel can start on that tab
+  const [checklistFirst] = useState(() => readFlag(OPEN_CHECKLIST) === String(iterationId));
   const wantResume = useRef(false);
   const clockAtMount = useRef(now);
   useEffect(() => {
@@ -180,6 +185,8 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
   const [composer, setComposer] = useState<{ start: number | null; end: number | null } | null>(null);
   const cm = useComments(iterationId, { role, username }, { seen });
   const [videoError, setVideoError] = useState<string | null>(null);
+  // this browser could not decode the picture (MEDIA_ERR_SRC_NOT_SUPPORTED, or metadata with no video size)
+  const [cannotDecode, setCannotDecode] = useState(false);
   const [videoKey, setVideoKey] = useState(0);
   const reloadAt = useRef<number | null>(null);
   const wantPlay = useRef(false);
@@ -333,6 +340,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
   // floor: 100% only once it is all there
   const pct = media.total > 0 ? Math.floor((media.doneBytes / media.total) * 100) : 0;
   const err = (media.error && !storageOnly ? media.error : null) ?? worker.error ?? startError ?? videoError;
+  const problem = playbackProblem(it.checks, cannotDecode);
   const storageNote = storageOnly && (
     <p className="text-amber">
       Streaming only: not enough browser storage to save it
@@ -368,6 +376,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {!started && (
           <div className="space-y-3 self-start border border-seam bg-bezel p-4">
+            <PlaybackBar problem={problem} overlay={false} />
             <div className="flex items-center gap-3">
               {ring}
               <p>
@@ -406,6 +415,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
 
         {started && (
           <div ref={box} className="relative space-y-2 bg-ink">
+            <PlaybackBar problem={problem} />
             <video
               key={videoKey}
               ref={video}
@@ -414,6 +424,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
               onClick={toggle}
               onLoadedMetadata={(e) => {
                 setDuration(e.currentTarget.duration);
+                if (!e.currentTarget.videoWidth) setCannotDecode(true); // sound only: the picture's codec is not supported
                 e.currentTarget.playbackRate = SPEEDS[speed]; // a reloaded element starts at 1×
                 if (reloadAt.current !== null) e.currentTarget.currentTime = reloadAt.current;
                 reloadAt.current = null;
@@ -424,7 +435,9 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
                 setCurrent(e.currentTarget.currentTime);
                 if (!e.currentTarget.paused) save();
               }}
-              onError={() => setVideoError("The video could not be played")}
+              onError={(e) =>
+                e.currentTarget.error?.code === 4 ? setCannotDecode(true) : setVideoError("The video could not be played")
+              }
               onPlay={() => setPaused(false)}
               onPause={() => {
                 setPaused(true);
@@ -488,8 +501,13 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
               onCancel={() => setComposer(null)}
             />
           )}
+          <ExportMarkers
+            comments={cm.comments}
+            fps={typeof it.checks?.fps?.value === "number" ? it.checks.fps.value : null}
+            title={`${tapeName} v${it.version}`}
+          />
           {/* no seeking until there is something to seek */}
-          <CommentPanel cm={cm} username={username} projectId={projectId} tapeId={tapeId} currentTime={current} onSeek={started ? seekTo : undefined} now={now} />
+          <CommentPanel cm={cm} initialTab={checklistFirst ? "Checklist" : "Open"} username={username} projectId={projectId} tapeId={tapeId} currentTime={current} onSeek={started ? seekTo : undefined} now={now} />
         </div>
       </div>
       {!started && sheet && <KeySheet onClose={() => setSheet(false)} />}
