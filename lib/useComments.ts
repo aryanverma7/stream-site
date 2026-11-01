@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { EditorApiError, editorApi } from "./editorApi";
 import * as queue from "./unsentQueue";
 
-export type Reply = { id: number; comment_id: number; author: string; body: string; created_at: number };
+import type { Attachment } from "@/components/editor/Attachments";
+
+export type Reply = { id: number; comment_id: number; author: string; body: string; created_at: number; attachments?: Attachment[] };
 export type Comment = {
   id: number;
   kind: "fix" | "keep" | "question";
@@ -19,8 +21,9 @@ export type Comment = {
   origin_iteration_id: number;
   origin_version: number;
   replies: Reply[];
+  attachments?: Attachment[];
 };
-export type Draft = { kind: Comment["kind"]; body: string; start_s: number | null; end_s: number | null };
+export type Draft = { kind: Comment["kind"]; body: string; start_s: number | null; end_s: number | null; attachment_ids?: number[] };
 export type Failed = { client_id: string; message: string; body: string };
 
 const EVERY_MS = 30_000;
@@ -168,8 +171,15 @@ export function useComments(
         (item.updated_at !== undefined && item.updated_at !== item.created_at && item.updated_at > (previousSeen ?? -Infinity))),
     add: (draft: Draft) =>
       enqueueAndFlush({ client_id: queue.newClientId(), kind: "comment", iterationId, payload: { ...draft }, created_at: Date.now(), username }),
-    reply: (commentId: number, body: string) =>
-      enqueueAndFlush({ client_id: queue.newClientId(), kind: "reply", commentId, payload: { body }, created_at: Date.now(), username }),
+    reply: (commentId: number, body: string, attachment_ids: number[] = []) =>
+      enqueueAndFlush({
+        client_id: queue.newClientId(),
+        kind: "reply",
+        commentId,
+        payload: attachment_ids.length ? { body, attachment_ids } : { body },
+        created_at: Date.now(),
+        username,
+      }),
     edit: (id: number, patch: { body?: string; kind?: Comment["kind"] }) => act(() => editorApi(`/comments/${id}`, { method: "PATCH", body: patch })),
     setResolved: (id: number, resolved: boolean) =>
       act(() => editorApi(`/iterations/${iterationId}/comments/${id}/resolved`, { method: "PUT", body: { resolved } })),

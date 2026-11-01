@@ -95,3 +95,12 @@ it("writes seekS to at most 3 decimals with trailing zeros trimmed", () => {
   expect(at(83.4567)).toBe("#/p/1/t/2/v/3@83.457");
   expect(at(0.0000001)).toBe("#/p/1/t/2/v/3@0");
 });
+
+it("round-trips side-by-side compare, and Esc's parent is the left version", () => {
+  const r = parseHash("#/p/1/t/2/v/7/vs/5@12.5");
+  expect(r).toEqual({ view: "iteration", projectId: 1, tapeId: 2, iterationId: 7, vsId: 5, seekS: 12.5 });
+  expect(routeHash(r)).toBe("#/p/1/t/2/v/7/vs/5@12.5");
+  expect(parentRoute(r)).toEqual({ view: "iteration", projectId: 1, tapeId: 2, iterationId: 7 });
+  expect(parseHash("#/p/1/t/2/v/7/vs/7")).toEqual({ view: "iteration", projectId: 1, tapeId: 2, iterationId: 7 });
+  expect(parseHash("#/p/1/t/2/v/7/vs/0")).toEqual({ view: "iteration", projectId: 1, tapeId: 2, iterationId: 7 });
+});

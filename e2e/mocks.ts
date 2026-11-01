@@ -95,7 +95,7 @@ export async function startDrive(files: Record<string, string>): Promise<Drive> 
 }
 
 /** One version the mock backend knows: project -> tape -> iteration. */
-export type Fixture = { projectId: number; tapeId: number; iterationId: number; fileId: string; filename: string; size: number; kind: "vod" | "clip" };
+export type Fixture = { projectId: number; tapeId: number; iterationId: number; fileId: string; filename: string; size: number; kind: "vod" | "clip"; version?: number };
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -137,7 +137,7 @@ export async function startBackend(outDir: string, drive: Drive, fixtures: Fixtu
   const iteration = (f: Fixture) => ({
     id: f.iterationId,
     tape_id: f.tapeId,
-    version: 1,
+    version: f.version ?? 1,
     filename: f.filename,
     size: f.size,
     status: "ready",
@@ -188,7 +188,7 @@ export async function startBackend(outDir: string, drive: Drive, fixtures: Fixtu
     if (byIt && p.endsWith("/media-link")) return { url: drive.url(byIt.fileId), access_token: TOKEN, expires_in: 3600 };
     if (byIt && p.endsWith("/seen")) return { previous_seen_at: null };
     if (byIt && (p.endsWith("/position") || p.endsWith("/comments"))) return { ok: true };
-    if (byTape) return { tape: tape(byTape), iterations: [iteration(byTape)] };
+    if (byTape) return { tape: tape(byTape), iterations: fixtures.filter((f) => f.tapeId === byTape.tapeId).map(iteration) };
     if (byProject) return { project: project(byProject), tapes: [tape(byProject)] };
     return undefined;
   }

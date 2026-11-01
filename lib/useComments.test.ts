@@ -33,6 +33,19 @@ describe("useComments", () => {
     expect(JSON.parse(String(sent[0][1]?.body)).client_id).toBe(id);
   });
 
+  it("a reply queued with images sends their ids, and one without sends none", async () => {
+    const up = editorBackend({ "/iterations/7": { comments: [c({})] }, "POST /iterations/7/seen": { previous_seen_at: null }, "POST /comments/1/replies": { id: 5 } });
+    const { result } = renderHook(() => useComments(7, { role: "admin", username: "me" }, { schedule: noTimer }));
+    await waitFor(() => expect(result.current.comments).toHaveLength(1));
+    await act(() => result.current.reply(1, "see", [4]));
+    await act(() => result.current.reply(1, "plain"));
+    const bodies = up.mock.calls.filter((x) => String(x[0]).endsWith("/replies")).map((x) => JSON.parse(String(x[1]?.body)));
+    expect(bodies.map(({ body, attachment_ids }) => ({ body, attachment_ids }))).toEqual([
+      { body: "see", attachment_ids: [4] },
+      { body: "plain", attachment_ids: undefined },
+    ]);
+  });
+
   it("isNew follows previous_seen_at and the author, replies included", async () => {
     editorBackend({ "/iterations/7": { comments: [c({})] }, "POST /iterations/7/seen": { previous_seen_at: 150 } });
     const { result } = renderHook(() => useComments(7, { role: "editor", username: "me" }, { schedule: noTimer }));

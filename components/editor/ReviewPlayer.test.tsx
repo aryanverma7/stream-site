@@ -58,6 +58,23 @@ async function watch() {
 const loaded = (v: HTMLVideoElement) => fireEvent.loadedMetadata(v);
 
 describe("ReviewPlayer", () => {
+  it("shows the codec bar on top of the video when this browser cannot decode it", async () => {
+    await open();
+    const v = await watch();
+    Object.defineProperty(v, "error", { value: { code: 4 } });
+    fireEvent.error(v);
+    expect(await screen.findByText("This browser can't play this video's format, open it in Chrome")).toBeInTheDocument();
+    expect(screen.queryByText("The video could not be played")).toBeNull();
+  });
+
+  it("shows no codec bar once the picture has a size", async () => {
+    await open();
+    const v = await watch();
+    Object.defineProperty(v, "videoWidth", { value: 1920 });
+    loaded(v);
+    expect(screen.queryByText(/can't play/)).toBeNull();
+  });
+
   it("shows download progress; Play only when complete, Start watching now otherwise", async () => {
     await open();
     expect(screen.getByText("Loading v3 · 1.2 of 3.4 GB · 35%")).toBeInTheDocument();
@@ -435,6 +452,14 @@ describe("ReviewPlayer", () => {
       expect(sessionStorage.getItem("editor.resumePlaying")).toBeNull();
     });
 
+    it("Shift+V opens side by side with the partner", async () => {
+      withTape(tapeOf([5, 2, "ready"], [7, 3, "ready"]));
+      await open();
+      expect(await screen.findByRole("link", { name: "Side by side" })).toHaveAttribute("href", "#/p/1/t/2/v/7/vs/5");
+      fireEvent.keyDown(document.body, { key: "V", shiftKey: true });
+      expect(window.location.hash).toBe("#/p/1/t/2/v/7/vs/5");
+    });
+
     it("V with no earlier version shows a toast and stays", async () => {
       withTape(tapeOf([7, 3, "ready"]));
       await open();
@@ -451,6 +476,13 @@ describe("ReviewPlayer", () => {
       loaded(await watch());
       expect(await screen.findByRole("button", { name: /Save|Add|Post|Send/i })).toBeInTheDocument();
       expect(time).toBe(42);
+    });
+
+    it("opens the comment panel on Checklist when the card's Edit checklist set the flag, then clears it", async () => {
+      sessionStorage.setItem("editor.openChecklist", "7");
+      await open();
+      expect(sessionStorage.getItem("editor.openChecklist")).toBeNull();
+      expect(screen.getByRole("tab", { name: "Checklist" })).toHaveAttribute("aria-selected", "true");
     });
 
     it("a flag for another version, or a resume older than 30 s, does nothing and is cleared", async () => {

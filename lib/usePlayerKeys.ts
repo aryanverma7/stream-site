@@ -12,6 +12,7 @@ export type PlayerKeyHandlers = {
   comment?(): void;
   general?(): void;
   compare?(): void;
+  sideBySide?(): void;
   fullscreen?(): void;
   help?(): void;
   /** True when it closed something; only then does Esc stop here. */
@@ -61,6 +62,7 @@ export function usePlayerKeys(handlers: PlayerKeyHandlers, { enabled = true, con
       else if (/^\d$/.test(key)) h.seekPercent?.(Number(key));
       else if (key === "c") h.comment?.();
       else if (key === "g") h.general?.();
+      else if (key === "v" && e.shiftKey) h.sideBySide?.();
       else if (key === "v") h.compare?.();
       else if (key === "f") h.fullscreen?.();
       else if (key === "?") h.help?.();
