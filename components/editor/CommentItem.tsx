@@ -61,7 +61,13 @@ export function CommentItem({
         ) : (
           head
         )}
-        <span className="text-dim">{c.author}</span>
+        {c.author?.startsWith("guest:") ? (
+          <>
+            <span className="text-dim">{c.author.slice(6)}</span> <span className="label border border-amber px-1 text-[10px] text-amber">guest</span>
+          </>
+        ) : (
+          <span className="text-dim">{c.author}</span>
+        )}
         {cm.isNew(c) && <span className="label text-amber">New</span>}
         {c.updated_at > c.created_at && <span className="label text-dim">Edited</span>}
       </div>

@@ -17,6 +17,7 @@ import { DownloadLink, OpenInDrive } from "./DriveLinks";
 import { DownloadRing } from "./DownloadRing";
 import { PlaybackBar, playbackProblem } from "./PlaybackBar";
 import { ExportMarkers } from "./ExportMarkers";
+import { GuestNotesPanel, SharePanel } from "./SharePanel";
 import { ScrubBar, type Marker } from "./ScrubBar";
 import { KeySheet } from "./KeySheet";
 import { CommentPanel } from "./CommentPanel";
@@ -512,6 +513,8 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
               onCancel={() => setComposer(null)}
             />
           )}
+          {role === "admin" && <GuestNotesPanel iterationId={iterationId} onSeek={started ? seekTo : undefined} onApproved={() => void cm.reload()} />}
+          {role === "admin" && it.status === "ready" && <SharePanel iterationId={iterationId} version={it.version} />}
           <ExportMarkers
             comments={cm.comments}
             fps={typeof it.checks?.fps?.value === "number" ? it.checks.fps.value : null}
