@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { formatTime, parseTime } from "@/lib/timecode";
 import type { Draft } from "@/lib/useComments";
+import { useAttachmentUploads } from "@/lib/useAttachmentUploads";
+import { AttachmentPicker, attachHandlers } from "./Attachments";
 
 const field = "border border-seam bg-ink px-2 py-1 text-sm";
 const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
@@ -12,12 +14,15 @@ const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:
  * Esc cancels and stops here, so the shell does not also zoom out.
  */
 export function CommentComposer({
+  iterationId,
   start,
   end,
   getNow,
   onSubmit,
   onCancel,
 }: {
+  /** Where pasted or picked images upload to. */
+  iterationId: number;
   /** null: a general comment. */
   start: number | null;
   end?: number | null;
@@ -30,6 +35,7 @@ export function CommentComposer({
   const [startText, setStartText] = useState(start === null ? "" : formatTime(start, true));
   const [endText, setEndText] = useState(end == null ? "" : formatTime(end, true));
   const [error, setError] = useState<string | null>(null);
+  const uploads = useAttachmentUploads(iterationId);
   // A new start/end (a range dragged, C again) replaces the times and keeps what was typed.
   const [times, setTimes] = useState([start, end ?? null]);
   if (times[0] !== start || times[1] !== (end ?? null)) {
@@ -51,14 +57,17 @@ export function CommentComposer({
       }
     }
     if (!body.trim()) return setError("Write something first");
+    if (uploads.blocking) return setError("Wait for the images to finish, or remove the failed one");
     setError(null);
-    onSubmit({ kind, body: body.trim(), start_s: s, end_s: e });
+    onSubmit({ kind, body: body.trim(), start_s: s, end_s: e, ...(uploads.ids.length && { attachment_ids: uploads.ids }) });
+    uploads.clear();
   }
 
   return (
     <form
       aria-label={start === null ? "General comment" : "Comment"}
       className="space-y-2 border border-field bg-bezel p-3"
+      {...attachHandlers(uploads)}
       onSubmit={(ev) => {
         ev.preventDefault();
         submit();
@@ -104,9 +113,10 @@ export function CommentComposer({
         value={body}
         onChange={(e) => setBody(e.target.value)}
       />
+      <AttachmentPicker uploads={uploads} />
       {error && <p role="alert" className="text-rec">{error}</p>}
       <div className="flex gap-2">
-        <button type="submit" className={btn}>
+        <button type="submit" className={btn} disabled={uploads.blocking}>
           Add comment
         </button>
         <button type="button" className={btn} onClick={onCancel}>

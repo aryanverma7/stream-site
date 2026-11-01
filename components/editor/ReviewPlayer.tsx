@@ -501,6 +501,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
         <div className="space-y-3">
           {composer && (
             <CommentComposer
+              iterationId={iterationId}
               start={composer.start}
               end={composer.end}
               getNow={() => video.current?.currentTime ?? current}

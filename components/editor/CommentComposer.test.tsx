@@ -17,7 +17,7 @@ function Harness({ onKey, ...p }: React.ComponentProps<typeof CommentComposer> &
   );
 }
 const setup = (over: Partial<React.ComponentProps<typeof CommentComposer>> = {}) => {
-  const props = { start: 222, getNow: () => 230, onSubmit: vi.fn(), onCancel: vi.fn(), ...over };
+  const props = { iterationId: 7, start: 222, getNow: () => 230, onSubmit: vi.fn(), onCancel: vi.fn(), ...over };
   const onKey = vi.fn();
   render(<Harness onKey={onKey} {...props} />);
   return { ...props, onKey };
