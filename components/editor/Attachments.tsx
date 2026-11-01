@@ -33,12 +33,13 @@ export function attachHandlers(uploads: AttachmentUploads) {
 }
 
 /** The 📎 button and the picked images, each with its progress and a Remove. */
-export function AttachmentPicker({ uploads, compact = false }: { uploads: AttachmentUploads; compact?: boolean }) {
+/** `label` names what the images are for, so each reply box's picker is told apart from the others. */
+export function AttachmentPicker({ uploads, compact = false, label = "comment" }: { uploads: AttachmentUploads; compact?: boolean; label?: string }) {
   const input = useRef<HTMLInputElement>(null);
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className={btn} aria-label="Attach images" onClick={() => input.current?.click()}>
+        <button type="button" className={btn} aria-label={`Attach images to the ${label}`} onClick={() => input.current?.click()}>
           📎{compact ? "" : " Image"}
         </button>
         <input
@@ -47,7 +48,7 @@ export function AttachmentPicker({ uploads, compact = false }: { uploads: Attach
           hidden
           multiple
           accept={ATTACHMENT_MIMES.join(",")}
-          aria-label="Images to attach"
+          aria-label={`Images for the ${label}`}
           onChange={(e) => {
             uploads.add([...(e.target.files ?? [])]);
             e.target.value = ""; // the same file can be picked again

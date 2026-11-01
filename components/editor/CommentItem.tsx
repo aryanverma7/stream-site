@@ -140,7 +140,7 @@ export function CommentItem({
             Reply
           </button>
         </div>
-        <AttachmentPicker uploads={uploads} compact />
+        <AttachmentPicker uploads={uploads} compact label={`reply to ${c.author}`} />
       </form>
     </li>
   );

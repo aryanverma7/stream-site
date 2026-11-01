@@ -85,6 +85,13 @@ describe("CommentComposer with images", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add comment" }));
     expect(onSubmit).toHaveBeenCalledWith({ kind: "fix", body: "plain", start_s: null, end_s: null });
   });
+
+  it("names its picker after what it attaches to, so several on a page are told apart", () => {
+    backend();
+    render(<CommentComposer iterationId={7} start={null} getNow={() => 0} onSubmit={() => {}} onCancel={() => {}} />);
+    expect(screen.getByLabelText("Images for the comment")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Attach images to the comment" })).toBeInTheDocument();
+  });
 });
 
 describe("AttachmentThumbs", () => {
