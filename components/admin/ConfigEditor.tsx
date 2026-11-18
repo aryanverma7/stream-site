@@ -112,6 +112,14 @@ export function ConfigEditor() {
       />}
 
       {config && <ConnectRow
+        name="Twitch"
+        connected={Boolean(config.twitch_refresh_token)}
+        hasCredentials={Boolean(config.twitch_client_id)}
+        href="/auth/twitch/login"
+        needed="twitch_client_id, twitch_client_secret, and public_base_url (and <public_base_url>/auth/twitch/callback added to the Twitch app's OAuth Redirect URLs)"
+      />}
+
+      {config && <ConnectRow
         name="Google Drive"
         connected={Boolean(config.gdrive_refresh_token)}
         hasCredentials={Boolean(config.gdrive_client_id)}
