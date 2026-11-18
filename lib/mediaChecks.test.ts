@@ -10,6 +10,8 @@ describe("grade", () => {
       fps: { state: "pass", value: 60 },
       bitrate: { state: "pass", value: "≈ 55.0 Mbps" },
       duration_s: 90,
+      codec: null,
+      playable: null,
     });
   });
 
@@ -122,7 +124,30 @@ describe("measureMedia", () => {
   it("gives no bitrate for a file with no decodable video track (audio only), so it grades unknown", async () => {
     fakeVideo({ duration: 90, videoWidth: 0, videoHeight: 0 });
     const got = await measureMedia(new File([new Uint8Array(1000)], "a.mp4"));
-    expect(got).toEqual({ width: null, height: null, duration_s: 90, fps: null, bitrate_mbps: null });
+    expect(got).toEqual({ width: null, height: null, duration_s: 90, fps: null, bitrate_mbps: null, codec: null, playable: false });
     expect(grade(got, "tape").bitrate.state).toBe("unknown");
+  });
+
+  it("marks a file the browser cannot decode playable: false instead of failing, so it still uploads", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:x");
+    URL.revokeObjectURL = vi.fn();
+    const make = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = make(tag);
+      if (tag !== "video") return el;
+      (el as HTMLVideoElement).pause = () => {};
+      Object.defineProperty(el, "src", { set: () => setTimeout(() => el.dispatchEvent(new Event("error"))) });
+      return el;
+    });
+    const got = await measureMedia(new File([new Uint8Array(10)], "a.mp4"));
+    expect(got.playable).toBe(false);
+    const g = grade(got, "tape");
+    expect(g.playable).toBe(false);
+    expect(g.codec).toBeNull();
+  });
+
+  it("marks a file with a picture playable", async () => {
+    fakeVideo({ duration: Infinity, videoWidth: 1920, videoHeight: 1080 });
+    expect((await measureMedia(new File([new Uint8Array(10)], "a.mp4"))).playable).toBe(true);
   });
 });

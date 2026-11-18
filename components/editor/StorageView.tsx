@@ -6,6 +6,7 @@ import { useDeletions, type DeleteKind } from "@/lib/useDeletions";
 import { routeHash } from "@/lib/useHashRoute";
 import { PendingDelete } from "./PendingDelete";
 import { DeleteDialog } from "./DeleteDialog";
+import { LiveLinks } from "./SharePanel";
 import { useAsk } from "./AskDialog";
 
 const btn = "menu-pop label border-2 border-phosphor bg-ink px-3 py-1.5 text-xs text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
@@ -111,6 +112,10 @@ export function StorageView({ username }: { username: string }) {
           </ul>
         </div>
       )}
+
+      <div className="border border-seam bg-bezel px-4 py-3">
+        <LiveLinks />
+      </div>
 
       {storage?.files && (
         <div className="space-y-2">
