@@ -8,13 +8,13 @@ import { useCallback, useMemo, useSyncExternalStore } from "react";
  * browser's Back all work with no router at all.
  */
 export type Route =
-  | { view: "projects" | "home" | "fixes" | "storage" | "todo" }
+  | { view: "projects" | "home" | "fixes" | "storage" | "todo" | "quota" }
   | { view: "project"; projectId: number }
   | { view: "tape"; projectId: number; tapeId: number }
   /** `vsId`: side-by-side compare with that version on the right. */
   | { view: "iteration"; projectId: number; tapeId: number; iterationId: number; seekS?: number; vsId?: number };
 
-const TOP = { "": "projects", home: "home", fixes: "fixes", storage: "storage", todo: "todo" } as const;
+const TOP = { "": "projects", home: "home", fixes: "fixes", storage: "storage", todo: "todo", quota: "quota" } as const;
 const NESTED = /^#\/p\/(\d+)(?:\/t\/(\d+)(?:\/v\/(\d+)(?:\/vs\/(\d+))?(?:@(\d+(?:\.\d+)?))?)?)?$/;
 
 /** Anything unrecognised is the projects list, never an error page. */

@@ -9,6 +9,7 @@ import { StatusLabel } from "./StatusLabel";
 import { DeleteDialog } from "./DeleteDialog";
 import { PendingDelete } from "./PendingDelete";
 import { DownloadLink, OpenInDrive } from "./DriveLinks";
+import { QuotaCard } from "./QuotaView";
 
 const btn = "menu-pop label border-2 border-phosphor bg-ink px-3 py-1.5 text-xs text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
 const card = "slab slab-sm relative flex flex-wrap items-center gap-3 px-4 py-3";
@@ -49,6 +50,7 @@ export function HomeView({ role, username }: { role: "admin" | "editor"; usernam
           {error}
         </p>
       )}
+      <QuotaCard />
       {home && (
         <>
           <div className="space-y-2">

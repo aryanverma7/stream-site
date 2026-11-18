@@ -150,6 +150,16 @@ export function TapeView({
           <span className="label block">Status</span>
           <StatusSelect name={tape.name} status={tape.status} role={role} onChange={setStatus} />
         </div>
+        {isAdmin && (
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={!tape.quota_exempt}
+              onChange={(e) => run(() => update({ quota_exempt: !e.target.checked }))}
+            />
+            Counts toward the weekly quota
+          </label>
+        )}
         <label className="space-y-1 text-xs text-dim sm:col-span-2">
           <span className="label">Notes</span>
           <textarea

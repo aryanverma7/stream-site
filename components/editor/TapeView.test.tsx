@@ -53,6 +53,23 @@ describe("TapeView", () => {
     expect(queryByRole("button", { name: "Delete files" })).toBeNull();
   });
 
+  it("gives only the streamer the quota switch, and sends quota_exempt", async () => {
+    base("final");
+    const editorView = render(<TapeView projectId={12} tapeId={5} role="editor" username="cutter" />);
+    await editorView.findByRole("heading", { name: "Jett dash" });
+    expect(editorView.queryByRole("checkbox", { name: /weekly quota/ })).toBeNull();
+    editorView.unmount();
+
+    const fetchMock = base("final", { "PATCH /tapes/5": (body: unknown) => tape("final", { quota_exempt: (body as { quota_exempt: boolean }).quota_exempt ? 1 : 0 }) });
+    const { findByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
+    const box = (await findByRole("checkbox", { name: /weekly quota/ })) as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    fireEvent.click(box);
+    await waitFor(() => expect(box.checked).toBe(false));
+    const patch = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH")!;
+    expect(JSON.parse(String(patch[1]!.body))).toEqual({ quota_exempt: true });
+  });
+
   it("asks the streamer before marking Final, and sends it only on yes", async () => {
     const fetchMock = base("in_review");
     const { findByRole, getAllByRole, getByRole, queryByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
