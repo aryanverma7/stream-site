@@ -9,7 +9,7 @@ import { STATUS_LABELS, StatusLabel } from "./StatusLabel";
 import { PendingDelete } from "./PendingDelete";
 import { DeleteDialog } from "./DeleteDialog";
 
-const btn = "label border border-seam px-3 py-2 text-xs text-phosphor hover:border-field disabled:opacity-40";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-3 py-2 text-xs text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
 const field = "border border-seam bg-ink px-2 py-1.5 text-sm text-phosphor";
 type Sort = "newest" | "comments" | "name";
 
@@ -27,7 +27,7 @@ export function ProjectView({ projectId, role, username }: { projectId: number; 
 
   // One h2 in the same place loading or loaded, so the focus the shell gives it survives the load.
   const heading = (
-    <h2 tabIndex={-1} className="stencil text-4xl">
+    <h2 tabIndex={-1} className="stencil tilt slam text-4xl">
       {project?.name ?? "Project"}
     </h2>
   );
@@ -70,7 +70,7 @@ export function ProjectView({ projectId, role, username }: { projectId: number; 
       <div className="flex flex-wrap items-center gap-3">
         {projectDelete && <PendingDelete request={projectDelete} onUndo={deletions.undo} me={me} />}
         {role === "admin" && !projectDelete && (
-          <button type="button" onClick={() => setDeleting(true)} className={`${btn} ml-auto border-rec text-rec`}>
+          <button type="button" onClick={() => setDeleting(true)} className={`${btn} ml-auto border-rec! text-rec! hover:bg-rec! hover:text-ink!`}>
             Delete project
           </button>
         )}
@@ -81,7 +81,7 @@ export function ProjectView({ projectId, role, username }: { projectId: number; 
         </p>
       )}
 
-      <div className="flex flex-wrap items-end gap-3 border border-seam bg-bezel p-3">
+      <div className="slab slab-sm relative flex flex-wrap items-end gap-3 p-3">
         {project.kind !== "clip" && (
           <form
             className="flex gap-2"
@@ -118,12 +118,12 @@ export function ProjectView({ projectId, role, username }: { projectId: number; 
           {shown.map((t) => {
             const filesDelete = deletions.find("tape_files", t.id);
             return (
-              <li key={t.id} className="flex flex-wrap items-center gap-3 border border-seam bg-bezel px-4 py-3">
+              <li key={t.id} className="slab slab-sm relative flex flex-wrap items-center gap-3 px-4 py-3">
                 <a href={routeHash({ view: "tape", projectId, tapeId: t.id })} className="font-bold hover:underline">
                   {t.name}
                 </a>
                 <StatusLabel status={t.status} />
-                {t.has_new && <span className="label bg-field px-1.5 text-[11px] text-ink">New</span>}
+                {t.has_new && <span className="tag bg-field text-[11px] text-ink">New</span>}
                 <span className="osd text-lg text-dim">{t.latest_version ? `v${t.latest_version}` : "no versions"}</span>
                 <span className="text-xs text-dim">{t.open_comments ?? 0} open</span>
                 {filesDelete && <PendingDelete request={filesDelete} onUndo={deletions.undo} me={me} />}

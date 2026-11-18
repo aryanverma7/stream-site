@@ -20,7 +20,7 @@ export function LegalPage({
         <a href="/" className="osd text-lg text-dim">
           ← DualBladeX
         </a>
-        <h1 className="stencil text-5xl text-field">{title}</h1>
+        <h1 className="stencil tilt text-5xl text-phosphor">{title}</h1>
         <p className="osd text-lg text-dim">Last updated {updated}</p>
         {children}
       </article>

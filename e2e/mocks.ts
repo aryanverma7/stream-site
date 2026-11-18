@@ -112,7 +112,7 @@ const TYPES: Record<string, string> = {
 const pageCsp = (driveOrigin: string) =>
   "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; " +
-  `img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ${driveOrigin}; ` +
+  `img-src 'self' data: blob:; media-src 'self' blob: https://www.googleapis.com ${driveOrigin}; connect-src 'self' ${driveOrigin}; ` +
   "frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
 /** site_server._resolve_within: exact, then .html, then /index.html; nothing outside out/. */

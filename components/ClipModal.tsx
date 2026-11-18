@@ -27,17 +27,17 @@ export function ClipModal({ clip, onClose }: ClipModalProps) {
       role="dialog"
       aria-modal="true"
       aria-label={clip.title}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/92 p-4 sm:p-6"
+      className="dialog-backdrop fixed inset-0 z-50 flex items-center justify-center bg-ink/92 p-4 sm:p-6"
       onClick={onClose}
     >
-      <div className="crt-on w-full max-w-4xl border border-seam bg-bezel" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog-in slab relative w-full max-w-4xl p-[3px]" onClick={(e) => e.stopPropagation()}>
         <video src={clip.url} controls autoPlay className="block w-full" />
         <div className="flex items-center justify-between gap-4 px-4 py-3">
           <p className="font-bold capitalize text-phosphor">{clip.title}</p>
           <button
             type="button"
             onClick={onClose}
-            className="label border border-seam px-3 py-1.5 text-xs text-phosphor transition-colors hover:border-field hover:text-field"
+            className="menu-pop label border-2 border-phosphor px-3 py-1.5 text-xs text-phosphor hover:bg-phosphor hover:text-ink"
           >
             Close
           </button>

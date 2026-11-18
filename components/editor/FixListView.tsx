@@ -23,7 +23,7 @@ export function FixListView() {
   const { groups, error } = useFixList();
   return (
     <section className="space-y-6">
-      <h2 tabIndex={-1} className="stencil text-4xl">
+      <h2 tabIndex={-1} className="stencil tilt slam text-4xl">
         Fix list
       </h2>
       {error && (
@@ -44,7 +44,7 @@ export function FixListView() {
               const c = i.comment;
               const at = c.start_s === null ? null : clock(c.start_s);
               return (
-                <li key={c.id} className="border border-seam bg-bezel px-4 py-3">
+                <li key={c.id} className="slab slab-sm relative px-4 py-3">
                   <a href={fixHref(i)} className="block hover:underline">
                     {[`v${i.version}`, at, `${KIND[c.kind]}: ${c.body}`].filter(Boolean).join(" · ")}
                   </a>

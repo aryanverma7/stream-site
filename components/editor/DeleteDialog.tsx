@@ -56,7 +56,7 @@ export function DeleteDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4">
+    <div className="dialog-backdrop fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4">
       <form
         role="dialog"
         aria-modal="true"
@@ -65,9 +65,9 @@ export function DeleteDialog({
           e.preventDefault();
           if (typed === label) submit();
         }}
-        className="w-full max-w-md space-y-4 border border-rec bg-bezel p-5"
+        className="dialog-in slab slab-alert relative w-full max-w-md space-y-4 p-6"
       >
-        <h3 id="delete-title" className="stencil text-3xl text-phosphor">
+        <h3 id="delete-title" className="stencil tilt text-4xl text-phosphor">
           {title}
         </h3>
         <p className="text-sm text-dim">
@@ -79,7 +79,7 @@ export function DeleteDialog({
           aria-label="Type the name to confirm"
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
-          className="w-full border border-seam bg-ink px-3 py-2 text-sm text-phosphor"
+          className="w-full border-2 border-seam bg-ink px-3 py-2 text-sm text-phosphor focus:border-phosphor focus:outline-none"
         />
         {error && (
           <p role="alert" className="text-sm text-rec">
@@ -87,13 +87,13 @@ export function DeleteDialog({
           </p>
         )}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="label border border-seam px-4 py-2 text-sm text-phosphor hover:border-field">
+          <button type="button" onClick={onClose} className="menu-pop label border-2 border-phosphor bg-ink px-4 py-2 text-sm text-phosphor hover:bg-phosphor hover:text-ink">
             Cancel
           </button>
           <button
             type="submit"
             disabled={typed !== label || busy}
-            className="label border border-rec bg-rec px-4 py-2 text-sm text-ink disabled:opacity-40"
+            className="menu-pop label border-2 border-rec bg-rec px-4 py-2 text-sm text-ink shadow-[4px_4px_0_var(--phosphor)] disabled:opacity-40"
           >
             Delete in an hour
           </button>

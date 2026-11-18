@@ -78,7 +78,7 @@ export function ScrubBar({
             e.preventDefault();
             onSeek(Math.min(Math.max(current + (e.key === "ArrowLeft" ? -5 : 5), 0), duration));
           }}
-          className="absolute inset-0 cursor-pointer select-none bg-seam"
+          className="absolute inset-0 cursor-pointer select-none bg-seam shadow-[0_0_0_2px_var(--phosphor),4px_4px_0_2px_var(--field-deep)]"
         >
           {size > 0 &&
             downloaded.map(([a, b]) => (
@@ -90,7 +90,7 @@ export function ScrubBar({
                 style={{ left: `${pct((a / size) * duration)}%`, width: `${pct((b / size) * duration) - pct((a / size) * duration)}%` }}
               />
             ))}
-          <div className="absolute inset-y-0 left-0 bg-field/70" style={{ width: `${pct(current)}%` }} />
+          <div className="absolute inset-y-0 left-0 bg-field" style={{ width: `${pct(current)}%` }} />
           {sel && <div data-selection className="absolute inset-y-0 bg-amber/50" style={{ left: `${pct(sel[0])}%`, width: `${pct(sel[1]) - pct(sel[0])}%` }} />}
         </div>
         {markers.map((m) => (
@@ -105,7 +105,7 @@ export function ScrubBar({
         ))}
       </div>
       {rangeMode && (
-        <button type="button" onMouseDown={(e) => drag(e, true)} className="label border border-amber px-2 py-0.5 text-[10px] text-amber">
+        <button type="button" onMouseDown={(e) => drag(e, true)} className="label border-2 border-amber px-2 py-0.5 text-[10px] text-amber">
           Range
         </button>
       )}

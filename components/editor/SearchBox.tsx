@@ -98,10 +98,10 @@ export function SearchBox() {
           else if (e.key === "Home" && listOpen) move(0);
           else if (e.key === "End" && listOpen) move(last);
         }}
-        className="w-40 border border-ink/40 bg-transparent px-2 py-1.5 text-xs placeholder:text-ink/60 sm:w-56"
+        className="w-40 -skew-x-6 border-2 border-ink bg-ink px-2 py-1.5 text-xs text-phosphor placeholder:text-dim sm:w-56"
       />
       {listOpen && (
-        <ul id={listId} role="listbox" aria-label="Search results" className="absolute right-0 z-30 mt-1 max-h-80 w-80 max-w-[90vw] overflow-y-auto border border-seam bg-bezel text-phosphor shadow-lg">
+        <ul id={listId} role="listbox" aria-label="Search results" className="slab-flat absolute right-0 z-30 mt-2 max-h-80 w-80 max-w-[90vw] overflow-y-auto text-phosphor">
           {loading && <li className="px-3 py-2 text-sm text-dim">Searching…</li>}
           {error && <li className="px-3 py-2 text-sm text-rec">{error}</li>}
           {!loading && !error && hits.length === 0 && <li className="px-3 py-2 text-sm text-dim">No matches</li>}
@@ -113,7 +113,7 @@ export function SearchBox() {
                 onMouseDown={(e) => e.preventDefault() /* keep focus in the box until the click lands */}
                 onMouseEnter={() => setActive(i)}
                 onClick={() => pick(h)}
-                className={`block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-bezel-2 ${i === active ? "bg-bezel-2 outline outline-1 -outline-offset-1 outline-field" : ""}`}
+                className={`block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-bezel-2 ${i === active ? "bg-phosphor text-ink [&_.text-dim]:text-ink" : ""}`}
               >
                 <span className="label mr-2 text-[10px] text-dim">{h.kind === "reply" ? "Reply" : "Comment"}</span>
                 v{h.version}

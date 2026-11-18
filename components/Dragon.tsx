@@ -93,7 +93,7 @@ export function Dragon() {
             position: "absolute",
             inset: 0,
             // Must equal the fog/floor colour in dragon-original.js.
-            background: "#7aa0ff",
+            background: "#d80f1d",
             overflow: "hidden",
             filter: "contrast(1.04)",
           }}
@@ -105,10 +105,10 @@ export function Dragon() {
             zIndex: 20,
             left: "clamp(24px, 3vw, 48px)",
             top: "clamp(56px, 7vw, 84px)",
-            fontFamily: "var(--font-osd)",
+            fontFamily: "var(--font-tag)",
             color: "var(--ink)",
-            fontSize: "1.15rem",
-            letterSpacing: "0.06em",
+            fontSize: "0.95rem",
+            letterSpacing: "0.04em",
             textTransform: "uppercase",
             lineHeight: 1.25,
             maxWidth: "22rem",
@@ -118,7 +118,7 @@ export function Dragon() {
         >
           The longer you keep clicking, the harder he sneezes
           <br />
-          <span style={{ color: "rgb(10 12 18 / 0.8)" }}>- Press and drag to turn around -</span>
+          <span style={{ color: "rgb(11 11 11 / 0.85)" }}>- Press and drag to turn around -</span>
         </div>
         <div
           id="power"
@@ -128,8 +128,9 @@ export function Dragon() {
             width: "100%",
             top: "50%",
             marginTop: "-220px",
-            fontFamily: "var(--font-osd)",
-            color: "var(--ink)",
+            fontFamily: "var(--font-stencil)",
+            color: "var(--phosphor)",
+            textShadow: "0.06em 0.06em 0 var(--ink)",
             fontSize: "5.5em",
             textAlign: "center",
             lineHeight: 1,

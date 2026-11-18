@@ -1,24 +1,32 @@
 @import "tailwindcss";
 
 /*
- * Security Feed. One world for the public site and the admin: the stream
- * is a camera feed, live is REC, offline is NO SIGNAL. Deliberately
- * single-theme - it is used in a dim room beside OBS and watched at night,
- * and a light rendition would be a different world, not the same one.
+ * Phantom Card. An original Persona 5-style world shared with the OBS
+ * widgets: red, black and white comic panels, cut-out "ransom note"
+ * lettering, slanted black slabs with a white stroke and a hard red offset
+ * shadow, starbursts, and snappy slam-in motion. Nothing is taken from the
+ * game: the fonts are Google Fonts and every shape is CSS or inline SVG.
+ *
+ * The token NAMES are the old ones (ink, bezel, field...) so every
+ * component keeps its classes; only what they mean changed. See THEME.md.
  */
 :root {
-  --ink: #0a0c12;
-  --bezel: #11141c;
-  --bezel-2: #181c27;
-  --seam: #2c3242;
-  --field: #6e95ff;
-  --field-hot: #8eacff;
-  --field-deep: #4a6fd9;
-  --phosphor: #eaeefa;
-  --dim: #9aa3b8;
-  --rec: #ff3b30;
-  --signal: #8be36b;
-  --amber: #ffa630;
+  --ink: #0b0b0b;          /* black slab, page */
+  --bezel: #151313;        /* panel body */
+  --bezel-2: #221e1e;      /* raised strip, hover */
+  --seam: #5c5555;         /* hairlines inside panels */
+  --field: #ff1f30;        /* the red: fills with black text, red text on black (5.1:1) */
+  --field-hot: #ff5562;    /* hover of anything red */
+  --field-deep: #e60012;   /* offset shadows, rays (the widgets' --red) */
+  --blood: #8f000b;        /* second red for backgrounds and rays */
+  --phosphor: #ffffff;     /* text, strokes, paper */
+  --paper: #f4f1ea;        /* soft white for cut-out paper */
+  --dim: #b9b4ab;          /* quiet text */
+  --rec: #ff3b3b;          /* live and failure */
+  --signal: #9be86a;       /* healthy */
+  --amber: #ffc21a;        /* needs a look */
+  --slam: cubic-bezier(0.2, 1.4, 0.4, 1);
+  --snap: cubic-bezier(0.7, 0, 0.3, 1);
   color-scheme: dark;
 }
 
@@ -30,14 +38,17 @@
   --color-field: var(--field);
   --color-field-hot: var(--field-hot);
   --color-field-deep: var(--field-deep);
+  --color-blood: var(--blood);
+  --color-paper: var(--paper);
   --color-phosphor: var(--phosphor);
   --color-dim: var(--dim);
   --color-rec: var(--rec);
   --color-signal: var(--signal);
   --color-amber: var(--amber);
-  --font-stencil: "Big Shoulders Stencil Display", "Big Shoulders Display", "Arial Narrow", sans-serif;
+  --font-stencil: "Anton", "Bebas Neue", "Arial Narrow", sans-serif;
   --font-sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
-  --font-osd: "VT323", "Courier New", monospace;
+  --font-tag: "Archivo Black", "Archivo", Arial, sans-serif;
+  --font-osd: "Bebas Neue", "Anton", "Arial Narrow", sans-serif;
   --font-mono: "Martian Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
@@ -47,7 +58,10 @@ html {
 }
 
 body {
-  background: var(--ink);
+  background-color: var(--ink);
+  /* Halftone: the one texture. Faint red dots, denser toward the top-left. */
+  background-image: radial-gradient(rgb(230 0 18 / 0.16) 1px, transparent 1.6px);
+  background-size: 9px 9px;
   color: var(--phosphor);
   font-family: var(--font-sans);
   font-feature-settings: "tnum" 1;
@@ -58,9 +72,14 @@ body {
   color: var(--ink);
 }
 
+input, textarea, select { caret-color: var(--field); accent-color: var(--field); }
+
+/* Focus: a white keyline with the red offset behind it, the panel motif in
+   miniature. Clearly visible on black, on red and on white. */
 :focus-visible {
-  outline: 2px solid var(--field);
-  outline-offset: 3px;
+  outline: 3px solid var(--phosphor) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 5px var(--ink), 5px 5px 0 5px var(--field-deep);
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -68,36 +87,40 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--seam); border: 2px solid var(--ink); }
 ::-webkit-scrollbar-thumb:hover { background: var(--field-deep); }
 
-a { text-underline-offset: 0.2em; }
+a { text-underline-offset: 0.2em; text-decoration-color: var(--field); }
 
-/* Stencil display caps. Tracking stays positive: stencil bridges need air. */
+/* Display caps: Anton with a hard red offset. The class keeps its old name. */
 .stencil {
   font-family: var(--font-stencil);
-  font-weight: 800;
+  font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
-  line-height: 0.88;
+  letter-spacing: 0.01em;
+  line-height: 0.92;
   text-wrap: balance;
+  text-shadow: 0.05em 0.05em 0 var(--field-deep);
 }
+.wallpaper .stencil, .stencil.no-shadow { text-shadow: none; }
 
-/* Control and status words: Archivo caps. VT323 is kept for what a
-   camera would burn in - feed names, timestamps, counters, clocks. */
+/* Control and status words: Archivo Black caps. */
 .label {
-  font-family: var(--font-sans);
-  font-weight: 700;
+  font-family: var(--font-tag);
+  font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
-/* On-screen-display text: CAM labels, timestamps, counters. Data only. */
+/* Numbers, clocks, counters, state words. */
 .osd {
   font-family: var(--font-osd);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   line-height: 1;
 }
 
-/* Scanlines + vignette laid over a feed. Never takes pointer events: the
+/* A section heading set on a tilt, like a word pasted on. */
+.tilt { display: inline-block; transform: rotate(-2deg); transform-origin: left bottom; }
+
+/* Halftone vignette laid over a picture. Never takes pointer events: the
    dragon underneath is also the admin door. */
 .crt::after {
   content: "";
@@ -105,88 +128,263 @@ a { text-underline-offset: 0.2em; }
   inset: 0;
   pointer-events: none;
   background:
-    repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.22) 0 1px, transparent 1px 3px),
-    radial-gradient(120% 90% at 50% 50%, transparent 55%, rgb(0 0 0 / 0.55) 100%);
+    radial-gradient(rgb(11 11 11 / 0.35) 1.2px, transparent 1.8px) 0 0 / 7px 7px,
+    radial-gradient(130% 100% at 50% 40%, transparent 55%, rgb(11 11 11 / 0.6) 100%);
+  -webkit-mask-image: linear-gradient(115deg, #000 0 8%, transparent 30% 70%, #000 92%);
+  mask-image: linear-gradient(115deg, #000 0 8%, transparent 30% 70%, #000 92%);
   z-index: 5;
 }
 
-/* The field: VCR no-signal blue with faint vertical stripes, the way a
-   blue screen reads through a bad camera. */
+/* The red field: header bars, primary buttons, the donate wall. Black text
+   on it (5.1:1), black halftone as its texture. */
 .wallpaper {
   background-color: var(--field);
-  background-image:
-    repeating-linear-gradient(90deg, rgb(74 111 217 / 0.35) 0 2px, transparent 2px 28px),
-    repeating-linear-gradient(90deg, transparent 0 13px, rgb(74 111 217 / 0.18) 13px 15px, transparent 15px 28px);
+  background-image: radial-gradient(rgb(11 11 11 / 0.22) 1px, transparent 1.6px);
+  background-size: 6px 6px;
   color: var(--ink);
 }
+button.wallpaper, a.wallpaper { transition: transform 160ms var(--slam), background-color 160ms ease-out, box-shadow 160ms ease-out; box-shadow: 3px 3px 0 var(--ink), 3px 3px 0 1.5px var(--phosphor); }
+button.wallpaper:hover:not(:disabled), a.wallpaper:hover { transform: skewX(-8deg) scale(1.04); background-color: var(--field-hot); }
+button.wallpaper:active:not(:disabled) { transform: skewX(-8deg) scale(0.97); }
 
-/* Hazard band used as a section seam. */
+/* Section seam: a slashed black/red band. */
 .hazard {
-  background: repeating-linear-gradient(-45deg, var(--field) 0 14px, var(--ink) 14px 28px);
+  background: repeating-linear-gradient(-60deg, var(--field-deep) 0 18px, var(--ink) 18px 26px, var(--phosphor) 26px 28px, var(--ink) 28px 36px);
 }
 
-/* A feed switching on: a bright line that opens to the full frame. */
-@keyframes crt-on {
-  0% { clip-path: inset(49.5% 0 49.5% 0); filter: brightness(3); }
-  45% { clip-path: inset(49.5% 0 49.5% 0); filter: brightness(2); }
-  100% { clip-path: inset(0 0 0 0); filter: brightness(1); }
+/* A slab: black panel, white stroke, hard red offset, drawn slanted on a
+   ::before so the content inside stays square. The element needs a
+   position (relative/absolute/fixed) - .slab never sets one, so it cannot
+   undo a popover's. Not for scroll containers: the ::before would scroll
+   away with the content; use .slab-flat there. */
+.slab { isolation: isolate; background: transparent !important; border-color: transparent !important; }
+.slab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--bezel);
+  border: 2px solid var(--phosphor);
+  box-shadow: var(--slab-shadow, 6px 6px 0) var(--slab-red, var(--field-deep));
+  transform: skewX(-0.8deg);
+  pointer-events: none;
 }
-.crt-on { animation: crt-on 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.slab-sm { --slab-shadow: 4px 4px 0; }
+.slab-sm::before { border-width: 1.5px; }
+.slab-alert { --slab-red: var(--rec); }
+.slab-alert::before { border-color: var(--rec); }
+.slab-warn::before { border-color: var(--amber); }
+.slab-ok::before { border-color: var(--signal); }
+.slab-red::before { background: var(--field); background-image: radial-gradient(rgb(11 11 11 / 0.22) 1px, transparent 1.6px); background-size: 6px 6px; box-shadow: 6px 6px 0 var(--ink); }
+.slab-flat {
+  background-color: var(--bezel) !important;
+  border: 2px solid var(--phosphor) !important;
+  box-shadow: 6px 6px 0 var(--field-deep);
+}
 
-@keyframes rec-blink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0.15; } }
+/* A strip that names a panel: skewed, black on red or white on black. */
+.strip-cut { clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+
+/* Cut-out tag, the widgets' small pasted labels. */
+.tag {
+  display: inline-block;
+  font-family: var(--font-tag);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15em 0.6em;
+  transform: rotate(-2deg);
+  box-shadow: 3px 3px 0 var(--field-deep);
+}
+
+/* Menu items skew and pop on hover and focus, the way a game menu leans
+   into the selection. Transform only, so the layout never moves. */
+.menu-pop { transition: transform 150ms var(--slam), background-color 120ms ease-out, color 120ms ease-out, box-shadow 150ms ease-out; }
+.menu-pop:hover, .menu-pop:focus-visible { transform: skewX(-10deg) scale(1.05); }
+.menu-on {
+  background: var(--phosphor) !important;
+  color: var(--ink) !important;
+  box-shadow: 4px 4px 0 var(--field-deep);
+  transform: skewX(-10deg);
+}
+.menu-on:hover, .menu-on:focus-visible { transform: skewX(-10deg) scale(1.05); }
+.menu-on > * { color: var(--ink) !important; }
+
+/* ---------------------------------------------------------------- motion */
+/* Slam: arrive from a lean with an overshoot, then hold still. */
+@keyframes slam {
+  0% { opacity: 0; transform: translateX(-28px) skewX(-12deg) scale(0.94); }
+  60% { opacity: 1; transform: translateX(4px) skewX(2deg) scale(1.01); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes slam-right {
+  0% { opacity: 0; transform: translateX(28px) skewX(12deg) scale(0.94); }
+  60% { opacity: 1; transform: translateX(-4px) skewX(-2deg) scale(1.01); }
+  100% { opacity: 1; transform: none; }
+}
+.slam { animation: slam 340ms var(--slam) backwards; }
+
+/* View change: the new view slams in and a red slash wipes across it.
+   The wipe is a background moved inside the element's own box (no
+   overflow), never takes pointer events, and runs once. */
+@keyframes wipe-across { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.wipe { position: relative; }
+.wipe::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background: linear-gradient(110deg,
+    transparent 0 38%, var(--ink) 38% 40%, var(--field-deep) 40% 56%, var(--phosphor) 56% 57%, transparent 57% 100%);
+  background-size: 340% 100%;
+  background-position: 0 0;
+  animation: wipe-across 380ms var(--snap) both;
+}
+.crt-on { animation: slam 360ms var(--slam) backwards; }
+.zoom-in { animation: slam-right 340ms var(--slam) backwards; }
+.zoom-out { animation: slam 340ms var(--slam) backwards; }
+
+/* Toasts: in from the right edge on a lean. */
+@keyframes toast-in {
+  0% { opacity: 0; transform: translateX(110%) skewX(-14deg); }
+  65% { opacity: 1; transform: translateX(-6px) skewX(3deg); }
+  100% { transform: none; }
+}
+.toast-in { animation: toast-in 300ms var(--slam) backwards; }
+
+/* Dialogs: the backdrop slashes in, the panel slams down on a tilt. Entry
+   only - closing is instant, so an answer never waits. */
+@keyframes dialog-fade { from { opacity: 0; } }
+@keyframes dialog-in {
+  0% { opacity: 0; transform: rotate(-4deg) scale(0.8); }
+  60% { opacity: 1; transform: rotate(1deg) scale(1.03); }
+  100% { transform: none; }
+}
+.dialog-backdrop {
+  animation: dialog-fade 140ms ease-out;
+  background-color: rgb(11 11 11 / 0.82) !important;
+  background-image:
+    linear-gradient(115deg, transparent 0 62%, rgb(230 0 18 / 0.55) 62% 74%, transparent 74%),
+    radial-gradient(rgb(230 0 18 / 0.35) 1px, transparent 1.7px);
+  background-size: 100% 100%, 8px 8px;
+}
+.dialog-in { animation: dialog-in 300ms var(--slam) backwards; }
+
+/* Starburst pop: a jagged red star stamped behind something that just
+   happened (saved, upload done, a roulette winner). Mount-driven: the
+   element carrying .burst plays it once when it appears. */
+.burst { position: relative; isolation: isolate; }
+.burst::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* Stretched to the thing it stamps, so it frames the word instead of
+     covering its neighbours. */
+  width: calc(100% + 30px);
+  height: calc(100% + 22px);
+  min-width: 2.2em;
+  min-height: 2.2em;
+  z-index: -1;
+  background: var(--field-deep);
+  clip-path: polygon(50% 0%, 58% 30%, 82% 8%, 70% 36%, 100% 30%, 76% 52%, 98% 74%, 66% 66%, 72% 98%, 50% 76%, 30% 100%, 32% 68%, 2% 76%, 24% 52%, 0% 26%, 30% 34%, 20% 4%, 42% 28%);
+  transform: translate(-50%, -50%) scale(1);
+  animation: burst-pop 380ms var(--slam) backwards;
+  pointer-events: none;
+}
+.burst-white::before { background: var(--phosphor); }
+@keyframes burst-pop {
+  0% { transform: translate(-50%, -50%) scale(0) rotate(-40deg); }
+  70% { transform: translate(-50%, -50%) scale(1.15) rotate(6deg); }
+  100% { transform: translate(-50%, -50%) scale(1) rotate(0); }
+}
+
+/* Ransom-note title: one span per letter, each a different paper, each
+   tilted, slamming in one after another. Style is picked from position,
+   never at random, so it renders the same every time. */
+.ransom { display: inline-flex; flex-wrap: wrap; gap: 0.04em; align-items: flex-end; }
+.ransom > span {
+  display: inline-block;
+  padding: 0.04em 0.09em 0;
+  line-height: 0.95;
+  text-transform: uppercase;
+  animation: letter-in 300ms var(--slam) backwards;
+  animation-delay: calc(var(--i, 0) * 45ms + 120ms);
+}
+.rn0 { font-family: var(--font-stencil); background: var(--ink); color: var(--phosphor); box-shadow: inset 0 0 0 0.05em var(--phosphor); transform: rotate(-4deg); }
+.rn1 { font-family: var(--font-tag); background: var(--paper); color: var(--ink); transform: rotate(3deg) scale(0.9); }
+.rn2 { font-family: var(--font-stencil); background: var(--field-deep); color: var(--phosphor); transform: rotate(-2deg) translateY(0.04em); }
+.rn3 { font-family: var(--font-osd); color: var(--phosphor); background: var(--ink); text-shadow: 0.06em 0.06em 0 var(--field-deep); transform: rotate(5deg) scale(1.08); }
+.rn4 { font-family: var(--font-tag); background: var(--phosphor); color: var(--field-deep); transform: rotate(-6deg) scale(0.92); }
+@keyframes letter-in {
+  0% { opacity: 0; translate: 0 -0.6em; scale: 1.8; }
+  70% { opacity: 1; translate: 0 0.04em; scale: 0.95; }
+  100% { translate: 0 0; scale: 1; }
+}
+
+/* A slow turning starburst behind the hero title. 40 s a turn. */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin-slow { animation: spin 40s linear infinite; }
+
+@keyframes rec-blink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0.2; } }
 .rec-dot { animation: rec-blink 1.2s steps(1) infinite; }
 
-/* Stickers: the flat potato emotes, cut out with a white keyline and a real
-   soft shadow, slapped on at an angle. */
+/* Stickers: the flat potato emotes, cut out with a white keyline and a red
+   offset, slapped on at an angle. */
 .sticker {
   filter:
     drop-shadow(0 0 0 #fff) drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff)
     drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff)
-    drop-shadow(0 10px 14px rgb(0 0 0 / 0.45));
+    drop-shadow(6px 6px 0 var(--field-deep));
   user-select: none;
   pointer-events: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .crt-on, .rec-dot { animation: none; }
-}
-
-/* A lost feed shows static. CSS noise, no script: the tile's state is
-   carried by its texture, not only by the word on it. */
+/* A lost feed shows static. CSS noise, no script. */
 .noise {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='.33 .33 .33 0 0 .33 .33 .33 0 0 .33 .33 .33 0 0 0 0 0 0 1'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='3' intercept='-1'/%3E%3CfeFuncG type='linear' slope='3' intercept='-1'/%3E%3CfeFuncB type='linear' slope='3' intercept='-1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 160px 160px;
-  animation: static-shift 0.5s steps(5) infinite;
+  animation: static-shift 1s steps(3) infinite; /* 3 changes a second, the flash ceiling */
 }
 @keyframes static-shift {
   0% { background-position: 0 0; }
   100% { background-position: 97px 61px; }
 }
+
+/* Reduced motion: no slams, wipes, pops, leans or loops. What is left is
+   a short fade, so a change still reads as a change. */
+@keyframes fade-only { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .noise { animation: none; }
+  .slam, .crt-on, .zoom-in, .zoom-out, .toast-in, .dialog-in, .ransom > span {
+    animation: fade-only 150ms ease-out backwards !important;
+  }
+  .wipe::after, .burst::before { animation: none !important; }
+  .wipe::after { display: none; }
+  .spin-slow, .rec-dot, .noise { animation: none !important; }
+  .menu-pop, button.wallpaper, a.wallpaper { transition: background-color 120ms, color 120ms !important; }
+  .menu-pop:hover, .menu-pop:focus-visible, .menu-on:hover, .menu-on:focus-visible,
+  button.wallpaper:hover:not(:disabled), a.wallpaper:hover, button.wallpaper:active:not(:disabled) {
+    transform: none;
+  }
+  .menu-on { transform: none; }
 }
 
-/* The editor app zooming between levels: in grows from slightly small,
-   out settles from slightly large. Short, because it is a cue for which
-   way you went, not a show. */
-@keyframes toast-in { from { transform: translateY(-0.5rem); opacity: 0; } }
-.toast-in { animation: toast-in 200ms ease-out; }
-@media (prefers-reduced-motion: reduce) { .toast-in { animation: none; } }
+.shadow-ink { text-shadow: 0.05em 0.05em 0 var(--ink); }
 
-@keyframes zoom-in { from { transform: scale(0.97); opacity: 0; } }
-@keyframes zoom-out { from { transform: scale(1.03); opacity: 0; } }
-.zoom-in { animation: zoom-in 180ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
-.zoom-out { animation: zoom-out 180ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
-@media (prefers-reduced-motion: reduce) {
-  .zoom-in, .zoom-out { animation: none; }
+/* Comic speech bubble: comments, and the "uploads ready" popup in paper. */
+.bubble { position: relative; border: 2px solid var(--seam); background: var(--bezel); }
+.bubble::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  bottom: -12px;
+  width: 18px;
+  height: 11px;
+  background: var(--seam);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  pointer-events: none;
 }
-
-/* The site's confirm/prompt: the backdrop fades in, the panel rises and
-   settles. Entry only - closing is instant, so an answer never waits. */
-@keyframes dialog-fade { from { opacity: 0; } }
-@keyframes dialog-in { from { transform: translateY(0.5rem) scale(0.98); opacity: 0; } }
-.dialog-backdrop { animation: dialog-fade 160ms ease-out; }
-.dialog-in { animation: dialog-in 200ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
-@media (prefers-reduced-motion: reduce) {
-  .dialog-backdrop, .dialog-in { animation: none; }
-}
+.bubble-on { border-color: var(--phosphor); box-shadow: 4px 4px 0 var(--field-deep); }
+.bubble-on::after { background: var(--phosphor); }
+.bubble-paper { background: var(--paper); color: var(--ink); border: 3px solid var(--ink); box-shadow: 8px 8px 0 var(--field-deep); }
+.bubble-paper::after { bottom: -16px; left: 28px; width: 26px; height: 14px; background: var(--ink); }

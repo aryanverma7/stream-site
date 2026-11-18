@@ -51,15 +51,15 @@ export function Footer() {
   const platforms = ["twitch", "youtube", "instagram", "discord"] as const;
 
   return (
-    <footer className="w-full border-t border-seam bg-bezel px-4 py-14 text-phosphor sm:px-6">
+    <footer className="w-full border-t-4 border-field-deep bg-ink px-4 py-14 text-phosphor sm:px-6">
       <div className="mx-auto flex max-w-6xl flex-col gap-10 md:flex-row md:items-end md:justify-between">
         <div className="flex flex-col gap-3">
-          <p className="stencil text-5xl text-field">DualBladeX</p>
-          <p className="osd text-lg text-dim">End of tape · Valorant on Twitch and YouTube</p>
+          <p className="stencil tilt text-5xl text-phosphor">DualBladeX</p>
+          <p className="osd text-xl text-dim">End of tape · Valorant on Twitch and YouTube</p>
           {/* Plain <a>: a document load, like /admin, so no router data fetch is needed. */}
           <p className="flex gap-4 text-sm text-dim">
-            <a href="/privacy" className="hover:text-field">Privacy</a>
-            <a href="/terms" className="hover:text-field">Terms</a>
+            <a href="/privacy" className="underline hover:text-field">Privacy</a>
+            <a href="/terms" className="underline hover:text-field">Terms</a>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -74,7 +74,7 @@ export function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={LABELS[platform]}
-                className="flex items-center gap-2.5 border border-seam bg-ink px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-phosphor transition-colors hover:border-field hover:text-field"
+                className="menu-pop label flex items-center gap-2.5 border-2 border-phosphor bg-ink px-4 py-3 text-sm text-phosphor shadow-[4px_4px_0_var(--field-deep)] hover:bg-phosphor hover:text-ink"
               >
                 {ICONS[platform]}
                 <span aria-hidden>{LABELS[platform]}</span>

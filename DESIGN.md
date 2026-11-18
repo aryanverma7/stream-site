@@ -110,6 +110,10 @@ components:
     padding: "10px 12px"
 ---
 
+> **Superseded on 2026-11-18** by the Persona 5 style in `THEME.md`. Kept for the reasoning behind the
+> layout, which the restyle did not change.
+
+
 # Design System: DualBladeX
 
 ## Overview

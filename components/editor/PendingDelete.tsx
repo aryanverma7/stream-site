@@ -22,7 +22,7 @@ export function PendingDelete({
   const [busy, setBusy] = useState(false);
   const mins = minutesLeft(request.ends_at_ms);
   return (
-    <span role="status" className="inline-flex flex-wrap items-center gap-2 border border-rec px-2 py-1 text-xs text-rec">
+    <span role="status" className="inline-flex -rotate-1 flex-wrap items-center gap-2 border-2 border-rec bg-ink px-2 py-1 text-xs text-rec shadow-[3px_3px_0_var(--rec)]">
       <span className="label">
         {request.status === "running" || mins === 0 ? "Deleting now" : `Deleting in ${mins} min`}
       </span>
@@ -36,7 +36,7 @@ export function PendingDelete({
             await onUndo(request.id).catch((e: Error) => setError(e.message));
             setBusy(false);
           }}
-          className="label border border-rec px-2 py-0.5 text-phosphor hover:bg-rec hover:text-ink disabled:opacity-40"
+          className="menu-pop label border-2 border-rec px-2 py-0.5 text-phosphor hover:bg-rec hover:text-ink disabled:opacity-40"
         >
           Undo
         </button>

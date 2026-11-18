@@ -13,7 +13,7 @@ import { useAsk } from "./AskDialog";
 import { UploadDrop } from "./UploadDrop";
 import { DownloadLink, OpenInDrive } from "./DriveLinks";
 
-const btn = "label border border-seam px-3 py-2 text-xs text-phosphor hover:border-field disabled:opacity-40";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-3 py-2 text-xs text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
 const field = "w-full border border-seam bg-ink px-3 py-2 text-sm text-phosphor";
 const SAVE_AFTER_MS = 1_000;
 
@@ -107,7 +107,7 @@ export function TapeView({
 
   // One h2 in the same place loading or loaded, so the focus the shell gives it survives the load.
   const heading = (
-    <h2 tabIndex={-1} className="stencil text-4xl">
+    <h2 tabIndex={-1} className="stencil tilt slam text-4xl">
       {tape?.name ?? "Tape"}
     </h2>
   );
@@ -133,7 +133,7 @@ export function TapeView({
         </p>
       )}
 
-      <div className="grid gap-3 border border-seam bg-bezel p-4 sm:grid-cols-[1fr_auto]">
+      <div className="slab relative grid gap-3 p-4 sm:grid-cols-[1fr_auto]">
         <label className="space-y-1 text-xs text-dim">
           <span className="label">Name</span>
           <input
@@ -166,14 +166,14 @@ export function TapeView({
       </div>
 
       {isFinal && latest?.drive_file_id && !tape.files_deleted_at && (
-        <div className="flex flex-wrap items-center gap-3 border border-signal bg-bezel p-4">
+        <div className="slab slab-ok relative flex flex-wrap items-center gap-3 p-4">
           <span className="label text-sm text-signal">Final: v{latest.version}</span>
           <DownloadLink fileId={latest.drive_file_id} disabled={locked} className={btn}>
             Download Final
           </DownloadLink>
           <OpenInDrive fileId={latest.drive_file_id} />
           {isAdmin && !locked && (
-            <button type="button" onClick={() => setDeleting(true)} className={`${btn} ml-auto border-rec text-rec`}>
+            <button type="button" onClick={() => setDeleting(true)} className={`${btn} ml-auto border-rec! text-rec! hover:bg-rec! hover:text-ink!`}>
               Delete files
             </button>
           )}

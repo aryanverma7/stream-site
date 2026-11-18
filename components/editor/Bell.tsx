@@ -52,17 +52,17 @@ export function Bell({ role }: { role: "admin" | "editor" }) {
         aria-controls="bell-panel"
         aria-label={`Notifications (${bell.unseen} unseen)`}
         onClick={toggle}
-        className="relative border border-ink/40 px-3 py-1.5 text-xs font-bold uppercase tracking-widest hover:bg-ink hover:text-phosphor"
+        className="menu-pop label relative border-2 border-ink px-3 py-1.5 text-xs text-ink hover:bg-ink hover:text-phosphor"
       >
         Bell
         {bell.unseen > 0 && (
-          <span aria-hidden="true" className="absolute -right-2 -top-2 min-w-5 bg-rec px-1 text-center text-[11px] text-ink">
+          <span aria-hidden="true" className="burst burst-white absolute -right-3 -top-3 min-w-5 px-1 text-center text-[11px] text-ink">
             {bell.unseen}
           </span>
         )}
       </button>
       {open && (
-        <div id="bell-panel" className="absolute right-0 z-40 mt-2 max-h-[70vh] w-80 overflow-y-auto border border-seam bg-bezel text-phosphor">
+        <div id="bell-panel" className="dialog-in slab-flat absolute right-0 z-40 mt-3 max-h-[70vh] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto text-phosphor">
           {bell.items.length === 0 ? (
             <p className="p-4 text-sm text-dim">Nothing yet.</p>
           ) : (
@@ -78,7 +78,7 @@ export function Bell({ role }: { role: "admin" | "editor" }) {
                 return (
                   <li key={i.id}>
                     {href ? (
-                      <a href={href} onClick={() => setOpen(false)} className="block px-4 py-2 hover:bg-bezel-2">
+                      <a href={href} onClick={() => setOpen(false)} className="block px-4 py-2 transition-colors hover:bg-phosphor hover:text-ink [&:hover_.text-dim]:text-ink">
                         {body}
                       </a>
                     ) : (

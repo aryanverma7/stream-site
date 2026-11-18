@@ -38,7 +38,7 @@ export function ClipCard({ clip, onExpand }: ClipCardProps) {
       onClick={() => onExpand(clip)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="group flex w-full flex-col border border-seam bg-bezel text-left transition-[transform,border-color] duration-200 ease-out hover:-translate-y-1 hover:border-field"
+      className="slab slab-sm group relative flex w-full flex-col p-[3px] text-left transition-transform duration-150 ease-out hover:-translate-y-1 hover:-rotate-1"
     >
       <span className="crt relative block aspect-video overflow-hidden">
         <video
@@ -50,11 +50,11 @@ export function ClipCard({ clip, onExpand }: ClipCardProps) {
           preload="metadata"
           className="h-full w-full object-cover"
         />
-        <span className="label absolute left-2 top-2 z-10 flex items-center gap-1.5 bg-ink/80 px-2 py-1 text-[11px] text-phosphor opacity-0 transition-opacity group-hover:opacity-100">
+        <span className="tag absolute left-2 top-2 z-10 flex items-center gap-1.5 bg-field-deep text-[11px] text-phosphor opacity-0 transition-opacity group-hover:opacity-100">
           Playing
         </span>
       </span>
-      <span className="px-3 py-2.5 text-sm font-bold capitalize text-phosphor group-hover:text-field">
+      <span className="px-3 py-2.5 text-sm font-bold capitalize text-phosphor group-hover:text-field-hot">
         {clip.title}
       </span>
     </button>

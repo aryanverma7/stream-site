@@ -28,11 +28,11 @@ export function Breadcrumb({ route, names }: { route: Route; names: CrumbNames }
           const last = i === crumbs.length - 1;
           return (
             <li key={i} className="flex items-center gap-2">
-              {i > 0 && <span aria-hidden className="text-dim">›</span>}
+              {i > 0 && <span aria-hidden className="inline-block h-3 w-2 -skew-x-[20deg] bg-field" />}
               <a
                 href={routeHash(c.to)}
                 aria-current={last ? "page" : undefined}
-                className={`font-bold uppercase tracking-[0.08em] hover:underline ${last ? "text-phosphor" : "text-dim"}`}
+                className={`label inline-block px-1.5 py-0.5 text-[13px] ${last ? "-skew-x-6 bg-phosphor text-ink" : "menu-pop text-dim hover:bg-field hover:text-ink"}`}
               >
                 {c.label}
               </a>

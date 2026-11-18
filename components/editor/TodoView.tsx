@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTodos, type Todo } from "@/lib/useTodos";
 
-const btn = "label border border-seam px-3 py-1.5 text-xs text-phosphor hover:border-field disabled:opacity-40";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-3 py-1.5 text-xs text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
 const field = "min-w-0 flex-1 border border-seam bg-ink px-3 py-2 text-sm text-phosphor";
 
 function TodoRow({ todo, todos }: { todo: Todo; todos: ReturnType<typeof useTodos> }) {
@@ -50,7 +50,7 @@ export function TodoView() {
   const [text, setText] = useState("");
   return (
     <section className="space-y-6">
-      <h2 tabIndex={-1} className="stencil text-4xl">
+      <h2 tabIndex={-1} className="stencil tilt slam text-4xl">
         To-do
       </h2>
       <p className="text-sm text-dim">Only you can see these.</p>
@@ -74,7 +74,7 @@ export function TodoView() {
       )}
       <ul className="grid gap-2">
         {todos.todos.map((t) => (
-          <li key={t.id} className="border border-seam bg-bezel px-4 py-3">
+          <li key={t.id} className="slab slab-sm relative px-4 py-3">
             <TodoRow todo={t} todos={todos} />
           </li>
         ))}

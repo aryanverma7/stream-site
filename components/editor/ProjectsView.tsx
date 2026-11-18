@@ -11,8 +11,8 @@ import { DeleteDialog } from "./DeleteDialog";
 import { useAsk } from "./AskDialog";
 import { DownloadLink, OpenInDrive } from "./DriveLinks";
 
-const btn = "label border border-seam px-3 py-1.5 text-xs text-phosphor hover:border-field disabled:opacity-40";
-const card = "flex flex-wrap items-center gap-3 border border-seam bg-bezel px-4 py-3";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-3 py-1.5 text-xs text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
+const card = "slab slab-sm relative flex flex-wrap items-center gap-3 px-4 py-3";
 
 /**
  * Download, Open in Drive and Delete for a project's own file: a VOD, or a
@@ -36,7 +36,7 @@ function FileActions({ p, pending, role, onDownload, onDelete }: {
       </DownloadLink>
       <OpenInDrive fileId={p.vod_file_id} />
       {!pending && (role === "admin" || p.download_clicked_at !== null) && (
-        <button type="button" onClick={onDelete} className={`${btn} border-rec text-rec`}>
+        <button type="button" onClick={onDelete} className={`${btn} border-rec! text-rec! hover:bg-rec! hover:text-ink!`}>
           {clip ? "Delete clip file" : "Delete VOD"}
         </button>
       )}
@@ -87,7 +87,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
 
   return (
     <section className="space-y-6">
-      <h2 tabIndex={-1} className="stencil text-4xl">
+      <h2 tabIndex={-1} className="stencil tilt slam text-4xl">
         Projects
       </h2>
       {(error || actionError) && (
@@ -108,7 +108,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
                 <a href={routeHash({ view: "project", projectId: p.id })} className="font-bold hover:underline">
                   {p.name}
                 </a>
-                {p.has_new && <span className="label bg-field px-1.5 text-[11px] text-ink">New</span>}
+                {p.has_new && <span className="tag bg-field text-[11px] text-ink">New</span>}
                 <span className="label text-[11px] text-dim">VOD {p.vod_status}</span>
                 <span className="text-xs text-dim">{p.tape_count === 1 ? "1 tape" : `${p.tape_count} tapes`}</span>
                 {pending && <PendingDelete request={pending} onUndo={deletions.undo} me={me} />}
@@ -155,7 +155,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
                   {c.name}
                 </a>
                 <span className="osd text-lg text-dim">{c.duration_s === null ? "" : duration(c.duration_s)}</span>
-                {c.has_new && <span className="label bg-field px-1.5 text-[11px] text-ink">New</span>}
+                {c.has_new && <span className="tag bg-field text-[11px] text-ink">New</span>}
                 {reel && <StatusLabel status={reel.status} />}
                 {pending && <PendingDelete request={pending} onUndo={deletions.undo} me={me} />}
                 <span className="ml-auto flex flex-wrap items-center gap-2">
