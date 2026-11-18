@@ -6,7 +6,8 @@ import { CommentItem } from "./CommentItem";
 
 const SCROLL_QUIET_MS = 5_000;
 const FALLBACK_LENGTH_S = 4;
-const TABS = ["Open", "All", "Resolved"] as const;
+const TABS = ["Open", "All", "Resolved", "Checklist"] as const;
+export type CommentTab = (typeof TABS)[number];
 
 /** Timed by start, then general, then carried. */
 export function orderComments(cs: Comment[]): Comment[] {
@@ -18,6 +19,7 @@ export const isActive = (c: Comment, t: number) => !c.carried && c.start_s !== n
 
 export function CommentPanel({
   cm,
+  initialTab = "Open",
   username,
   projectId,
   tapeId,
@@ -26,6 +28,8 @@ export function CommentPanel({
   now = Date.now,
 }: {
   cm: CommentsApi;
+  /** "Checklist" when opened from a card's Edit checklist: the carried checkboxes only. */
+  initialTab?: CommentTab;
   username: string;
   projectId: number;
   tapeId: number;
@@ -34,12 +38,14 @@ export function CommentPanel({
   onSeek?(s: number): void;
   now?: () => number;
 }) {
-  const [tab, setTab] = useState<(typeof TABS)[number]>("Open");
+  const [tab, setTab] = useState<CommentTab>(initialTab);
   const list = useRef<HTMLUListElement>(null);
   const touched = useRef(-Infinity);
   const clock = useRef(now);
   const done = cm.comments.filter((c) => c.resolved).length;
-  const shown = orderComments(cm.comments).filter((c) => tab === "All" || (tab === "Resolved") === c.resolved);
+  const shown = orderComments(cm.comments).filter((c) =>
+    tab === "All" ? true : tab === "Checklist" ? c.carried : (tab === "Resolved") === c.resolved,
+  );
   const activeId = shown.find((c) => isActive(c, currentTime))?.id;
 
   useEffect(() => {

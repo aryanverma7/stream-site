@@ -16,18 +16,19 @@ const CHUNK = 32 * 1024 * 1024; // lib/opfsMedia.ts CHUNK_BYTES; not overridable
 const size = (f: string) => statSync(path.join(MEDIA, f)).size;
 const VOD: Fixture = { projectId: 1, tapeId: 10, iterationId: 100, fileId: "bigfile", filename: "big.webm", get size() { return size("big.webm"); }, kind: "vod" };
 const CLIP: Fixture = { projectId: 2, tapeId: 20, iterationId: 200, fileId: "clipfile", filename: "clip.webm", get size() { return size("clip.webm"); }, kind: "clip" };
+const CLIP2: Fixture = { ...CLIP, iterationId: 201, fileId: "clipfile2", version: 2, get size() { return size("clip.webm"); } };
 const dir = (f: Fixture) => `it-${f.projectId}-${f.iterationId}-${f.fileId}`;
 const hash = (f: Fixture) => `#/p/${f.projectId}/t/${f.tapeId}/v/${f.iterationId}`;
 
 // fixtures name their callback `provide`, not `use`: the React hooks lint rule reads `use` as a hook
 const test = base.extend<{ drive: Drive; backend: Backend }>({
   drive: async ({}, provide) => {
-    const drive = await startDrive({ [VOD.fileId]: path.join(MEDIA, VOD.filename), [CLIP.fileId]: path.join(MEDIA, CLIP.filename) });
+    const drive = await startDrive({ [VOD.fileId]: path.join(MEDIA, VOD.filename), [CLIP.fileId]: path.join(MEDIA, CLIP.filename), [CLIP2.fileId]: path.join(MEDIA, CLIP.filename) });
     await provide(drive);
     await drive.close().catch(() => {});
   },
   backend: async ({ drive }, provide) => {
-    const backend = await startBackend(OUT, drive, [VOD, CLIP]);
+    const backend = await startBackend(OUT, drive, [VOD, CLIP, CLIP2]);
     await provide(backend);
     if (test.info().status !== test.info().expectedStatus)
       writeFileSync(test.info().outputPath("server-logs.json"), JSON.stringify({ drive: drive.log, backend: backend.log }, null, 1));
@@ -181,5 +182,18 @@ test("a clip under one chunk downloads and plays", async ({ page, backend, drive
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await playsFrom(page, 0);
   await seekAndPlay(page, 4);
+  noMediaHits(backend);
+});
+
+test("side by side plays both versions together", async ({ page, backend }) => {
+  await page.goto(backend.origin + "/editor" + hash(CLIP2) + "/vs/" + CLIP.iterationId);
+  await expect(page.getByRole("heading", { name: "v2 ↔ v1" })).toBeVisible();
+  await page.getByRole("button", { name: "Play side by side" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  const times = () => page.locator("video").evaluateAll((vs) => (vs as HTMLVideoElement[]).map((v) => v.currentTime));
+  await expect.poll(async () => Math.min(...(await times())), { message: "both advance" }).toBeGreaterThan(0.5);
+  const [l, r] = await times();
+  expect(Math.abs(l - r)).toBeLessThan(0.3);
+  await expect(page.locator("video").nth(1)).toHaveJSProperty("muted", true);
   noMediaHits(backend);
 });

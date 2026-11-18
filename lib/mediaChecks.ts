@@ -6,12 +6,18 @@
  * in pure functions so it can be tested without a video decoder.
  */
 
+import { mp4VideoCodec } from "./mp4Codec";
+
 export interface Measure {
   width: number | null;
   height: number | null;
   duration_s: number | null;
   fps: number | null;
   bitrate_mbps: number | null;
+  /** The MP4's video sample entry ("hvc1", "avc1"...), null when unreadable. */
+  codec?: string | null;
+  /** Whether the uploader's browser could show a picture; null when it was never asked. */
+  playable?: boolean | null;
 }
 
 type State = "pass" | "warn" | "fail" | "unknown";
@@ -20,6 +26,8 @@ export interface GradedChecks {
   fps: { state: State; value: number | null };
   bitrate: { state: State; value: string | null };
   duration_s: number | null;
+  codec: string | null;
+  playable: boolean | null;
 }
 
 export const THUMBNAIL_MAX_BYTES = 262144;
@@ -45,6 +53,8 @@ export function grade(m: Measure, kind: "tape" | "reel"): GradedChecks {
         ? { state: "unknown", value: null }
         : { state: m.bitrate_mbps >= 50 ? "pass" : "fail", value: `≈ ${m.bitrate_mbps.toFixed(1)} Mbps` },
     duration_s: m.duration_s,
+    codec: m.codec ?? null,
+    playable: m.playable ?? null,
   };
 }
 
@@ -75,11 +85,17 @@ export async function jpegUnder(canvas: HTMLCanvasElement): Promise<Blob | null>
   return null;
 }
 
+class Unreadable extends Error {
+  constructor() {
+    super("The browser cannot read this video");
+  }
+}
+
 function once(v: HTMLVideoElement, name: string, ms = 15000) {
   return new Promise<void>((ok, no) => {
     const t = setTimeout(() => no(new Error(`Timed out waiting for ${name}`)), ms);
     v.addEventListener(name, () => (clearTimeout(t), ok()), { once: true });
-    v.addEventListener("error", () => (clearTimeout(t), no(new Error("The browser cannot read this video"))), { once: true });
+    v.addEventListener("error", () => (clearTimeout(t), no(new Unreadable())), { once: true });
   });
 }
 
@@ -136,7 +152,19 @@ function capped<T>(p: Promise<T | null>, ms: number): Promise<T | null> {
   return Promise.race([p, new Promise<null>((r) => (t = setTimeout(() => r(null), ms)))]).finally(() => clearTimeout(t));
 }
 
-export function measureMedia(file: File): Promise<Measure> {
+/** The browser's measure of `file`; a file it cannot decode is `playable: false`, never an error, so it still uploads. */
+export async function measureMedia(file: File): Promise<Measure> {
+  const codec = await mp4VideoCodec(file);
+  try {
+    const m = await measureWith(file);
+    return { ...m, codec, playable: m.width !== null };
+  } catch (e) {
+    if (!(e instanceof Unreadable)) throw e;
+    return { width: null, height: null, duration_s: null, fps: null, bitrate_mbps: null, codec, playable: false };
+  }
+}
+
+function measureWith(file: File): Promise<Measure> {
   return withVideo(file, async (v) => {
     const d = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : null;
     return {

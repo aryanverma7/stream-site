@@ -99,6 +99,41 @@ describe("IterationCard Add comment", () => {
   });
 });
 
+describe("IterationCard Edit checklist and summary", () => {
+  it("Edit checklist sets its own one-shot flag and goes to the version", () => {
+    editorBackend({ "/iterations/2": { comments: [] } });
+    sessionStorage.clear();
+    const { getByRole } = render(<IterationCard iteration={it2()} tape={tape} role="editor" onStatus={() => {}} locked={false} />);
+    fireEvent.click(getByRole("button", { name: "Edit checklist" }));
+    expect(sessionStorage.getItem("editor.openChecklist")).toBe("2");
+    expect(window.location.hash).toBe("#/p/12/t/5/v/2");
+  });
+
+  it("shows a summary card with open Fix and Question counts", async () => {
+    editorBackend({
+      "/iterations/2": {
+        comments: [
+          { resolved: true, kind: "fix", carried: false },
+          { resolved: false, kind: "fix", carried: true },
+          { resolved: false, kind: "question", carried: false },
+          { resolved: false, kind: "keep", carried: false },
+        ],
+      },
+    });
+    const { findByLabelText } = render(<IterationCard iteration={it2()} tape={tape} role="editor" onStatus={() => {}} locked={false} />);
+    const card = await findByLabelText("Comment summary");
+    expect(card).toHaveTextContent("1 of 4 resolved");
+    expect(card).toHaveTextContent("1 Fix open");
+    expect(card).toHaveTextContent("1 Question open");
+    expect(card).toHaveTextContent("1 on the checklist");
+  });
+
+  it("flags a version the uploader's browser could not play", () => {
+    const { getByText } = render(<CheckBadges checks={{ playable: false } as Checks} />);
+    expect(getByText("Won't play in some browsers")).toBeInTheDocument();
+  });
+});
+
 describe("IterationDetails", () => {
   it("builds Download and Open in Drive from the file id, never asking for a media link, and shows the duration", async () => {
     const fetchMock = editorBackend({ "/iterations/2": { iteration: it2(), comments: [] } });

@@ -12,6 +12,7 @@ export const KEYS: [string, string][] = [
   ["C", "Comment at this moment"],
   ["G", "General comment"],
   ["V", "Compare versions"],
+  ["Shift+V", "Side by side"],
   ["F", "Fullscreen"],
   ["?", "This sheet"],
   ["Esc", "Close the sheet or comment box"],

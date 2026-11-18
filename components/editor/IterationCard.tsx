@@ -42,6 +42,11 @@ export function CheckBadges({ checks }: { checks: Checks | null }) {
           </span>
         );
       })}
+      {checks.playable === false && (
+        <span title="The uploader's browser could not show the picture" className="label border border-rec px-1.5 py-0.5 text-[10px] text-rec">
+          Won&apos;t play in some browsers
+        </span>
+      )}
     </span>
   );
 }
@@ -61,23 +66,50 @@ export function Thumbnail({ iteration }: { iteration: Iteration }) {
   );
 }
 
-/** "3 of 5 resolved", from the version's own comments; fetched once, when the card mounts. */
+type SummaryComment = { resolved: boolean; kind: string; carried: boolean };
+interface Summary {
+  total: number;
+  done: number;
+  fix: number;
+  question: number;
+  checklist: number;
+}
+
+export function summarize(comments: SummaryComment[]): Summary {
+  const open = comments.filter((c) => !c.resolved);
+  return {
+    total: comments.length,
+    done: comments.length - open.length,
+    fix: open.filter((c) => c.kind === "fix").length,
+    question: open.filter((c) => c.kind === "question").length,
+    checklist: comments.filter((c) => c.carried).length,
+  };
+}
+
+/** A small card of the version's comments ("3 of 5 resolved", open Fix/Question); fetched once, when the card mounts. */
 function CommentSummary({ iterationId }: { iterationId: number }) {
-  const [text, setText] = useState("");
+  const [s, setS] = useState<Summary | null>(null);
   useEffect(() => {
     let live = true;
-    editorApi<{ comments: { resolved: boolean }[] }>(`/iterations/${iterationId}`)
-      .then(({ comments }) => {
-        if (!live) return;
-        const done = comments.filter((c) => c.resolved).length;
-        setText(comments.length ? `${done} of ${comments.length} resolved` : "No comments");
-      })
+    editorApi<{ comments: SummaryComment[] }>(`/iterations/${iterationId}`)
+      .then(({ comments }) => live && setS(summarize(comments)))
       .catch(() => {});
     return () => {
       live = false;
     };
   }, [iterationId]);
-  return <span className="text-xs text-dim">{text}</span>;
+  if (!s) return null;
+  if (!s.total) return <p className="text-xs text-dim">No comments</p>;
+  return (
+    <div aria-label="Comment summary" className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border border-seam bg-ink px-2 py-1 text-xs">
+      <span className="font-bold text-phosphor">
+        {s.done} of {s.total} resolved
+      </span>
+      {s.fix > 0 && <span className="text-rec">{s.fix} Fix open</span>}
+      {s.question > 0 && <span className="text-amber">{s.question} Question{s.question > 1 ? "s" : ""} open</span>}
+      {s.checklist > 0 && <span className="text-dim">{s.checklist} on the checklist</span>}
+    </div>
+  );
 }
 
 const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
@@ -196,6 +228,22 @@ export function IterationCard({
               }}
             >
               Add comment
+            </button>
+          )}
+          {ready && (
+            <button
+              type="button"
+              className={btn}
+              onClick={() => {
+                try {
+                  sessionStorage.setItem("editor.openChecklist", String(iteration.id)); // only that version opens it
+                } catch {
+                  /* the player just opens on its Open tab */
+                }
+                window.location.hash = play;
+              }}
+            >
+              Edit checklist
             </button>
           )}
           <StatusSelect name={tape.name} status={tape.status} role={role} onChange={onStatus} />

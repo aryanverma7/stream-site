@@ -36,6 +36,12 @@ describe("CommentPanel", () => {
     expect(ids()).toEqual(["3", "2", "1"]);
   });
 
+  it("Checklist shows the carried checkboxes only, and can be the first tab", () => {
+    render(<CommentPanel cm={api(set)} initialTab="Checklist" username="me" projectId={1} tapeId={2} currentTime={0} onSeek={vi.fn()} />);
+    expect(screen.getByRole("tab", { name: "Checklist" })).toHaveAttribute("aria-selected", "true");
+    expect(ids()).toEqual(["1"]);
+  });
+
   it("highlights the item under the playhead and seeks on click", () => {
     const onSeek = vi.fn();
     const { rerender } = panel(api(set), 51, onSeek);
