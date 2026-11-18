@@ -34,7 +34,7 @@ export function isCodecError(codec: unknown, code: number | undefined, canPlay: 
 export function PlaybackBar({ problem, overlay = true }: { problem: string | null; overlay?: boolean }) {
   if (!problem) return null;
   return (
-    <p role="alert" className={`${overlay ? "absolute inset-x-0 top-0 z-10" : ""} bg-rec px-3 py-2 text-sm font-bold text-ink`}>
+    <p role="alert" className={`${overlay ? "absolute inset-x-0 top-0 z-10" : ""} label border-b-4 border-ink bg-rec px-3 py-2 text-sm tracking-wide text-ink`}>
       {problem}
     </p>
   );

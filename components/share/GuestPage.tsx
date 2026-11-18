@@ -3,16 +3,54 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isTyping } from "@/lib/isTyping";
 import { formatTime } from "@/lib/timecode";
-import { PlaybackBar, isCodecError, playbackProblem } from "@/components/editor/PlaybackBar";
+import {
+  PlaybackBar,
+  isCodecError,
+  playbackProblem,
+} from "@/components/editor/PlaybackBar";
+import { Ransom } from "@/components/Hero";
 
-type View = { title: string; file_id: string; api_key: string; expires_at: number; duration_s: number | null; codec: string | null; playable: boolean | null };
+/** The page frame: the editor's red halftone header with the ransom mark, on black. */
+function Frame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-screen flex-col bg-ink text-phosphor">
+      <header className="wallpaper relative z-30 flex flex-wrap items-center gap-3 border-b-4 border-ink px-4 py-3 sm:px-6">
+        <h1 className="text-3xl">
+          <Ransom text="DualBladeX" />
+        </h1>
+        <span className="tag bg-ink text-sm text-phosphor">Shared video</span>
+      </header>
+      {children}
+    </div>
+  );
+}
+
+type View = {
+  title: string;
+  file_id: string;
+  api_key: string;
+  expires_at: number;
+  duration_s: number | null;
+  codec: string | null;
+  playable: boolean | null;
+};
 type Kind = "fix" | "keep" | "question";
 /** A note this browser wrote; kept so the guest sees their own, and resent if it did not reach the backend. */
-export type MyNote = { client_id: string; name: string; kind: Kind; body: string; start_s: number | null; sent: boolean; at: number };
+export type MyNote = {
+  client_id: string;
+  name: string;
+  kind: Kind;
+  body: string;
+  start_s: number | null;
+  sent: boolean;
+  at: number;
+};
 
 const EXPIRED = "This link has expired. Ask DualBladeX for a new one.";
-const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
-const field = "border border-seam bg-ink px-2 py-1 text-sm";
+const btn =
+  "menu-pop label border-2 border-phosphor bg-ink px-2 py-1 text-[11px] text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
+const field =
+  "border-2 border-seam bg-ink px-2 py-1 text-sm focus:border-phosphor focus:outline-none";
 const KINDS: [Kind, string, string][] = [
   ["fix", "Fix", "text-rec"],
   ["keep", "Keep", "text-signal"],
@@ -40,9 +78,17 @@ const store = {
 const notesKey = (fileId: string) => `share.notes.${fileId}`;
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const r = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(data.error ?? `Request failed (${r.status})`), { status: r.status });
+  if (!r.ok)
+    throw Object.assign(
+      new Error(data.error ?? `Request failed (${r.status})`),
+      { status: r.status },
+    );
   return data as T;
 }
 
@@ -86,7 +132,11 @@ export function GuestPage() {
         notesRef.current = store.get<MyNote[]>(notesKey(v.file_id), []);
         setNotes(notesRef.current);
       } catch (e) {
-        setFatal((e as { status?: number }).status === 404 ? EXPIRED : (e as Error).message);
+        setFatal(
+          (e as { status?: number }).status === 404
+            ? EXPIRED
+            : (e as Error).message,
+        );
       }
     });
   }, []);
@@ -112,8 +162,19 @@ export function GuestPage() {
         again.current = false;
         for (const n of notesRef.current.filter((x) => !x.sent)) {
           try {
-            await post("/api/share/notes", { token: token.current, name: n.name, kind: n.kind, body: n.body, start_s: n.start_s, client_id: n.client_id });
-            save(notesRef.current.map((x) => (x.client_id === n.client_id ? { ...x, sent: true } : x)));
+            await post("/api/share/notes", {
+              token: token.current,
+              name: n.name,
+              kind: n.kind,
+              body: n.body,
+              start_s: n.start_s,
+              client_id: n.client_id,
+            });
+            save(
+              notesRef.current.map((x) =>
+                x.client_id === n.client_id ? { ...x, sent: true } : x,
+              ),
+            );
           } catch (e) {
             const status = (e as { status?: number }).status;
             if (status === 404) {
@@ -126,7 +187,11 @@ export function GuestPage() {
               continue;
             }
             // offline, the Mac Mini down, or too many at once: keep it and try again later
-            setError(status === 429 ? (e as Error).message : "Not sent yet; it will be sent when the connection is back");
+            setError(
+              status === 429
+                ? (e as Error).message
+                : "Not sent yet; it will be sent when the connection is back",
+            );
             return;
           }
         }
@@ -172,87 +237,175 @@ export function GuestPage() {
     if (!body.trim()) return setError("Write something first");
     setError(null);
     store.set("share.name", name.trim());
-    const note: MyNote = { client_id: crypto.randomUUID().replaceAll("-", ""), name: name.trim(), kind, body: body.trim(), start_s: timed ? Math.round(at * 10) / 10 : null, sent: false, at: Date.now() };
+    const note: MyNote = {
+      client_id: crypto.randomUUID().replaceAll("-", ""),
+      name: name.trim(),
+      kind,
+      body: body.trim(),
+      start_s: timed ? Math.round(at * 10) / 10 : null,
+      sent: false,
+      at: Date.now(),
+    };
     setBody("");
     save([...notesRef.current, note]); // kept before it is sent, so a closed tab or a second note loses nothing
     void send();
   };
 
-  if (fatal) return <main className="mx-auto max-w-xl p-6"><p role="alert" className="text-amber">{fatal}</p></main>;
-  if (!view) return <main className="mx-auto max-w-xl p-6"><p className="osd text-xl text-dim">Loading…</p></main>;
+  if (fatal)
+    return (
+      <Frame>
+        <main className="mx-auto max-w-xl p-6">
+          <p role="alert" className="slab slab-alert relative p-4 text-amber">
+            {fatal}
+          </p>
+        </main>
+      </Frame>
+    );
+  if (!view)
+    return (
+      <Frame>
+        <main className="mx-auto max-w-xl p-6">
+          <p className="osd text-xl text-dim">Loading…</p>
+        </main>
+      </Frame>
+    );
   const src = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(view.file_id)}?alt=media&key=${encodeURIComponent(view.api_key)}`;
-  const problem = playbackProblem({ codec: view.codec ?? undefined, playable: view.playable ?? undefined }, cannotDecode);
+  const problem = playbackProblem(
+    { codec: view.codec ?? undefined, playable: view.playable ?? undefined },
+    cannotDecode,
+  );
 
   return (
-    <main className="mx-auto max-w-6xl space-y-3 p-4">
-      <header className="flex flex-wrap items-baseline gap-3">
-        <h1 className="stencil text-3xl">{view.title}</h1>
-        <span className="text-xs text-dim">Link works until {new Date(view.expires_at * 1000).toLocaleString()}</span>
-      </header>
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="relative bg-ink">
-          <PlaybackBar problem={problem} />
-          <video
-            ref={video}
-            src={src}
-            controls
-            playsInline
-            preload="metadata"
-            className="aspect-video w-full bg-black"
-            onTimeUpdate={(e) => setAt(e.currentTarget.currentTime)}
-            onLoadedMetadata={(e) => !e.currentTarget.videoWidth && setCannotDecode(true)}
-            onError={(e) => (isCodecError(view.codec, e.currentTarget.error?.code) ? setCannotDecode(true) : setVideoFailed(true))}
-          />
-          {videoFailed && <p className="p-2 text-sm text-rec">The video could not load. If many people watched it today, Google may be limiting it; try again later.</p>}
+    <Frame>
+      <main className="mx-auto w-full max-w-6xl space-y-4 p-4">
+        <div className="flex flex-wrap items-baseline gap-3">
+          <h2 className="stencil text-4xl">{view.title}</h2>
+          <span className="tag bg-phosphor text-xs text-ink">
+            Link works until {new Date(view.expires_at * 1000).toLocaleString()}
+          </span>
         </div>
-        <form
-          aria-label="Leave a note"
-          className="space-y-2 border border-seam bg-bezel p-3 text-sm"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
-        >
-          <label className="block space-y-1">
-            <span className="block text-xs text-dim">Your name</span>
-            <input className={`${field} w-full`} maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Kind">
-            {KINDS.map(([k, label, tone]) => (
-              <button key={k} type="button" role="radio" aria-checked={kind === k} className={`${btn} ${kind === k ? `border-field ${tone}` : ""}`} onClick={() => setKind(k)}>
-                {label}
-              </button>
-            ))}
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="relative self-start border-2 border-phosphor bg-ink p-2 shadow-[8px_8px_0_var(--field-deep)]">
+            <PlaybackBar problem={problem} />
+            <video
+              ref={video}
+              src={src}
+              controls
+              playsInline
+              preload="metadata"
+              className="aspect-video w-full bg-black"
+              onTimeUpdate={(e) => setAt(e.currentTarget.currentTime)}
+              onLoadedMetadata={(e) =>
+                !e.currentTarget.videoWidth && setCannotDecode(true)
+              }
+              onError={(e) =>
+                isCodecError(view.codec, e.currentTarget.error?.code)
+                  ? setCannotDecode(true)
+                  : setVideoFailed(true)
+              }
+            />
+            {videoFailed && (
+              <p className="p-2 text-sm text-rec">
+                The video could not load. If many people watched it today,
+                Google may be limiting it; try again later.
+              </p>
+            )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1 text-xs">
-              <input type="checkbox" checked={timed} onChange={(e) => setTimed(e.target.checked)} /> At {formatTime(at)}
+          <form
+            aria-label="Leave a note"
+            className="slab relative space-y-2 p-3 text-sm"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit();
+            }}
+          >
+            <label className="block space-y-1">
+              <span className="block text-xs text-dim">Your name</span>
+              <input
+                className={`${field} w-full`}
+                maxLength={40}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </label>
-            <button type="button" className={btn} onClick={capture}>
-              Use current time (C)
-            </button>
-          </div>
-          <textarea ref={text} aria-label="Note" maxLength={2000} className={`${field} h-24 w-full`} value={body} onChange={(e) => setBody(e.target.value)} />
-          {error && <p role="alert" className="text-xs text-rec">{error}</p>}
-          <button type="submit" className={btn}>
-            Send note
-          </button>
-          <p className="text-[11px] text-dim">Your notes go to DualBladeX to review.</p>
-          {notes.length > 0 && (
-            <div className="space-y-1">
-              <h2 className="label text-[11px] text-dim">Your notes</h2>
-              <ul className="space-y-1">
-                {notes.map((n) => (
-                  <li key={n.client_id} className="border-l border-seam pl-2">
-                    <span className="font-mono text-xs">{n.start_s === null ? "General" : formatTime(n.start_s)}</span> {n.body}
-                    {!n.sent && <span className="label ml-1 text-amber">Not sent yet</span>}
-                  </li>
-                ))}
-              </ul>
+            <div
+              className="flex flex-wrap gap-1"
+              role="radiogroup"
+              aria-label="Kind"
+            >
+              {KINDS.map(([k, label, tone]) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="radio"
+                  aria-checked={kind === k}
+                  className={`${btn} ${kind === k ? "!bg-phosphor !text-ink" : tone}`}
+                  onClick={() => setKind(k)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-          )}
-        </form>
-      </div>
-    </main>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1 text-xs">
+                <input
+                  type="checkbox"
+                  checked={timed}
+                  onChange={(e) => setTimed(e.target.checked)}
+                />{" "}
+                At {formatTime(at)}
+              </label>
+              <button type="button" className={btn} onClick={capture}>
+                Use current time (C)
+              </button>
+            </div>
+            <textarea
+              ref={text}
+              aria-label="Note"
+              maxLength={2000}
+              className={`${field} h-24 w-full`}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+            />
+            {error && (
+              <p role="alert" className="text-xs text-rec">
+                {error}
+              </p>
+            )}
+            <button
+              type="submit"
+              className="wallpaper menu-pop label border-2 border-ink px-3 py-1.5 text-xs text-ink"
+            >
+              Send note
+            </button>
+            <p className="text-[11px] text-dim">
+              Your notes go to DualBladeX to review.
+            </p>
+            {notes.length > 0 && (
+              <div className="space-y-1">
+                <h3 className="strip-cut label inline-block bg-phosphor py-0.5 pl-2 pr-6 text-[11px] text-ink">
+                  Your notes
+                </h3>
+                <ul className="space-y-1">
+                  {notes.map((n) => (
+                    <li key={n.client_id} className="bubble px-2 py-1">
+                      <span className="font-mono text-xs">
+                        {n.start_s === null ? "General" : formatTime(n.start_s)}
+                      </span>{" "}
+                      {n.body}
+                      {!n.sent && (
+                        <span className="label ml-1 text-amber">
+                          Not sent yet
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </form>
+        </div>
+      </main>
+    </Frame>
   );
 }

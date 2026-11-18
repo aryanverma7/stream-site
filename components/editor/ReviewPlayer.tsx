@@ -425,7 +425,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
         )}
 
         {started && (
-          <div ref={box} className="relative space-y-2 border-2 border-phosphor bg-ink p-2 shadow-[8px_8px_0_var(--field-deep)]">
+          <div ref={box} className="relative space-y-2 self-start border-2 border-phosphor bg-ink p-2 shadow-[8px_8px_0_var(--field-deep)]">
             <PlaybackBar problem={problem} />
             <video
               key={videoKey}

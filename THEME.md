@@ -1,11 +1,11 @@
-# Theme: Persona 5 style (`theme/persona5`)
+# Theme: Persona 5 style (adopted 2026-11-18)
 
-A preview restyle of the whole site in the same world as the OBS widgets (`widgets/THEME.md`): red, black
+The restyle of the whole site in the same world as the OBS widgets (`widgets/THEME.md`): red, black
 and white comic panels, ransom-note cut-out lettering, slanted black slabs with a white stroke and a hard
 red offset shadow, starbursts, speech bubbles and snappy motion. It is an original design in that style.
 No Atlus logos, fonts, character art or assets: the type is Google Fonts and every shape is CSS or inline
 SVG. Only the look changed: routes, behaviour, data flow and accessible names are the same as `main`.
-`DESIGN.md` still describes `main`'s "Security Feed" look; replace it if this theme is adopted.
+This is the site's look since 2026-11-18; `DESIGN.md` describes the "Security Feed" look it replaced.
 
 ## The idea
 
@@ -25,7 +25,10 @@ letters cut from five papers. Things arrive by slamming in and overshooting a li
   get a starburst.
 - **Editor**: the same header and menu, slabs for cards and panels, the review player in a white frame with
   a red shadow, comments as speech bubbles, the "uploads ready" popup as a paper speech bubble, and the
-  dialogs as slabs that slam in over a red-slashed halftone backdrop.
+  dialogs as slabs that slam in over a red-slashed halftone backdrop. Plan 6's screens follow suit: the
+  "can't play" bar is a red hazard strip on the video, Share and Export markers are flat slabs under a cut
+  strip (red, white), Guest notes an amber slab, side by side two framed panes with red shadows, attachment
+  thumbnails pasted cut-outs, and the guest page `/s` gets the same red header with a "Shared video" tag.
 
 ## Tokens (`app/globals.css`)
 

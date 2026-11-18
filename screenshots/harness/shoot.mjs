@@ -181,7 +181,10 @@ const COMMENTS = [
     replies: [{ id: 9, comment_id: 1, author: "editor1", body: "On it, trimming to the first shot.", created_at: now - 2 * H }],
   }),
   comment(2, "keep", "dualbladex", "The zoom on the sheriff headshot is perfect. Keep it exactly like this.", 3.4),
-  comment(3, "question", "editor1", "Do you want the chat overlay visible during the clutch or hidden?", 4.8),
+  comment(3, "question", "editor1", "Do you want the chat overlay visible during the clutch or hidden?", 4.8, {
+    attachments: [{ id: 7, name: "overlay-ref.svg", mime: "image/png", size: 2048, drive_file_id: "img7" }],
+  }),
+  comment(5, "fix", "guest:Rahul", "The kill feed covers the crosshair for a second here.", 2.2),
   comment(4, "fix", "dualbladex", "Music is louder than my voice here.", null, { resolved: true }),
 ];
 const PROJECTS = [
@@ -219,7 +222,24 @@ const EDITOR = {
   "/drive/space": { limit: 2_199_023_255_552, free: 1_402_000_000_000 },
   "/fix-list": { items: [] },
   "/todos": { todos: [] },
+  "/share-links": {
+    links: [
+      { id: 4, iteration_id: 102, tape_id: 10, project_id: 1, tape: "Main cut", version: 3, expires_at: now + 72 * 60, state: "live" },
+      { id: 3, iteration_id: 101, tape_id: 10, project_id: 1, tape: "Main cut", version: 2, expires_at: now + 5 * 86400, state: "live" },
+    ],
+  },
+  "/iterations/102/guest-notes": {
+    guests: [
+      { name: "Priya", notes: [
+        { id: 11, name: "Priya", kind: "keep", start_s: 3.1, end_s: null, body: "That headshot replay is so clean, keep the slow-mo.", created_at: now - 40 * 60 },
+        { id: 12, name: "Priya", kind: "question", start_s: null, end_s: null, body: "Is the intro music copyright safe?", created_at: now - 38 * 60 },
+      ] },
+      { name: "Kabir", notes: [{ id: 13, name: "Kabir", kind: "fix", start_s: 4.4, end_s: 5.9, body: "Audio clips when the crowd cheers.", created_at: now - 20 * 60 }] },
+    ],
+  },
+  "/attachments/7/link": { url: "/shots-media/ref.svg", access_token: "x" },
 };
+const SHARE_VIEW = { title: "Main cut v3", file_id: "clipfile", api_key: "KEY", expires_at: now + 2 * H, duration_s: 6, codec: "vp09", playable: true };
 
 async function main() {
   const drive = await startDrive({ [VOD.fileId]: CLIP });
@@ -234,6 +254,12 @@ async function main() {
       const url = new URL(route.request().url());
       if (url.origin !== backend.origin) return route.fallback();
       if (url.pathname === "/shots-media/clip.webm") return route.fulfill({ path: CLIP, contentType: "video/webm" });
+      if (url.pathname === "/shots-media/ref.svg")
+        return route.fulfill({ body: decodeURIComponent(thumb("REF", "#f4f1ea", "#e60012").split(",")[1]), contentType: "image/svg+xml" });
+      if (url.pathname === "/api/share/view") return route.fulfill({ json: SHARE_VIEW });
+      if (url.pathname === "/api/share/notes") return route.fulfill({ status: 201, json: { id: 1 } });
+      if (url.pathname === "/api/editor/iterations/102/share" && route.request().method() === "POST")
+        return route.fulfill({ status: 201, json: { id: 5, url: backend.origin + "/s#example-token-shown-once", expires_at: now + 2 * H } });
       const table = { ...PUBLIC, ...ADMIN };
       if (url.pathname in table) return route.fulfill({ json: table[url.pathname] });
       const sub = url.pathname.replace(/^\/api\/editor/, "");
@@ -316,6 +342,29 @@ async function main() {
         }
       });
       await shot(p, "editor-review");
+      await p.getByText("Share", { exact: true }).click();
+      await p.getByRole("button", { name: "Make link" }).click();
+      await p.getByLabel("Share link").waitFor();
+      await p.getByText("Export markers").click();
+      await p.getByLabel("Select all from Priya").check();
+      await shot(p, "editor-review-share");
+      await p.goto(backend.origin + "/editor#/p/1/t/10/v/102/vs/101");
+      await p.getByRole("heading", { name: "v3 ↔ v2" }).waitFor();
+      await shot(p, "editor-compare");
+      await p.context().close();
+    }
+
+    for (const [w, suffix] of [[1440, "desktop"], [390, "phone"]]) {
+      if (!`share-guest-${suffix}`.includes(only)) continue;
+      const p = await page(w, w > 500 ? 900 : 844);
+      await p.route("https://www.googleapis.com/**", (route) => route.fulfill({ path: CLIP, contentType: "video/webm" }));
+      await p.goto(backend.origin + "/s#example-token-of-enough-length-1234");
+      await p.getByText("Main cut v3").first().waitFor();
+      await p.getByLabel("Your name").fill("Rahul");
+      await p.getByLabel("Note", { exact: true }).fill("The kill feed covers the crosshair here.");
+      await p.getByRole("button", { name: "Send note" }).click();
+      await p.getByText("The kill feed covers the crosshair here.").waitFor();
+      await shot(p, `share-guest-${suffix}`);
       await p.context().close();
     }
   } finally {

@@ -6,7 +6,7 @@ import { formatTime } from "@/lib/timecode";
 import { routeHash } from "@/lib/useHashRoute";
 import { useAsk } from "./AskDialog";
 
-const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-2 py-1 text-[11px] text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
 export const SHARE_HOURS: [number, string][] = [
   [1, "1 hour"],
   [2, "2 hours"],
@@ -57,7 +57,7 @@ export function LiveLinks({ iterationId, reloadKey = 0 }: { iterationId?: number
   };
   return (
     <div className="space-y-1">
-      <h4 className="label text-[11px] text-dim">Live links</h4>
+      <h4 className="osd text-lg text-phosphor">Live links</h4>
       {error && <p className="text-xs text-rec">{error}</p>}
       {links && !shown.length && <p className="text-xs text-dim">None</p>}
       <ul className="space-y-1">
@@ -106,13 +106,13 @@ export function SharePanel({ iterationId, version }: { iterationId: number; vers
     }
   };
   return (
-    <details className="border border-seam bg-bezel text-sm" onToggle={(e) => !e.currentTarget.open && setMade(null)}>
-      <summary className="label cursor-pointer px-2 py-1 text-[11px] text-phosphor">Share</summary>
+    <details className="slab-flat text-sm" onToggle={(e) => !e.currentTarget.open && setMade(null)}>
+      <summary className="strip-cut label cursor-pointer bg-field py-1 pl-2 pr-6 text-[11px] text-ink">Share</summary>
       <div className="space-y-2 p-3">
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs text-dim">
             Expires after{" "}
-            <select className="border border-seam bg-ink px-2 py-1 text-sm text-phosphor" value={hours} onChange={(e) => setHours(Number(e.target.value))}>
+            <select className="border-2 border-seam bg-ink px-2 py-1 text-sm focus:border-phosphor focus:outline-none text-phosphor" value={hours} onChange={(e) => setHours(Number(e.target.value))}>
               {SHARE_HOURS.map(([h, label]) => (
                 <option key={h} value={h}>
                   {label}
@@ -127,7 +127,7 @@ export function SharePanel({ iterationId, version }: { iterationId: number; vers
         {error && <p role="alert" className="text-xs text-rec">{error}</p>}
         {made && (
           <div className="space-y-1">
-            <input readOnly aria-label="Share link" className="w-full border border-seam bg-ink px-2 py-1 font-mono text-xs" value={made.url} onFocus={(e) => e.currentTarget.select()} />
+            <input readOnly aria-label="Share link" className="w-full border-2 border-phosphor bg-ink px-2 py-1 font-mono text-xs focus:outline-none" value={made.url} onFocus={(e) => e.currentTarget.select()} />
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -195,8 +195,8 @@ export function GuestNotesPanel({ iterationId, onSeek, onApproved }: { iteration
   };
   const count = guests.reduce((n, g) => n + g.notes.length, 0);
   return (
-    <section aria-label="Guest notes" className="space-y-2 border border-amber bg-bezel p-3 text-sm">
-      <h3 className="osd text-xl">Guest notes ({count})</h3>
+    <section aria-label="Guest notes" className="slab slab-warn relative space-y-2 p-3 text-sm">
+      <h3 className="tag bg-amber text-sm text-ink">Guest notes ({count})</h3>
       <p className="text-xs text-dim">Only you see these. Approved ones go to the editor as comments.</p>
       {guests.map((g) => (
         <div key={g.name} className="space-y-1">

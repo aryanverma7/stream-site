@@ -14,7 +14,7 @@ import { DownloadRing } from "./DownloadRing";
 import { PlaybackBar, isCodecError, playbackProblem } from "./PlaybackBar";
 import { ScrubBar } from "./ScrubBar";
 
-const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-2 py-1 text-[11px] text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
 
 /** Two versions of a tape side by side, `leftId` on the left; the route's `vs` is the right. */
 export function CompareView({ projectId, tapeId, leftId, rightId }: { projectId: number; tapeId: number; leftId: number; rightId: number }) {
@@ -105,9 +105,9 @@ function Pair({ projectId, tapeId, left, right }: { projectId: number; tapeId: n
       <figcaption className="flex items-center gap-2">
         <span className="osd text-xl">v{it.version}</span>
         <DownloadRing doneBytes={m.doneBytes} total={m.total} />
-        {(side === "left") !== soundRight && <span className="label text-[10px] text-signal">Sound</span>}
+        {(side === "left") !== soundRight && <span className="tag bg-signal text-[10px] text-ink">Sound</span>}
       </figcaption>
-      <div className="relative bg-ink">
+      <div className="relative border-2 border-phosphor bg-ink p-1 shadow-[6px_6px_0_var(--field-deep)]">
         <PlaybackBar problem={playbackProblem(it.checks, cannot[side])} overlay={started} />
         {started ? (
           <video

@@ -101,7 +101,7 @@ function CommentSummary({ iterationId }: { iterationId: number }) {
   if (!s) return null;
   if (!s.total) return <p className="text-xs text-dim">No comments</p>;
   return (
-    <div aria-label="Comment summary" className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border border-seam bg-ink px-2 py-1 text-xs">
+    <div aria-label="Comment summary" className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-2 border-phosphor bg-ink px-2 py-1 text-xs shadow-[3px_3px_0_var(--field-deep)]">
       <span className="font-bold text-phosphor">
         {s.done} of {s.total} resolved
       </span>

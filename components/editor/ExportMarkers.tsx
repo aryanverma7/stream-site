@@ -5,8 +5,8 @@ import { markersOf, parseTc, toEdl, toXmeml } from "@/lib/markerExport";
 import type { Comment } from "@/lib/useComments";
 
 const KEY = "editor.markerExport";
-const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
-const input = "border border-seam bg-ink px-2 py-1 font-mono text-sm";
+const btn = "menu-pop label border-2 border-phosphor bg-ink px-2 py-1 text-[11px] text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
+const input = "border-2 border-seam bg-ink px-2 py-1 font-mono text-sm focus:border-phosphor focus:outline-none";
 
 function remembered(): { fps?: number; startTc?: string } {
   try {
@@ -54,8 +54,8 @@ export function ExportMarkers({ comments, fps, title }: { comments: Comment[]; f
     else download(toXmeml(input), `${title} markers.xml`, "application/xml");
   };
   return (
-    <details className="border border-seam bg-bezel text-sm">
-      <summary className="label cursor-pointer px-2 py-1 text-[11px] text-phosphor">Export markers</summary>
+    <details className="slab-flat text-sm">
+      <summary className="strip-cut label cursor-pointer bg-phosphor py-1 pl-2 pr-6 text-[11px] text-ink">Export markers</summary>
       <div className="space-y-2 p-3">
         <div className="flex flex-wrap gap-3">
           <label className="space-y-1">
