@@ -11,7 +11,7 @@ import { syncVideos } from "@/lib/compareSync";
 import { formatTime } from "@/lib/timecode";
 import { downloadedRanges, fpsOf, mimeOf } from "@/lib/playerLogic";
 import { DownloadRing } from "./DownloadRing";
-import { PlaybackBar, playbackProblem } from "./PlaybackBar";
+import { PlaybackBar, isCodecError, playbackProblem } from "./PlaybackBar";
 import { ScrubBar } from "./ScrubBar";
 
 const btn = "label border border-seam px-2 py-1 text-[11px] text-phosphor hover:border-field disabled:opacity-40";
@@ -59,6 +59,7 @@ function Pair({ projectId, tapeId, left, right }: { projectId: number; tapeId: n
   const [duration, setDuration] = useState(0);
   const [soundRight, setSoundRight] = useState(false);
   const [cannot, setCannot] = useState({ left: false, right: false });
+  const [failed, setFailed] = useState({ left: false, right: false });
 
   const start = async () => {
     setStartError(null);
@@ -120,7 +121,11 @@ function Pair({ projectId, tapeId, left, right }: { projectId: number; tapeId: n
               if (!e.currentTarget.videoWidth) setCannot((c) => ({ ...c, [side]: true }));
               if (side === "left") setDuration(e.currentTarget.duration);
             }}
-            onError={(e) => e.currentTarget.error?.code === 4 && setCannot((c) => ({ ...c, [side]: true }))}
+            onError={(e) =>
+              isCodecError(it.checks?.codec, e.currentTarget.error?.code)
+                ? setCannot((c) => ({ ...c, [side]: true }))
+                : setFailed((f) => ({ ...f, [side]: true }))
+            }
             {...(side === "left" && {
               onTimeUpdate: (e: React.SyntheticEvent<HTMLVideoElement>) => setCurrent(e.currentTarget.currentTime),
               onPlay: () => setPaused(false),
@@ -132,6 +137,14 @@ function Pair({ projectId, tapeId, left, right }: { projectId: number; tapeId: n
         )}
       </div>
       {m.error && <p className="text-xs text-rec">{m.error}</p>}
+      {failed[side] && (
+        <p role="alert" className="text-xs text-rec">
+          v{it.version} could not be played.{" "}
+          <button type="button" className="underline" onClick={() => window.location.reload()}>
+            Reload
+          </button>
+        </p>
+      )}
     </figure>
   );
 

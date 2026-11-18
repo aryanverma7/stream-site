@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { PlaybackBar, playbackProblem } from "./PlaybackBar";
+import { PlaybackBar, isCodecError, playbackProblem } from "./PlaybackBar";
 
 const no = () => "";
 const yes = () => "probably";
@@ -27,6 +27,15 @@ describe("playbackProblem", () => {
   it("says nothing for a playable version, or unknown codec without a failure here", () => {
     expect(playbackProblem({ codec: "hvc1", playable: true }, false, no)).toBeNull();
     expect(playbackProblem({ playable: false }, false, no)).toBeNull();
+  });
+});
+
+describe("isCodecError", () => {
+  it("is the codec only for code 4 when this browser cannot play that codec", () => {
+    expect(isCodecError("hvc1", 4, no)).toBe(true);
+    expect(isCodecError("avc1", 4, yes)).toBe(false); // an expired link or a quota 403 also reports 4
+    expect(isCodecError(null, 4, no)).toBe(false);
+    expect(isCodecError("hvc1", 2, no)).toBe(false);
   });
 });
 

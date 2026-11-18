@@ -7,7 +7,7 @@
 export const DRIFT_S = 0.1;
 export const CHECK_MS = 500;
 
-type Video = Pick<HTMLVideoElement, "currentTime" | "paused" | "playbackRate" | "duration" | "play" | "pause" | "addEventListener" | "removeEventListener">;
+type Video = Pick<HTMLVideoElement, "currentTime" | "paused" | "playbackRate" | "duration" | "seeking" | "readyState" | "play" | "pause" | "addEventListener" | "removeEventListener">;
 
 export function syncVideos(
   leader: Video,
@@ -39,7 +39,9 @@ export function syncVideos(
   ];
   for (const [e, h] of handlers) leader.addEventListener(e, h);
   const timer = every(() => {
-    if (leader.paused || !inRange()) return;
+    // A follower still seeking or buffering (streaming from Drive) is left alone: seeking it again every
+    // tick would restart its download each time and it would never catch up.
+    if (leader.paused || !inRange() || follower.seeking || follower.readyState < 3) return;
     if (Math.abs(follower.currentTime - leader.currentTime) > DRIFT_S) seek();
     if (follower.paused) play();
   }, CHECK_MS);

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { editorBackend } from "@/lib/testUtils";
-import { GuestNotesPanel, SharePanel, left } from "./SharePanel";
+import { GuestNotesPanel, LiveLinks, SharePanel, left } from "./SharePanel";
 
 const LINK = { id: 4, iteration_id: 7, tape_id: 2, project_id: 1, tape: "Clutch", version: 3, expires_at: Date.now() / 1000 + 4320 };
 
@@ -26,6 +26,18 @@ describe("SharePanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
     fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Revoke" }));
     await waitFor(() => expect(api.mock.calls.some(([u, i]) => u === "/api/editor/share-links/4/revoke" && i?.method === "POST")).toBe(true));
+  });
+
+  it("shows a link Google has not unshared yet as Removing, and says so when a revoke is not confirmed", async () => {
+    editorBackend({
+      "/share-links": { links: [LINK, { ...LINK, id: 6, state: "revoking" }] },
+      "POST /share-links/4/revoke": { revoked: false },
+    });
+    render(<LiveLinks />);
+    expect(await screen.findByText(/Removing: still viewable/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
+    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Revoke" }));
+    expect(await screen.findByText(/Google hasn't removed the sharing yet/)).toBeInTheDocument();
   });
 
   it("formats the time left", () => {

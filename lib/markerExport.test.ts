@@ -36,6 +36,13 @@ describe("markersOf", () => {
   });
 });
 
+describe("NTSC rates", () => {
+  it("counts frames at 59.94 a second, so an hour in lands on 01:59:56:24, not 02:00:00:00", () => {
+    expect(markersOf([c({ start_s: 3600 })], 59.94)[0].start).toBe(215784);
+    expect(toEdl({ comments: [c({ start_s: 3600 })], fps: 59.94, startTc: "01:00:00:00", title: "t" })).toContain("01:59:56:24");
+  });
+});
+
 describe("toEdl", () => {
   it("writes Resolve's marker EDL with colour, note and duration", () => {
     const edl = toEdl({ comments: [c({}), c({ kind: "keep", start_s: 5, end_s: 6, body: "nice" })], fps: 60, startTc: "01:00:00:00", title: "Jett dash v2" });

@@ -58,13 +58,26 @@ async function watch() {
 const loaded = (v: HTMLVideoElement) => fireEvent.loadedMetadata(v);
 
 describe("ReviewPlayer", () => {
-  it("shows the codec bar on top of the video when this browser cannot decode it", async () => {
+  it("shows the H.265 bar on top of the video when this browser cannot decode the file's codec", async () => {
+    serve({ iteration: { ...IT, checks: { codec: "hvc1" } } });
+    vi.spyOn(HTMLMediaElement.prototype, "canPlayType").mockReturnValue("");
     await open();
     const v = await watch();
     Object.defineProperty(v, "error", { value: { code: 4 } });
     fireEvent.error(v);
-    expect(await screen.findByText("This browser can't play this video's format, open it in Chrome")).toBeInTheDocument();
+    expect(await screen.findByText("This browser can't play H.265, open it in Chrome")).toBeInTheDocument();
     expect(screen.queryByText("The video could not be played")).toBeNull();
+  });
+
+  it("treats a code-4 load failure in a browser that can play the codec as a failed load, with Try again", async () => {
+    serve({ iteration: { ...IT, checks: { codec: "avc1" } } });
+    vi.spyOn(HTMLMediaElement.prototype, "canPlayType").mockReturnValue("probably");
+    await open();
+    const v = await watch();
+    Object.defineProperty(v, "error", { value: { code: 4 } });
+    fireEvent.error(v);
+    expect(await screen.findByText(/The video could not be played/)).toBeInTheDocument();
+    expect(screen.queryByText(/can't play/)).toBeNull();
   });
 
   it("shows no codec bar once the picture has a size", async () => {

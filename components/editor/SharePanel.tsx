@@ -15,7 +15,7 @@ export const SHARE_HOURS: [number, string][] = [
   [168, "7 days"],
 ];
 
-export type LiveLink = { id: number; iteration_id: number; tape_id: number; project_id: number; tape: string; version: number; expires_at: number };
+export type LiveLink = { id: number; iteration_id: number; tape_id: number; project_id: number; tape: string; version: number; expires_at: number; state?: "live" | "revoking" };
 
 /** "1 h 12 m", "5 m", "2 d 3 h" until `at` (seconds). */
 export function left(at: number, now = Date.now() / 1000): string {
@@ -32,7 +32,10 @@ export function LiveLinks({ iterationId, reloadKey = 0 }: { iterationId?: number
   const load = useCallback(
     () =>
       editorApi<{ links: LiveLink[] }>("/share-links")
-        .then((d) => setLinks(d.links))
+        .then((d) => {
+          setLinks(d.links);
+          setError(null);
+        })
         .catch((e: Error) => setError(e.message)),
     [],
   );
@@ -42,12 +45,15 @@ export function LiveLinks({ iterationId, reloadKey = 0 }: { iterationId?: number
   const shown = (links ?? []).filter((l) => iterationId === undefined || l.iteration_id === iterationId);
   const revoke = async (l: LiveLink) => {
     if (!(await ask.confirm({ title: `Revoke the link to ${l.tape} v${l.version}?`, message: "Anyone with it stops being able to open it.", confirmLabel: "Revoke", danger: true }))) return;
+    let note: string | null = null;
     try {
-      await editorApi(`/share-links/${l.id}/revoke`, { method: "POST" });
+      const r = await editorApi<{ revoked: boolean }>(`/share-links/${l.id}/revoke`, { method: "POST" });
+      if (!r.revoked) note = "Google hasn't removed the sharing yet. It keeps trying; until then the link shows as Removing.";
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not revoke");
+      note = e instanceof Error ? e.message : "Could not revoke";
     }
-    void load();
+    await load();
+    setError(note);
   };
   return (
     <div className="space-y-1">
@@ -60,10 +66,16 @@ export function LiveLinks({ iterationId, reloadKey = 0 }: { iterationId?: number
             <a className="hover:underline" href={routeHash({ view: "iteration", projectId: l.project_id, tapeId: l.tape_id, iterationId: l.iteration_id })}>
               {l.tape} v{l.version}
             </a>
-            <span className="text-xs text-dim">expires in {left(l.expires_at)}</span>
-            <button type="button" className={btn} onClick={() => void revoke(l)}>
-              Revoke
-            </button>
+            {l.state === "revoking" ? (
+              <span className="text-xs text-amber">Removing: still viewable until Google confirms</span>
+            ) : (
+              <>
+                <span className="text-xs text-dim">expires in {left(l.expires_at)}</span>
+                <button type="button" className={btn} onClick={() => void revoke(l)}>
+                  Revoke
+                </button>
+              </>
+            )}
           </li>
         ))}
       </ul>

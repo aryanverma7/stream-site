@@ -6,6 +6,8 @@ class FakeVideo extends EventTarget {
   paused = true;
   playbackRate = 1;
   duration = 100;
+  seeking = false;
+  readyState = 4;
   play = vi.fn(async () => {
     this.paused = false;
   });
@@ -55,6 +57,24 @@ describe("syncVideos", () => {
     tick();
     expect(f.currentTime).toBe(10.05);
     f.currentTime = 10.3;
+    tick();
+    expect(f.currentTime).toBe(10);
+  });
+
+  it("leaves a follower that is still seeking or buffering alone", () => {
+    const { l, f, tick } = setup();
+    l.paused = false;
+    f.paused = false;
+    l.currentTime = 10;
+    f.currentTime = 5;
+    f.seeking = true;
+    tick();
+    expect(f.currentTime).toBe(5);
+    f.seeking = false;
+    f.readyState = 2;
+    tick();
+    expect(f.currentTime).toBe(5);
+    f.readyState = 4;
     tick();
     expect(f.currentTime).toBe(10);
   });

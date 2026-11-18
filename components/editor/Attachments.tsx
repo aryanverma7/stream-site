@@ -77,27 +77,37 @@ export function AttachmentPicker({ uploads, compact = false, label = "comment" }
  * A saved image: fetched with the drive.file token in a header (never in the
  * img src), shown from a blob: URL that is revoked on unmount.
  */
+// One download per image per page: a blob: URL is kept for the page's lifetime, so switching comment tabs
+// (which remounts every item) never fetches the same up-to-20 MB image again.
+const loaded = new Map<number, Promise<string>>();
+
+function loadImage(id: number): Promise<string> {
+  let p = loaded.get(id);
+  if (!p) {
+    p = (async () => {
+      const link = await editorApi<{ url: string; access_token: string }>(`/attachments/${id}/link`);
+      const r = await fetch(link.url, { headers: { Authorization: `Bearer ${link.access_token}` } });
+      if (!r.ok) throw new Error(String(r.status));
+      return URL.createObjectURL(await r.blob());
+    })();
+    p.catch(() => loaded.delete(id)); // a failure is tried again on the next mount
+    loaded.set(id, p);
+  }
+  return p;
+}
+
+/** A saved image: fetched with the drive.file token in a header (never in the img src), shown from a blob: URL. */
 function Thumb({ a, onOpen }: { a: Attachment; onOpen(url: string): void }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let live = true;
-    let made: string | null = null;
-    (async () => {
-      try {
-        const link = await editorApi<{ url: string; access_token: string }>(`/attachments/${a.id}/link`);
-        const r = await fetch(link.url, { headers: { Authorization: `Bearer ${link.access_token}` } });
-        if (!r.ok) throw new Error(String(r.status));
-        made = URL.createObjectURL(await r.blob());
-        if (live) setUrl(made);
-        else URL.revokeObjectURL(made);
-      } catch {
-        if (live) setFailed(true);
-      }
-    })();
+    loadImage(a.id).then(
+      (u) => live && setUrl(u),
+      () => live && setFailed(true),
+    );
     return () => {
       live = false;
-      if (made) URL.revokeObjectURL(made);
     };
   }, [a.id]);
   if (failed) return <span className="text-[10px] text-dim">{a.name} (not available)</span>;

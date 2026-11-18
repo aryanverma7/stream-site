@@ -74,7 +74,30 @@ describe("GuestPage", () => {
     expect(ids[0]).toBe(ids[1]);
   });
 
-  it("reads the token from the fragment", () => {
+  it("reads the token from the fragment, and a mangled one as no token instead of crashing", () => {
     expect(tokenFromHash("#abc%2Ddef")).toBe("abc-def");
+    expect(tokenFromHash("#abc%E0")).toBe("");
+  });
+
+  it("keeps a first note that is still on its way when a second one is sent", async () => {
+    let release: () => void = () => {};
+    answer = (path, b) => (path === "/api/share/view" ? { status: 200, body: VIEW } : { status: 201, body: { id: 1, b } });
+    const slow = global.fetch;
+    global.fetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path === "/api/share/notes" && JSON.parse(String(init?.body)).body === "first") await new Promise<void>((r) => (release = r));
+      return slow(path, init);
+    }) as unknown as typeof fetch;
+    render(<GuestPage />);
+    await screen.findByText("Clutch v2");
+    fireEvent.change(screen.getByLabelText("Your name"), { target: { value: "Rahul" } });
+    fireEvent.change(screen.getByLabelText("Note", { exact: true }), { target: { value: "first" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send note" }));
+    fireEvent.change(screen.getByLabelText("Note", { exact: true }), { target: { value: "second" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send note" }));
+    expect(JSON.parse(localStorage.getItem("share.notes.FILE1")!).map((n: { body: string }) => n.body)).toEqual(["first", "second"]);
+    release();
+    await waitFor(() => expect(bodies("/api/share/notes").map((b) => b.body)).toEqual(["first", "second"]));
+    await waitFor(() => expect(screen.queryByText("Not sent yet")).toBeNull());
+    expect(screen.getByText("first")).toBeInTheDocument();
   });
 });

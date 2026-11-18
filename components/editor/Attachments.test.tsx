@@ -112,6 +112,9 @@ describe("AttachmentThumbs", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open ref.png" }));
     expect(screen.getByRole("dialog", { name: "Image" })).toBeInTheDocument();
     unmount();
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:remote");
+    const before = calls.length;
+    render(<AttachmentThumbs attachments={[{ id: 3, name: "ref.png", mime: "image/png", size: 1, drive_file_id: "IMG" }]} />);
+    expect(await screen.findByAltText("ref.png")).toHaveAttribute("src", "blob:remote");
+    expect(calls.length).toBe(before); // a remount (switching comment tabs) does not download it again
   });
 });

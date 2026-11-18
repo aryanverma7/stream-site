@@ -15,7 +15,7 @@ import { SPEEDS, downloadedRanges, fpsOf, mimeOf, startPosition } from "@/lib/pl
 import { CheckBadges } from "./IterationCard";
 import { DownloadLink, OpenInDrive } from "./DriveLinks";
 import { DownloadRing } from "./DownloadRing";
-import { PlaybackBar, playbackProblem } from "./PlaybackBar";
+import { PlaybackBar, isCodecError, playbackProblem } from "./PlaybackBar";
 import { ExportMarkers } from "./ExportMarkers";
 import { GuestNotesPanel, SharePanel } from "./SharePanel";
 import { ScrubBar, type Marker } from "./ScrubBar";
@@ -447,7 +447,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
                 if (!e.currentTarget.paused) save();
               }}
               onError={(e) =>
-                e.currentTarget.error?.code === 4 ? setCannotDecode(true) : setVideoError("The video could not be played")
+                isCodecError(it.checks?.codec, e.currentTarget.error?.code) ? setCannotDecode(true) : setVideoError("The video could not be played")
               }
               onPlay={() => setPaused(false)}
               onPause={() => {

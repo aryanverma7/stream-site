@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isTyping } from "@/lib/isTyping";
 import { formatTime } from "@/lib/timecode";
-import { PlaybackBar, playbackProblem } from "@/components/editor/PlaybackBar";
+import { PlaybackBar, isCodecError, playbackProblem } from "@/components/editor/PlaybackBar";
 
 type View = { title: string; file_id: string; api_key: string; expires_at: number; duration_s: number | null; codec: string | null; playable: boolean | null };
 type Kind = "fix" | "keep" | "question";
@@ -47,13 +47,23 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 /** The token from the fragment (#<token>); the fragment never reaches a server or a Referer. */
-export const tokenFromHash = (hash: string) => decodeURIComponent(hash.replace(/^#/, ""));
+export function tokenFromHash(hash: string): string {
+  try {
+    return decodeURIComponent(hash.replace(/^#/, ""));
+  } catch {
+    return ""; // a mangled link reads as expired, never a blank page
+  }
+}
 
 export function GuestPage() {
   const token = useRef("");
   const [view, setView] = useState<View | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
   const [notes, setNotes] = useState<MyNote[]>([]);
+  // The ref is the truth (a second note sent while the first is still on its way must not overwrite it).
+  const notesRef = useRef<MyNote[]>([]);
+  const sending = useRef(false);
+  const again = useRef(false);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<Kind>("fix");
   const [body, setBody] = useState("");
@@ -73,7 +83,8 @@ export function GuestPage() {
       try {
         const v = await post<View>("/api/share/view", { token: token.current });
         setView(v);
-        setNotes(store.get<MyNote[]>(notesKey(v.file_id), []));
+        notesRef.current = store.get<MyNote[]>(notesKey(v.file_id), []);
+        setNotes(notesRef.current);
       } catch (e) {
         setFatal((e as { status?: number }).status === 404 ? EXPIRED : (e as Error).message);
       }
@@ -82,44 +93,53 @@ export function GuestPage() {
 
   const save = useCallback(
     (next: MyNote[]) => {
+      notesRef.current = next;
       setNotes(next);
       if (view) store.set(notesKey(view.file_id), next);
     },
     [view],
   );
 
-  const send = useCallback(
-    async (list: MyNote[]) => {
-      let next = list;
-      for (const n of list.filter((x) => !x.sent)) {
-        try {
-          await post("/api/share/notes", { token: token.current, name: n.name, kind: n.kind, body: n.body, start_s: n.start_s, client_id: n.client_id });
-          next = next.map((x) => (x.client_id === n.client_id ? { ...x, sent: true } : x));
-        } catch (e) {
-          const status = (e as { status?: number }).status;
-          if (status === 404) {
-            setFatal(EXPIRED);
-            break;
+  /** Sends every unsent note, one pass at a time; a call during a pass asks for another pass. */
+  const send = useCallback(async () => {
+    if (sending.current) {
+      again.current = true;
+      return;
+    }
+    sending.current = true;
+    try {
+      do {
+        again.current = false;
+        for (const n of notesRef.current.filter((x) => !x.sent)) {
+          try {
+            await post("/api/share/notes", { token: token.current, name: n.name, kind: n.kind, body: n.body, start_s: n.start_s, client_id: n.client_id });
+            save(notesRef.current.map((x) => (x.client_id === n.client_id ? { ...x, sent: true } : x)));
+          } catch (e) {
+            const status = (e as { status?: number }).status;
+            if (status === 404) {
+              setFatal(EXPIRED);
+              return;
+            }
+            if (status && status < 500 && status !== 429) {
+              setError((e as Error).message);
+              save(notesRef.current.filter((x) => x.client_id !== n.client_id)); // the server's final answer
+              continue;
+            }
+            // offline, the Mac Mini down, or too many at once: keep it and try again later
+            setError(status === 429 ? (e as Error).message : "Not sent yet; it will be sent when the connection is back");
+            return;
           }
-          if (status && status < 500 && status !== 429) {
-            setError((e as Error).message);
-            next = next.filter((x) => x.client_id !== n.client_id); // the server's final answer
-            continue;
-          }
-          // offline, the Mac Mini down, or too many at once: keep it and try again later
-          setError(status === 429 ? (e as Error).message : "Not sent yet; it will be sent when the connection is back");
-          break;
         }
-      }
-      save(next);
-    },
-    [save],
-  );
+      } while (again.current);
+    } finally {
+      sending.current = false;
+    }
+  }, [save]);
 
   useEffect(() => {
     if (!view) return;
-    const retry = () => void send(store.get<MyNote[]>(notesKey(view.file_id), []));
-    if (notes.some((n) => !n.sent)) retry();
+    const retry = () => void send();
+    if (notesRef.current.some((n) => !n.sent)) retry();
     window.addEventListener("online", retry);
     return () => window.removeEventListener("online", retry);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per loaded view
@@ -154,7 +174,8 @@ export function GuestPage() {
     store.set("share.name", name.trim());
     const note: MyNote = { client_id: crypto.randomUUID().replaceAll("-", ""), name: name.trim(), kind, body: body.trim(), start_s: timed ? Math.round(at * 10) / 10 : null, sent: false, at: Date.now() };
     setBody("");
-    void send([...notes, note]);
+    save([...notesRef.current, note]); // kept before it is sent, so a closed tab or a second note loses nothing
+    void send();
   };
 
   if (fatal) return <main className="mx-auto max-w-xl p-6"><p role="alert" className="text-amber">{fatal}</p></main>;
@@ -180,7 +201,7 @@ export function GuestPage() {
             className="aspect-video w-full bg-black"
             onTimeUpdate={(e) => setAt(e.currentTarget.currentTime)}
             onLoadedMetadata={(e) => !e.currentTarget.videoWidth && setCannotDecode(true)}
-            onError={(e) => (e.currentTarget.error?.code === 4 && view.codec ? setCannotDecode(true) : setVideoFailed(true))}
+            onError={(e) => (isCodecError(view.codec, e.currentTarget.error?.code) ? setCannotDecode(true) : setVideoFailed(true))}
           />
           {videoFailed && <p className="p-2 text-sm text-rec">The video could not load. If many people watched it today, Google may be limiting it; try again later.</p>}
         </div>

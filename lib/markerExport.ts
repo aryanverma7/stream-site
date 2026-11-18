@@ -57,12 +57,14 @@ const clean = (s: string) => {
 /** Only open comments with a time on this version: carried ones have no time here, general ones none at all. */
 export function markersOf(comments: Comment[], fps: number): Marker[] {
   const n = nominal(fps);
+  // Frames count at the real rate: a 59.94 timeline has 59.94 of them a second, though its timecode counts to 60.
+  const rate = isNtsc(fps) ? (n * 1000) / 1001 : fps;
   return comments
     .filter((c) => !c.resolved && !c.carried && c.start_s !== null)
     .sort((a, b) => (a.start_s as number) - (b.start_s as number))
     .map((c) => {
-      const start = Math.round((c.start_s as number) * n);
-      const end = c.end_s === null ? start : Math.round(c.end_s * n);
+      const start = Math.round((c.start_s as number) * rate);
+      const end = c.end_s === null ? start : Math.round(c.end_s * rate);
       const replies = c.replies.map((r) => `${r.author}: ${r.body}`).join(" / ");
       return {
         name: `${KIND[c.kind]} · ${c.author}`,
