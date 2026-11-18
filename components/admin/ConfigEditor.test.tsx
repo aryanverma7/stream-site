@@ -316,7 +316,7 @@ describe("ConfigEditor", () => {
   it("shows a setup hint (not a broken link) when Streamlabs credentials aren't configured yet", async () => {
     mockBackend({ config: { http_port: 8765 } });
     const { getByText, getAllByText, queryByText } = render(<ConfigEditor />);
-    await waitFor(() => expect(getAllByText("Not connected").length).toBe(3));
+    await waitFor(() => expect(getAllByText("Not connected").length).toBe(4));
     expect(queryByText("Connect Streamlabs")).toBeNull();
     expect(getByText(/fill in streamlabs_client_id/i)).toBeTruthy();
   });
@@ -349,9 +349,23 @@ describe("ConfigEditor", () => {
     // refresh token is the durable credential.
     mockBackend({ config: { spotify_client_id: "abc123", spotify_refresh_token: SECRET_MASK } });
     const { getAllByText, queryByText } = render(<ConfigEditor />);
-    // Streamlabs and Google Drive (no credentials) are the "Not connected" rows.
-    await waitFor(() => expect(getAllByText("Not connected")).toHaveLength(2));
+    // Streamlabs, Twitch and Google Drive (no credentials) are the "Not connected" rows.
+    await waitFor(() => expect(getAllByText("Not connected")).toHaveLength(3));
     expect(queryByText("Connect Spotify")).toBeNull();
+  });
+
+  it("offers Connect Twitch once the client id is saved, and counts the refresh token as connected", async () => {
+    mockBackend({ config: { twitch_client_id: "t123" } });
+    const first = render(<ConfigEditor />);
+    await waitFor(() => expect(first.getByText("Connect Twitch")).toBeTruthy());
+    const links = Array.from(first.container.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    expect(links).toContain("/auth/twitch/login");
+    first.unmount();
+
+    mockBackend({ config: { twitch_client_id: "t123", twitch_refresh_token: SECRET_MASK } });
+    const second = render(<ConfigEditor />);
+    await waitFor(() => expect(second.getAllByText("Not connected")).toHaveLength(3));
+    expect(second.queryByText("Connect Twitch")).toBeNull();
   });
 
   it("offers Google Drive its connect link once the client id is saved", async () => {
