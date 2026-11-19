@@ -18,6 +18,7 @@ import { HomeView } from "./HomeView";
 import { FixListView } from "./FixListView";
 import { TodoView } from "./TodoView";
 import { StorageView } from "./StorageView";
+import { QuotaView } from "./QuotaView";
 import { Ransom } from "../Hero";
 
 const DELETED = "That was deleted or never existed";
@@ -42,6 +43,8 @@ function RouteView({ route, me }: { route: Route; me: EditorMe }) {
       return <FixListView />;
     case "todo":
       return <TodoView />;
+    case "quota":
+      return <QuotaView role={me.role} />;
     case "storage":
       return me.role === "admin" ? (
         <StorageView username={me.username} />
@@ -130,6 +133,7 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
     { label: "Home", to: { view: "home" } },
     { label: "Fix list", to: { view: "fixes" } },
     { label: "To-do", to: { view: "todo" } },
+    { label: "Quota", to: { view: "quota" } },
     ...(me?.role === "admin" ? [{ label: "Storage", to: { view: "storage" } as Route }] : []),
   ];
   const inProjects = ["projects", "project", "tape", "iteration"].includes(route.view);

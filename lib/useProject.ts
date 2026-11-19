@@ -15,6 +15,8 @@ export interface Tape {
   status: TapeStatus;
   notes: string;
   files_deleted_at: number | null;
+  /** 1 when the streamer switched it out of the weekly quota (older backends leave it out). */
+  quota_exempt?: number;
   /** The clips a reel is made of, oldest first; two or more is a combined reel. */
   source_project_ids: number[];
   created_at: number;

@@ -12,6 +12,7 @@ const FORMS: [string, Route][] = [
   ["#/p/12/t/5", { view: "tape", projectId: 12, tapeId: 5 }],
   ["#/p/12/t/5/v/3", { view: "iteration", projectId: 12, tapeId: 5, iterationId: 3 }],
   ["#/p/12/t/5/v/3@222.5", { view: "iteration", projectId: 12, tapeId: 5, iterationId: 3, seekS: 222.5 }],
+  ["#/quota", { view: "quota" }],
 ];
 
 describe("parseHash / routeHash", () => {
@@ -42,7 +43,7 @@ describe("parentRoute", () => {
   });
 
   it("has nothing above the top-level views", () => {
-    for (const view of ["projects", "home", "fixes", "storage", "todo"] as const) {
+    for (const view of ["projects", "home", "fixes", "storage", "todo", "quota"] as const) {
       expect(parentRoute({ view })).toBeNull();
     }
   });
