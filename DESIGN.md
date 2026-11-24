@@ -120,7 +120,7 @@ components:
 
 **Creative North Star: "Security Feed"**
 
-Every surface is a monitor on a guard's wall. The public site is CAM 01 and CAM 02: the sphere cluster sits behind scanlines with a burned-in clock, the Twitch player is a feed with a REC tag, and offline is a dead channel of static reading NO SIGNAL. The admin is the same wall seen from the guard's chair. Each subsystem is a feed tile that reads OK, Check, Lost, Off or No report before it explains anything. One world covers both, and `FeedFrame` is the shared object, so "a feed" means the same thing on both.
+Every surface is a monitor on a guard's wall. The public site is CAM 01 and CAM 02: a cluster of ink-black and paper-white spheres sits behind scanlines with a burned-in clock, the Twitch player is a feed with a REC tag, and offline is a dead channel of static reading NO SIGNAL. The admin is the same wall seen from the guard's chair. Each subsystem is a feed tile that reads OK, Check, Lost, Off or No report before it explains anything. One world covers both, and `FeedFrame` is the shared object, so "a feed" means the same thing on both.
 
 The palette is VCR blue on dead-monitor blue-black. The blue is a *field*, not an accent. It owns roughly a third of each screen as wallpaper bands, bezel strips, the donate wall and the active nav tab, and text sits on it in ink. Everything else is phosphor text on near-black bezels. The theme is single and dark by choice, because the site is watched at night and the admin sits beside OBS in a dim room. A light rendition would be a different world. The personality comes from the potato king emotes, die-cut as stickers and slapped on at an angle. The controls stay plain enough to use one-handed on a phone.
 
@@ -141,7 +141,7 @@ A two-tone world of VCR blue and blue-black, plus three signal colours that are 
 - **VCR No-Signal Blue** (blue): the field colour. Wallpaper bands, feed strips on the blue tone, the donate wall, the active admin tab, primary buttons, stencil headings on ink, focus outline and text selection.
 - **Hot Bright Signal Blue** (field-hot): hover state of anything blue. Never a resting colour.
 - **Damask Deep blue** (deep blue): the faint stripe inside the wallpaper and the scrollbar thumb on hover. It is only a texture tone.
-- **Hero Room Red** (hero-room): the 3D hero's room background and fog, the one `ROOM` constant in `components/Spheres.tsx`. Nothing outside the sphere canvas uses it.
+- **Hero Room Red** (hero-room): the 3D hero's room background behind the sphere canvas, the one `ROOM` constant in `components/Spheres.tsx`. The spheres on it are ink (`#221c1c`, soft Phong highlight) and paper (`#b8b2a8`), two to one. Nothing outside the sphere canvas uses it.
 
 ### Secondary (signal colours, state only)
 - **REC Red** (rec): live and failure, nothing else. It covers the REC dot, the LIVE NOW plate, lost feed strips and borders, the lost summary bar, and error text.

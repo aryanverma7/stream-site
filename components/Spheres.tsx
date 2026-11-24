@@ -7,23 +7,10 @@ import gsap from "gsap";
 import { createTapCounter, isTap } from "@/lib/tapCounter";
 
 // A port of the "Festivity" sphere-collision CodePen: its radii, positions, intro,
-// hover force, collisions, breathing, material and lighting, verbatim.
+// hover force, collisions, breathing and lighting, verbatim; spheres in ink and paper.
 
 // Room red behind the canvas.
 const ROOM = "#d80f1d";
-
-// Sphere paints [colour, emissive], lit by the pen's own rig. Colours sit
-// well below white so the pen's light-to-shadow gradient still shows.
-const PAPER: [string, string] = ["#b8b2a8", "#0e0a06"];
-const INK: [string, string] = ["#1a1a1a", "#140002"];
-// Sphere i takes paint i % length: v1 [PAPER], v2 [INK], v3 [INK, INK, PAPER].
-const LOOK: [string, string][] = [INK, INK, PAPER];
-// true: ink spheres are Phong with a soft highlight, so they read as round balls.
-const ROUND_INK = true;
-const inkMaterial = () =>
-  ROUND_INK
-    ? new THREE.MeshPhongMaterial({ color: "#221c1c", specular: "#3a3434", shininess: 18 })
-    : new THREE.MeshLambertMaterial({ color: INK[0], emissive: INK[1] });
 
 const RADII = [
   1, 0.6, 0.8, 0.4, 0.9, 0.7, 0.9, 0.3, 0.2, 0.5, 0.6, 0.4, 0.5,
@@ -115,14 +102,15 @@ export function Spheres() {
     under.position.set(0, -4, 0);
     scene.add(under);
 
-    // One geometry for all, scaled per sphere; the pen's one material.
+    // One geometry for all, scaled per sphere. Two of every three spheres are
+    // ink (soft Phong highlight so they read round), every third is paper
+    // (kept well below white so the pen's light-to-shadow gradient shows).
     const geometry = new THREE.SphereGeometry(1, 64, 64);
-    const materials = LOOK.map((paint) =>
-      paint === INK ? inkMaterial() : new THREE.MeshLambertMaterial({ color: paint[0], emissive: paint[1] }),
-    );
+    const ink = new THREE.MeshPhongMaterial({ color: "#221c1c", specular: "#3a3434", shininess: 18 });
+    const paper = new THREE.MeshLambertMaterial({ color: "#b8b2a8", emissive: "#0e0a06" });
     const group = new THREE.Group();
     const spheres = POSITIONS.map(([x, y, z], i) => {
-      const sphere = new THREE.Mesh(geometry, materials[i % materials.length]);
+      const sphere = new THREE.Mesh(geometry, i % 3 === 2 ? paper : ink);
       sphere.scale.setScalar(RADII[i]);
       sphere.position.set(x, reduced ? y : INIT_Y, z);
       sphere.userData = { original: new THREE.Vector3(x, y, z), radius: RADII[i] };
@@ -310,7 +298,8 @@ export function Spheres() {
       seen.disconnect();
       controls.dispose();
       geometry.dispose();
-      materials.forEach((m) => m.dispose());
+      ink.dispose();
+      paper.dispose();
       renderer.dispose();
       canvas.remove();
     };
