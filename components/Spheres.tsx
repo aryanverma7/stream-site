@@ -18,6 +18,12 @@ const PAPER: [string, string] = ["#b8b2a8", "#0e0a06"];
 const INK: [string, string] = ["#1a1a1a", "#140002"];
 // Sphere i takes paint i % length: v1 [PAPER], v2 [INK], v3 [INK, INK, PAPER].
 const LOOK: [string, string][] = [INK, INK, PAPER];
+// true: ink spheres are Phong with a soft highlight, so they read as round balls.
+const ROUND_INK = true;
+const inkMaterial = () =>
+  ROUND_INK
+    ? new THREE.MeshPhongMaterial({ color: "#221c1c", specular: "#3a3434", shininess: 18 })
+    : new THREE.MeshLambertMaterial({ color: INK[0], emissive: INK[1] });
 
 const RADII = [
   1, 0.6, 0.8, 0.4, 0.9, 0.7, 0.9, 0.3, 0.2, 0.5, 0.6, 0.4, 0.5,
@@ -111,7 +117,9 @@ export function Spheres() {
 
     // One geometry for all, scaled per sphere; the pen's one material.
     const geometry = new THREE.SphereGeometry(1, 64, 64);
-    const materials = LOOK.map(([color, emissive]) => new THREE.MeshLambertMaterial({ color, emissive }));
+    const materials = LOOK.map((paint) =>
+      paint === INK ? inkMaterial() : new THREE.MeshLambertMaterial({ color: paint[0], emissive: paint[1] }),
+    );
     const group = new THREE.Group();
     const spheres = POSITIONS.map(([x, y, z], i) => {
       const sphere = new THREE.Mesh(geometry, materials[i % materials.length]);
