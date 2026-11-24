@@ -121,7 +121,7 @@ a { text-underline-offset: 0.2em; text-decoration-color: var(--field); }
 .tilt { display: inline-block; transform: rotate(-2deg); transform-origin: left bottom; }
 
 /* Halftone vignette laid over a picture. Never takes pointer events: the
-   dragon underneath is also the admin door. */
+   sphere hero underneath is also the admin door. */
 .crt::after {
   content: "";
   position: absolute;
