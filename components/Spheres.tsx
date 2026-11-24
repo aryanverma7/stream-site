@@ -66,9 +66,28 @@ export function Spheres() {
   const flashRef = useRef<HTMLDivElement>(null);
   const circleRef = useRef<HTMLDivElement>(null);
   const followRef = useRef<HTMLDivElement>(null);
+  // Set once the door has fired; cleared when Back restores this page from the bfcache.
+  const leavingRef = useRef(false);
+
+  useEffect(() => {
+    // Back after the door fired can restore this page from the bfcache as it
+    // was left: flash fully black and the door ignoring taps. Undo both.
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      leavingRef.current = false;
+      const flash = flashRef.current;
+      if (flash) {
+        flash.style.transition = "none";
+        flash.style.opacity = "0";
+      }
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current!;
+    const root = host.parentElement!;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     // The pen was written for three r1xx's legacy colour and light handling:
@@ -123,7 +142,14 @@ export function Spheres() {
     const centre = spheres[0];
 
     // Intro: each sphere swings up and round, then settles home.
-    let loadingComplete = reduced;
+    // The system cursor is hidden only while the custom one can show: after
+    // the intro, and never without WebGL (the early return above).
+    let loadingComplete = false;
+    const finishLoading = () => {
+      loadingComplete = true;
+      root.classList.add("pointer-fine:cursor-none");
+    };
+    if (reduced) finishLoading();
     const intro = reduced
       ? []
       : spheres.map((sphere, i) => {
@@ -148,7 +174,7 @@ export function Spheres() {
             })
             .to(sphere.position, { duration: 0.6, x: o.x, y: o.y, z: o.z, ease: "power1.out" });
         });
-    const ready = reduced ? 0 : window.setTimeout(() => (loadingComplete = true), (REVOLUTION_DURATION + 1) * 1000);
+    const ready = reduced ? 0 : window.setTimeout(finishLoading, (REVOLUTION_DURATION + 1) * 1000);
 
     const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = true;
@@ -190,7 +216,6 @@ export function Spheres() {
     const yFollow = gsap.quickTo(follow, "y", { duration: 0.6, ease: "power3" });
     const tap = createTapCounter(5, 3000);
     let down: { x: number; y: number; t: number } | null = null;
-    let leaving = false;
 
     const aim = (e: PointerEvent) => {
       const box = canvas.getBoundingClientRect();
@@ -216,14 +241,14 @@ export function Spheres() {
       down = { x: e.clientX, y: e.clientY, t: performance.now() };
     };
     const onUp = (e: PointerEvent) => {
-      if (!down || leaving) return;
+      if (!down || leavingRef.current) return;
       const now = performance.now();
       const wasTap = isTap(e.clientX - down.x, e.clientY - down.y, now - down.t);
       down = null;
       if (!wasTap) return;
       aim(e);
       if (!raycaster.intersectObject(centre, false).length || !tap(now)) return;
-      leaving = true;
+      leavingRef.current = true;
       const flash = flashRef.current!;
       flash.style.transition = reduced ? "none" : "opacity 0.6s ease-in";
       flash.style.opacity = "1";
@@ -292,6 +317,7 @@ export function Spheres() {
     return () => {
       cancelAnimationFrame(frame);
       clearTimeout(ready);
+      root.classList.remove("pointer-fine:cursor-none");
       intro.forEach((t) => t.kill());
       gsap.killTweensOf([circle, follow]);
       sizer.disconnect();
@@ -306,7 +332,7 @@ export function Spheres() {
   }, []);
 
   return (
-    <div className="absolute inset-0 pointer-fine:cursor-none" style={{ background: ROOM }}>
+    <div data-testid="spheres" className="absolute inset-0" style={{ background: ROOM }}>
       <div ref={hostRef} className="absolute inset-0" />
       <div
         ref={circleRef}
