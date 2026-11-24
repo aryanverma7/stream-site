@@ -7,21 +7,10 @@ import gsap from "gsap";
 import { createTapCounter, isTap } from "@/lib/tapCounter";
 
 // A port of the "Festivity" sphere-collision CodePen: its radii, positions, intro,
-// hover force, collisions, breathing and lighting, recoloured to the persona5 palette.
+// hover force, collisions, breathing, material and lighting, verbatim.
 
-// Room red behind the canvas (the pen's page gradient, persona-style).
+// Room red behind the canvas.
 const ROOM = "#d80f1d";
-
-// [colour, emissive]: a low emissive only lifts the shadow side, so each sphere keeps its form.
-const PAINTS: [string, string][] = [
-  ["#ff1f30", "#3a0004"], // hot red
-  ["#a3000d", "#1a0002"], // blood
-  ["#2a2626", "#000000"], // ink
-  ["#ff1f30", "#3a0004"],
-  ["#f4f1ea", "#1a1414"], // paper
-  ["#a3000d", "#1a0002"],
-  ["#2a2626", "#000000"],
-];
 
 const RADII = [
   1, 0.6, 0.8, 0.4, 0.9, 0.7, 0.9, 0.3, 0.2, 0.5, 0.6, 0.4, 0.5,
@@ -81,12 +70,16 @@ export function Spheres() {
     const host = hostRef.current!;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+    // The pen was written for three r1xx's legacy colour and light handling:
+    // no colour management, linear output, light intensities without the PI factor.
+    THREE.ColorManagement.enabled = false;
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     } catch {
       return; // no WebGL: the red room stays, the hero still reads
     }
+    renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -98,29 +91,22 @@ export function Spheres() {
     const camera = new THREE.PerspectiveCamera(25, 1, 0.1, 1000);
     camera.position.z = CAMERA_Z;
 
-    // The pen's light rig (same positions), rebalanced toward the key light:
-    // a low ambient so every sphere falls off into shadow, and a spot (no
-    // distance decay) that casts the soft contact shadows between them.
-    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    const spot = new THREE.SpotLight(0xffffff, 3.2, 0, 0.32, 0.6, 0);
+    // The pen's three lights at its numbers (legacy units: x PI, spot without decay).
+    scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI));
+    const spot = new THREE.SpotLight(0xffffff, 0.52 * Math.PI, 0, Math.PI / 3, 0, 0);
     spot.position.set(14, 24, 30);
     spot.castShadow = true;
-    spot.shadow.mapSize.set(2048, 2048);
-    spot.shadow.camera.near = 20;
-    spot.shadow.camera.far = 70;
-    spot.shadow.bias = -0.0005;
-    spot.shadow.radius = 4;
     scene.add(spot);
-    const under = new THREE.DirectionalLight(0xffffff, 0.35);
+    const under = new THREE.DirectionalLight(0xffffff, 0.2 * Math.PI);
     under.position.set(0, -4, 0);
     scene.add(under);
 
-    // One geometry for all, scaled per sphere; one material per paint.
+    // One geometry for all, scaled per sphere; the pen's one material.
     const geometry = new THREE.SphereGeometry(1, 64, 64);
-    const materials = PAINTS.map(([color, emissive]) => new THREE.MeshLambertMaterial({ color, emissive }));
+    const material = new THREE.MeshLambertMaterial({ color: "#c7a5a5", emissive: "red" });
     const group = new THREE.Group();
     const spheres = POSITIONS.map(([x, y, z], i) => {
-      const sphere = new THREE.Mesh(geometry, materials[i % materials.length]);
+      const sphere = new THREE.Mesh(geometry, material);
       sphere.scale.setScalar(RADII[i]);
       sphere.position.set(x, reduced ? y : INIT_Y, z);
       sphere.userData = { original: new THREE.Vector3(x, y, z), radius: RADII[i] };
@@ -175,12 +161,12 @@ export function Spheres() {
       if (!w || !h) return;
       renderer.setSize(w, h);
       camera.aspect = w / h;
-      // The pen is framed for a wide screen; on narrow ones pull back until the
-      // cluster's full width (about 8 units each side) fits.
+      // Wide screens get the pen's own framing. Tall ones pull back until the
+      // cluster's full width (about 8 units each side) fits, and lift it above the title block.
+      const tall = camera.aspect < 1;
       const halfTan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
-      camera.position.setLength(Math.max(CAMERA_Z, CLUSTER_HALF_WIDTH / halfTan + 2.5));
-      // Lift the cluster into the space above the title block, more on tall screens.
-      camera.setViewOffset(w, h, 0, h * (camera.aspect < 1 ? 0.12 : 0.04), w, h);
+      camera.position.setLength(tall ? Math.max(CAMERA_Z, CLUSTER_HALF_WIDTH / halfTan + 2.5) : CAMERA_Z);
+      camera.setViewOffset(w, h, 0, tall ? h * 0.12 : 0, w, h);
     };
     resize();
     const sizer = new ResizeObserver(resize);
@@ -307,7 +293,7 @@ export function Spheres() {
       seen.disconnect();
       controls.dispose();
       geometry.dispose();
-      materials.forEach((m) => m.dispose());
+      material.dispose();
       renderer.dispose();
       canvas.remove();
     };
