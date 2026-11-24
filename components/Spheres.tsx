@@ -12,6 +12,13 @@ import { createTapCounter, isTap } from "@/lib/tapCounter";
 // Room red behind the canvas.
 const ROOM = "#d80f1d";
 
+// Sphere paints [colour, emissive], lit by the pen's own rig. Colours sit
+// well below white so the pen's light-to-shadow gradient still shows.
+const PAPER: [string, string] = ["#b8b2a8", "#0e0a06"];
+const INK: [string, string] = ["#1a1a1a", "#140002"];
+// Sphere i takes paint i % length: v1 [PAPER], v2 [INK], v3 [INK, INK, PAPER].
+const LOOK: [string, string][] = [INK, INK, PAPER];
+
 const RADII = [
   1, 0.6, 0.8, 0.4, 0.9, 0.7, 0.9, 0.3, 0.2, 0.5, 0.6, 0.4, 0.5,
   0.6, 0.7, 0.3, 0.4, 0.8, 0.7, 0.5, 0.4, 0.6, 0.35, 0.38, 0.9, 0.3,
@@ -53,6 +60,7 @@ const BREATHING_AMPLITUDE = 0.1;
 const BREATHING_SPEED = 0.002;
 const CAMERA_Z = 24;
 const CLUSTER_HALF_WIDTH = 8;
+const WIDE_CAMERA_Z = 30;
 
 /**
  * The sphere cluster. Spheres swing up from below, breathe, are shoved by
@@ -103,10 +111,10 @@ export function Spheres() {
 
     // One geometry for all, scaled per sphere; the pen's one material.
     const geometry = new THREE.SphereGeometry(1, 64, 64);
-    const material = new THREE.MeshLambertMaterial({ color: "#c7a5a5", emissive: "red" });
+    const materials = LOOK.map(([color, emissive]) => new THREE.MeshLambertMaterial({ color, emissive }));
     const group = new THREE.Group();
     const spheres = POSITIONS.map(([x, y, z], i) => {
-      const sphere = new THREE.Mesh(geometry, material);
+      const sphere = new THREE.Mesh(geometry, materials[i % materials.length]);
       sphere.scale.setScalar(RADII[i]);
       sphere.position.set(x, reduced ? y : INIT_Y, z);
       sphere.userData = { original: new THREE.Vector3(x, y, z), radius: RADII[i] };
@@ -161,12 +169,13 @@ export function Spheres() {
       if (!w || !h) return;
       renderer.setSize(w, h);
       camera.aspect = w / h;
-      // Wide screens get the pen's own framing. Tall ones pull back until the
-      // cluster's full width (about 8 units each side) fits, and lift it above the title block.
+      // Pull back until the whole cluster fits (about 8 units each side wide,
+      // a little further on wide screens so it clears the title band in height),
+      // then lift it into the space above that band.
       const tall = camera.aspect < 1;
       const halfTan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
-      camera.position.setLength(tall ? Math.max(CAMERA_Z, CLUSTER_HALF_WIDTH / halfTan + 2.5) : CAMERA_Z);
-      camera.setViewOffset(w, h, 0, tall ? h * 0.12 : 0, w, h);
+      camera.position.setLength(tall ? Math.max(CAMERA_Z, CLUSTER_HALF_WIDTH / halfTan + 2.5) : WIDE_CAMERA_Z);
+      camera.setViewOffset(w, h, 0, h * (tall ? 0.12 : 0.08), w, h);
     };
     resize();
     const sizer = new ResizeObserver(resize);
@@ -293,7 +302,7 @@ export function Spheres() {
       seen.disconnect();
       controls.dispose();
       geometry.dispose();
-      material.dispose();
+      materials.forEach((m) => m.dispose());
       renderer.dispose();
       canvas.remove();
     };
