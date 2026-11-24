@@ -12,15 +12,15 @@ import { createTapCounter, isTap } from "@/lib/tapCounter";
 // Room red behind the canvas (the pen's page gradient, persona-style).
 const ROOM = "#d80f1d";
 
-// [colour, emissive]: the pen's single material is a pale colour lit by a red emissive.
+// [colour, emissive]: a low emissive only lifts the shadow side, so each sphere keeps its form.
 const PAINTS: [string, string][] = [
-  ["#ff5562", "#e60012"], // hot red
-  ["#8f000b", "#3a0004"], // blood
-  ["#2a2626", "#0b0b0b"], // ink
-  ["#ff5562", "#e60012"],
-  ["#f4f1ea", "#000000"], // paper
-  ["#8f000b", "#3a0004"],
-  ["#2a2626", "#0b0b0b"],
+  ["#ff1f30", "#3a0004"], // hot red
+  ["#a3000d", "#1a0002"], // blood
+  ["#2a2626", "#000000"], // ink
+  ["#ff1f30", "#3a0004"],
+  ["#f4f1ea", "#1a1414"], // paper
+  ["#a3000d", "#1a0002"],
+  ["#2a2626", "#000000"],
 ];
 
 const RADII = [
@@ -63,6 +63,7 @@ const REVOLUTION_DURATION = 2; // seconds
 const BREATHING_AMPLITUDE = 0.1;
 const BREATHING_SPEED = 0.002;
 const CAMERA_Z = 24;
+const CLUSTER_HALF_WIDTH = 8;
 
 /**
  * The sphere cluster. Spheres swing up from below, breathe, are shoved by
@@ -97,14 +98,20 @@ export function Spheres() {
     const camera = new THREE.PerspectiveCamera(25, 1, 0.1, 1000);
     camera.position.z = CAMERA_Z;
 
-    // The pen's lighting, written for three's legacy light units; current
-    // three drops the PI factor and decays the spot with distance, so restore both.
-    scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI));
-    const spot = new THREE.SpotLight(0xffffff, 0.52 * Math.PI, 0, Math.PI / 3, 0, 0);
+    // The pen's light rig (same positions), rebalanced toward the key light:
+    // a low ambient so every sphere falls off into shadow, and a spot (no
+    // distance decay) that casts the soft contact shadows between them.
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const spot = new THREE.SpotLight(0xffffff, 3.2, 0, 0.32, 0.6, 0);
     spot.position.set(14, 24, 30);
     spot.castShadow = true;
+    spot.shadow.mapSize.set(2048, 2048);
+    spot.shadow.camera.near = 20;
+    spot.shadow.camera.far = 70;
+    spot.shadow.bias = -0.0005;
+    spot.shadow.radius = 4;
     scene.add(spot);
-    const under = new THREE.DirectionalLight(0xffffff, 0.2 * Math.PI);
+    const under = new THREE.DirectionalLight(0xffffff, 0.35);
     under.position.set(0, -4, 0);
     scene.add(under);
 
@@ -168,9 +175,12 @@ export function Spheres() {
       if (!w || !h) return;
       renderer.setSize(w, h);
       camera.aspect = w / h;
-      // The pen is framed for a wide screen; pull back on narrow ones so more of the cluster shows.
-      camera.position.setLength(CAMERA_Z / Math.min(1, camera.aspect * 1.4));
-      camera.updateProjectionMatrix();
+      // The pen is framed for a wide screen; on narrow ones pull back until the
+      // cluster's full width (about 8 units each side) fits.
+      const halfTan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
+      camera.position.setLength(Math.max(CAMERA_Z, CLUSTER_HALF_WIDTH / halfTan + 2.5));
+      // Lift the cluster into the space above the title block, more on tall screens.
+      camera.setViewOffset(w, h, 0, h * (camera.aspect < 1 ? 0.12 : 0.04), w, h);
     };
     resize();
     const sizer = new ResizeObserver(resize);
