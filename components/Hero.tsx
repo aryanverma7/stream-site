@@ -4,11 +4,19 @@ import { useEffect, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import { useLiveStatus } from "@/lib/useLiveStatus";
 
-// three and gsap stay out of the main bundle; the red room shows until they load.
-const Spheres = dynamic(() => import("./Spheres").then((m) => m.Spheres), {
-  ssr: false,
-  loading: () => <div className="absolute inset-0" style={{ background: "#d80f1d" }} />,
-});
+// The hand-written WebGL2 spheres; the red room shows until the chunk loads. `?hero=2` swaps in
+// the comparison scene (HeroScene2) for screenshots; Spheres.tsx (three + gsap) is kept until
+// the owner picks.
+const Spheres = dynamic(
+  () =>
+    new URLSearchParams(window.location.search).get("hero") === "2"
+      ? import("./HeroScene2").then((m) => m.HeroScene2)
+      : import("./SpheresLite").then((m) => m.SpheresLite),
+  {
+    ssr: false,
+    loading: () => <div className="absolute inset-0" style={{ background: "#d80f1d" }} />,
+  },
+);
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
