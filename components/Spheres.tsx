@@ -100,7 +100,8 @@ export function Spheres() {
       return; // no WebGL: the red room stays, the hero still reads
     }
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Phones have dense screens and weak GPUs: cap lower below 768px.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, window.innerWidth < 768 ? 1.5 : 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const canvas = renderer.domElement;
@@ -124,7 +125,7 @@ export function Spheres() {
     // One geometry for all, scaled per sphere. Two of every three spheres are
     // ink (soft Phong highlight so they read round), every third is paper
     // (kept well below white so the pen's light-to-shadow gradient shows).
-    const geometry = new THREE.SphereGeometry(1, 64, 64);
+    const geometry = new THREE.SphereGeometry(1, 32, 32);
     const ink = new THREE.MeshPhongMaterial({ color: "#221c1c", specular: "#3a3434", shininess: 18 });
     const paper = new THREE.MeshLambertMaterial({ color: "#b8b2a8", emissive: "#0e0a06" });
     const group = new THREE.Group();
@@ -142,12 +143,11 @@ export function Spheres() {
     const centre = spheres[0];
 
     // Intro: each sphere swings up and round, then settles home.
-    // The system cursor is hidden only while the custom one can show: after
-    // the intro, and never without WebGL (the early return above).
+    // The system cursor is hidden only once the custom one shows: at the first
+    // mouse move after the intro, and never without WebGL (the early return above).
     let loadingComplete = false;
     const finishLoading = () => {
       loadingComplete = true;
-      root.classList.add("pointer-fine:cursor-none");
     };
     if (reduced) finishLoading();
     const intro = reduced
@@ -177,7 +177,7 @@ export function Spheres() {
     const ready = reduced ? 0 : window.setTimeout(finishLoading, (REVOLUTION_DURATION + 1) * 1000);
 
     const controls = new OrbitControls(camera, canvas);
-    controls.enableDamping = true;
+    controls.enableDamping = !reduced;
     controls.dampingFactor = 0.05;
     // Zoom and pan would steal the page's wheel scroll and two-finger gestures.
     controls.enableZoom = false;
@@ -210,12 +210,14 @@ export function Spheres() {
     const circle = circleRef.current!;
     const follow = followRef.current!;
     gsap.set([circle, follow], { xPercent: -50, yPercent: -50 });
-    const xTo = gsap.quickTo(circle, "x", { duration: 0.6, ease: "power3" });
-    const yTo = gsap.quickTo(circle, "y", { duration: 0.6, ease: "power3" });
-    const xFollow = gsap.quickTo(follow, "x", { duration: 0.6, ease: "power3" });
-    const yFollow = gsap.quickTo(follow, "y", { duration: 0.6, ease: "power3" });
+    const follows = { duration: reduced ? 0 : 0.6, ease: "power3" };
+    const xTo = gsap.quickTo(circle, "x", follows);
+    const yTo = gsap.quickTo(circle, "y", follows);
+    const xFollow = gsap.quickTo(follow, "x", follows);
+    const yFollow = gsap.quickTo(follow, "y", follows);
     const tap = createTapCounter(5, 3000);
     let down: { x: number; y: number; t: number } | null = null;
+    let leaving = 0;
 
     const aim = (e: PointerEvent) => {
       const box = canvas.getBoundingClientRect();
@@ -232,22 +234,25 @@ export function Spheres() {
         xFollow(e.clientX - box.left);
         yFollow(e.clientY - box.top);
         gsap.to([circle, follow], { autoAlpha: 1, duration: 0.2, overwrite: "auto" });
+        root.classList.add("pointer-fine:cursor-none");
       }
+      if (reduced) return;
       const hit = raycaster.intersectObjects(spheres, false)[0];
       if (hit) forces.set(hit.object, new THREE.Vector3().subVectors(hit.point, hit.object.position).normalize().multiplyScalar(0.2));
     };
     const onLeave = () => gsap.to([circle, follow], { autoAlpha: 0, duration: 0.2, overwrite: "auto" });
     const onDown = (e: PointerEvent) => {
-      down = { x: e.clientX, y: e.clientY, t: performance.now() };
+      down = e.button === 0 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
     };
     const onUp = (e: PointerEvent) => {
-      if (!down || leavingRef.current) return;
+      if (!down || e.button !== 0 || leavingRef.current) return;
       const now = performance.now();
       const wasTap = isTap(e.clientX - down.x, e.clientY - down.y, now - down.t);
       down = null;
       if (!wasTap) return;
       aim(e);
-      if (!raycaster.intersectObject(centre, false).length || !tap(now)) return;
+      // Only the nearest sphere counts: a tap on one in front of the centre is not a door tap.
+      if (raycaster.intersectObjects(spheres, false)[0]?.object !== centre || !tap(now)) return;
       leavingRef.current = true;
       const flash = flashRef.current!;
       flash.style.transition = reduced ? "none" : "opacity 0.6s ease-in";
@@ -256,7 +261,7 @@ export function Spheres() {
       // /admin and answers a session-less route-data fetch with a redirect
       // the client router cannot follow.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- see above
-      setTimeout(() => window.location.assign("/admin"), reduced ? 0 : 850);
+      leaving = window.setTimeout(() => window.location.assign("/admin"), reduced ? 0 : 850);
     };
     canvas.addEventListener("pointermove", onMove);
     canvas.addEventListener("pointerleave", onLeave);
@@ -317,6 +322,7 @@ export function Spheres() {
     return () => {
       cancelAnimationFrame(frame);
       clearTimeout(ready);
+      clearTimeout(leaving);
       root.classList.remove("pointer-fine:cursor-none");
       intro.forEach((t) => t.kill());
       gsap.killTweensOf([circle, follow]);
@@ -337,12 +343,12 @@ export function Spheres() {
       <div
         ref={circleRef}
         aria-hidden
-        className="pointer-events-none invisible absolute top-0 left-0 z-30 h-2.5 w-2.5 rounded-full bg-ink opacity-0 transition-all duration-[50ms]"
+        className="pointer-events-none invisible absolute top-0 left-0 z-30 h-2.5 w-2.5 rounded-full bg-paper opacity-0 mix-blend-difference"
       />
       <div
         ref={followRef}
         aria-hidden
-        className="pointer-events-none invisible absolute top-0 left-0 z-30 h-10 w-10 rounded-full border border-ink opacity-0 transition-all duration-100"
+        className="pointer-events-none invisible absolute top-0 left-0 z-30 h-10 w-10 rounded-full border border-paper opacity-0 mix-blend-difference"
       />
       <div ref={flashRef} className="pointer-events-none absolute inset-0 z-40 bg-ink opacity-0" />
     </div>

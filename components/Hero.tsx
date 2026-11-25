@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { Spheres } from "./Spheres";
+import dynamic from "next/dynamic";
 import { useLiveStatus } from "@/lib/useLiveStatus";
+
+// three and gsap stay out of the main bundle; the red room shows until they load.
+const Spheres = dynamic(() => import("./Spheres").then((m) => m.Spheres), {
+  ssr: false,
+  loading: () => <div className="absolute inset-0" style={{ background: "#d80f1d" }} />,
+});
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
