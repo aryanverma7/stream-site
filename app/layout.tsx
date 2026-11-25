@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SakugaFx } from "@/components/SakugaFx";
 
 export const metadata: Metadata = {
   title: "DualBladeX",
@@ -25,7 +26,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <SakugaFx />
+      </body>
     </html>
   );
 }

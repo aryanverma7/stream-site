@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading } from "@/components/Loading";
 import { useEffect, useId, useRef, useState } from "react";
 import { useSearch, type Hit } from "@/lib/useSearch";
 import { routeHash } from "@/lib/useHashRoute";
@@ -102,7 +103,7 @@ export function SearchBox() {
       />
       {listOpen && (
         <ul id={listId} role="listbox" aria-label="Search results" className="slab-flat absolute right-0 z-30 mt-2 max-h-80 w-80 max-w-[90vw] overflow-y-auto text-phosphor">
-          {loading && <li className="px-3 py-2 text-sm text-dim">Searching…</li>}
+          {loading && <li className="px-3 py-2"><Loading label="Searching…" /></li>}
           {error && <li className="px-3 py-2 text-sm text-rec">{error}</li>}
           {!loading && !error && hits.length === 0 && <li className="px-3 py-2 text-sm text-dim">No matches</li>}
           {shown.map((h, i) => (

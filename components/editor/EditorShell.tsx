@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading } from "@/components/Loading";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { parseHash, routeHash, useHashRoute, type Route } from "@/lib/useHashRoute";
 import { useEditorMe, type EditorMe } from "@/lib/useEditorMe";
@@ -197,7 +198,7 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
             {notice?.arrived ? notice.text : ""}
           </p>
           {error && <p className="text-rec">{error}</p>}
-          {!me && !error && <p className="osd text-xl text-dim">Loading…</p>}
+          {!me && !error && <p className="text-xl"><Loading /></p>}
           {me && (
             <>
               {inProjects && <Breadcrumb route={route} names={names} />}

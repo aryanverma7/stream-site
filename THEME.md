@@ -79,8 +79,15 @@ is a stacking context, which is why `useAsk` portals its dialog to `<body>`), `.
 - Loops are slow: the hero starburst turns once in 40 s; the live dot blinks at 0.8 Hz; the static
   texture changes 3 times a second. Nothing flashes faster than 3 times a second.
 - Nothing waits on an animation: entries only, closing is instant, overlays never take pointer events.
-- `prefers-reduced-motion: reduce`: every slam, wipe, pop, lean and loop is off; changes become a 150 ms
-  fade.
+- Loading: `components/Loading.tsx` everywhere something loads (a red star ratcheting round with a kick,
+  the word leaning); `overlay` puts it over a video while it buffers (review player, `/s`).
+- Controls (`lib/sakuga.ts`, ported in part from MIT sakuga-vfx, mounted once by `SakugaFx` in the layout
+  through document-level listeners): buttons, tabs, the scrub slider and checkboxes squash on a spring while
+  pressed and overshoot on release; one fixed canvas (`canvas.sakuga-fx`, no pointer events) draws a red
+  impact star with BAM! on primary (`.wallpaper`) buttons, a slash on tabs and menu items, CHECK! on a
+  checkbox turning on, smoke behind a fast scrub, and an impact on any `.toast-in` arriving.
+- `prefers-reduced-motion: reduce`: every slam, wipe, pop, lean, loop, squash and canvas effect is off;
+  changes become a 150 ms fade and the loading mark is a still frame.
 
 ## Focus
 

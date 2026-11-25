@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading } from "@/components/Loading";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { editorApi } from "@/lib/editorApi";
 import { routeHash } from "@/lib/useHashRoute";
@@ -144,7 +145,7 @@ export function ReviewPlayer(props: ReviewPlayerProps) {
       </section>
     );
   // after a version switch the old version's data must not render under the new id
-  if (!data || data.iteration.id !== iterationId) return <p className="osd text-xl text-dim">Loading…</p>;
+  if (!data || data.iteration.id !== iterationId) return <p className="text-xl"><Loading /></p>;
   return <Watch key={`${iterationId}-${attempt}`} {...props} data={data} retry={() => setAttempt(attempt + 1)} partner={partner} editReady={editReady} seen={seen} editName={edit?.name ?? "Untitled"} />;
 }
 
@@ -188,6 +189,7 @@ function Watch({ projectId, editId, iterationId, seekS, role, username, now = Da
   const [videoError, setVideoError] = useState<string | null>(null);
   // this browser could not decode the picture (MEDIA_ERR_SRC_NOT_SUPPORTED, or metadata with no video size)
   const [cannotDecode, setCannotDecode] = useState(false);
+  const [buffering, setBuffering] = useState(false);
   const [videoKey, setVideoKey] = useState(0);
   const reloadAt = useRef<number | null>(null);
   const wantPlay = useRef(false);
@@ -427,8 +429,14 @@ function Watch({ projectId, editId, iterationId, seekS, role, username, now = Da
         {started && (
           <div ref={box} className="relative space-y-2 self-start border-2 border-phosphor bg-ink p-2 shadow-[8px_8px_0_var(--field-deep)]">
             <PlaybackBar problem={problem} />
+            <div className="relative">
+            {buffering && <Loading overlay label="Buffering…" />}
             <video
               key={videoKey}
+              onWaiting={() => setBuffering(true)}
+              onPlaying={() => setBuffering(false)}
+              onCanPlay={() => setBuffering(false)}
+              onEmptied={() => setBuffering(false)}
               ref={video}
               src={mediaUrl(iterationId)}
               className="aspect-video w-full bg-black"
@@ -455,6 +463,7 @@ function Watch({ projectId, editId, iterationId, seekS, role, username, now = Da
                 save();
               }}
             />
+            </div>
             {err && (
               <p className="text-rec">
                 {err}{" "}

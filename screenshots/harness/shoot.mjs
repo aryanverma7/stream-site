@@ -368,6 +368,46 @@ async function main() {
       await shot(p, `share-guest-${suffix}`);
       await p.context().close();
     }
+
+    // Motion pass: the loading mark, and controls caught mid-effect (lib/sakuga.ts), shot without settling.
+    for (const [w, suffix] of [[1440, "desktop"], [390, "phone"]]) {
+      if (!`motion-${suffix}`.includes(only) && !only.startsWith("motion")) continue;
+      const snap = async (p, name, ms) => {
+        await p.waitForTimeout(ms);
+        await p.screenshot({ path: path.join(SHOTS, `${name}-${suffix}.png`) });
+        console.log("wrote", `${name}-${suffix}`);
+      };
+      const p = await page(w, w > 500 ? 900 : 844);
+      await p.route("**/api/editor/me", () => {}); // never answers, so the shell stays loading
+      await p.goto(backend.origin + "/editor#/home");
+      await p.locator(".loader").first().waitFor();
+      await snap(p, "motion-loading", 250);
+      await p.goto(backend.origin + "/admin");
+      await p.getByText("System Status").waitFor();
+      await settle(p);
+      await p.getByRole("button", { name: /Config/ }).click();
+      await snap(p, "motion-tab-slash", 110);
+      await p.getByRole("navigation", { name: "Settings sections" }).waitFor();
+      await p.getByRole("navigation", { name: "Settings sections" }).getByText("Roulette").first().click();
+      await settle(p);
+      const box = p.locator("input[type=checkbox]:visible").first();
+      await box.scrollIntoViewIfNeeded();
+      await box.setChecked(false);
+      await settle(p);
+      await box.check();
+      await snap(p, "motion-checkbox", 90);
+      await p.getByRole("button", { name: /Break/ }).first().click();
+      await p.getByText("Break screen").first().waitFor();
+      await settle(p);
+      const go = p.locator("button.wallpaper:visible").first();
+      await go.scrollIntoViewIfNeeded();
+      await go.hover();
+      await p.mouse.down();
+      await snap(p, "motion-button-squash", 90);
+      await p.mouse.up();
+      await snap(p, "motion-button-bam", 120);
+      await p.context().close();
+    }
   } finally {
     await browser.close();
     await backend.close();
