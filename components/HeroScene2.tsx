@@ -37,6 +37,8 @@ export function HeroScene2() {
   const tap = useRef(createTapCounter(5, 3000));
   const down = useRef<{ x: number; y: number; t: number } | null>(null);
   const leaving = useRef(false);
+  const navTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(navTimer.current), []);
 
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
@@ -75,7 +77,7 @@ export function HeroScene2() {
     flash.style.opacity = "1";
     // A real document navigation: the backend gates /admin with a redirect the router cannot follow.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- see above
-    window.setTimeout(() => window.location.assign("/admin"), reduced ? 0 : 850);
+    navTimer.current = window.setTimeout(() => window.location.assign("/admin"), reduced ? 0 : 850);
   };
 
   return (

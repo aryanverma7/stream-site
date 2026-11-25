@@ -378,7 +378,7 @@ export function SpheresLite() {
       }
     };
     const tap = createTapCounter(5, 3000);
-    let down: { x: number; y: number; t: number; id: number } | null = null;
+    let down: { x: number; y: number; t: number; id: number; lx: number; ly: number } | null = null;
     let leaving = 0;
     let loadingComplete = reduced;
     const started = performance.now();
@@ -399,8 +399,11 @@ export function SpheresLite() {
       if (down && down.id === e.pointerId) {
         // OrbitControls: a full canvas height of drag is one turn.
         const h = canvas.clientHeight || 1;
-        dTheta -= (2 * Math.PI * e.movementX) / h;
-        dPhi -= (2 * Math.PI * e.movementY) / h;
+        // Deltas from clientX/Y: movementX/Y is 0 or missing for touch on some mobile browsers.
+        dTheta -= (2 * Math.PI * (e.clientX - down.lx)) / h;
+        dPhi -= (2 * Math.PI * (e.clientY - down.ly)) / h;
+        down.lx = e.clientX;
+        down.ly = e.clientY;
       }
       if (!loadingComplete) return;
       if (e.pointerType === "mouse") {
@@ -428,7 +431,7 @@ export function SpheresLite() {
     };
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
-      down = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
+      down = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, lx: e.clientX, ly: e.clientY };
       canvas.setPointerCapture?.(e.pointerId);
     };
     const onCancel = () => (down = null);
