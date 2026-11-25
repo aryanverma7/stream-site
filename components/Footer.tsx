@@ -8,8 +8,8 @@ import { useSiteConfig } from "@/lib/useSiteConfig";
  * /api/public/site-config, already built and tested in Task #4.
  *
  * The hidden admin gateway used to live in this footer per the original
- * spec - that entire mechanism has since moved to the dragon's own
- * click-power game, so there's deliberately no admin marker here anymore.
+ * spec - that entire mechanism has since moved to the hero's centre
+ * sphere (five taps), so there's deliberately no admin marker here anymore.
  *
  * Icons are small hand-crafted SVGs rather than an icon library dependency -
  * consistent with this project's established lean-dependencies approach.

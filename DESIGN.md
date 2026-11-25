@@ -9,7 +9,7 @@ colors:
   blue: "#6e95ff"
   field-hot: "#8eacff"
   deep blue: "#4a6fd9"
-  dragon-room: "#7aa0ff"
+  hero-room: "#d80f1d"
   phosphor: "#eaeefa"
   dim: "#9aa3b8"
   rec: "#ff3b30"
@@ -120,7 +120,7 @@ components:
 
 **Creative North Star: "Security Feed"**
 
-Every surface is a monitor on a guard's wall. The public site is CAM 01 and CAM 02: the dragon plays behind scanlines with a burned-in clock, the Twitch player is a feed with a REC tag, and offline is a dead channel of static reading NO SIGNAL. The admin is the same wall seen from the guard's chair. Each subsystem is a feed tile that reads OK, Check, Lost, Off or No report before it explains anything. One world covers both, and `FeedFrame` is the shared object, so "a feed" means the same thing on both.
+Every surface is a monitor on a guard's wall. The public site is CAM 01 and CAM 02: a cluster of ink-black and paper-white spheres sits behind scanlines with a burned-in clock, the Twitch player is a feed with a REC tag, and offline is a dead channel of static reading NO SIGNAL. The admin is the same wall seen from the guard's chair. Each subsystem is a feed tile that reads OK, Check, Lost, Off or No report before it explains anything. One world covers both, and `FeedFrame` is the shared object, so "a feed" means the same thing on both.
 
 The palette is VCR blue on dead-monitor blue-black. The blue is a *field*, not an accent. It owns roughly a third of each screen as wallpaper bands, bezel strips, the donate wall and the active nav tab, and text sits on it in ink. Everything else is phosphor text on near-black bezels. The theme is single and dark by choice, because the site is watched at night and the admin sits beside OBS in a dim room. A light rendition would be a different world. The personality comes from the potato king emotes, die-cut as stickers and slapped on at an angle. The controls stay plain enough to use one-handed on a phone.
 
@@ -141,7 +141,7 @@ A two-tone world of VCR blue and blue-black, plus three signal colours that are 
 - **VCR No-Signal Blue** (blue): the field colour. Wallpaper bands, feed strips on the blue tone, the donate wall, the active admin tab, primary buttons, stencil headings on ink, focus outline and text selection.
 - **Hot Bright Signal Blue** (field-hot): hover state of anything blue. Never a resting colour.
 - **Damask Deep blue** (deep blue): the faint stripe inside the wallpaper and the scrollbar thumb on hover. It is only a texture tone.
-- **Dragon Room Blue** (dragon-room): the 3D hero's room background and fog. It is set in both `components/Dragon.tsx` (`#world` background) and `public/dragon-original.js` (fog and floor), and **the two must match**. It is deliberately a step brighter than the field blue, because scanlines and vignette darken the room. Nothing outside the dragon canvas uses it.
+- **Hero Room Red** (hero-room): the 3D hero's room background behind the sphere canvas, the one `ROOM` constant in `components/Spheres.tsx`. The spheres on it are ink (`#221c1c`, soft Phong highlight) and paper (`#b8b2a8`), two to one. Nothing outside the sphere canvas uses it.
 
 ### Secondary (signal colours, state only)
 - **REC Red** (rec): live and failure, nothing else. It covers the REC dot, the LIVE NOW plate, lost feed strips and borders, the lost summary bar, and error text.
@@ -205,7 +205,7 @@ Depth comes mostly from tone: ink, then bezel, then bezel-2, then the blue field
 - **Sticker cast** (`drop-shadow(0 10px 14px rgb(0 0 0 / 0.45))` under a 3px white keyline): die-cut stickers only.
 
 ### Named Rules
-**The Glass Rule.** Screen texture sits on top of the picture and never takes input. Scanlines, vignette and static (`crt`, `noise`) are `pointer-events: none`, and so are the hero's brackets, OSD and stickers. The dragon under them is the admin door. An overlay that eats clicks locks the streamer out.
+**The Glass Rule.** Screen texture sits on top of the picture and never takes input. Scanlines, vignette and static (`crt`, `noise`) are `pointer-events: none`, and so are the hero's brackets, OSD and stickers. The big centre sphere under them is the admin door (five taps inside three seconds). An overlay that eats clicks locks the streamer out.
 
 ## Shapes
 
@@ -273,8 +273,7 @@ All three are disabled under `prefers-reduced-motion`.
 - **Do** spend blue as a field (wallpaper band, strip, plate, active tab) with ink text on it, and let it hold about a third of the screen.
 - **Do** put a new status or picture inside the feed frame, naming the feed in VT323 on its strip.
 - **Do** give every state a form (bars, dot, static, dashed border) as well as a colour, and render missing fields as "Not reporting".
-- **Do** keep every overlay above the dragon at `pointer-events: none`, with the one real link opted back in.
-- **Do** keep the dragon room colour identical in `Dragon.tsx` and `dragon-original.js`.
+- **Do** keep every overlay above the spheres at `pointer-events: none`, with the one real link opted back in.
 - **Do** name the static-noise utility `.noise`. Never name a custom utility `.static`: Tailwind v4 already owns `static` as the position utility, and the collision silently changes layout.
 
 ### Don't:

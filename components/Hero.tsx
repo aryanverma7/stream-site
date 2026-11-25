@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { Dragon } from "./Dragon";
+import dynamic from "next/dynamic";
 import { useLiveStatus } from "@/lib/useLiveStatus";
+
+// three and gsap stay out of the main bundle; the red room shows until they load.
+const Spheres = dynamic(() => import("./Spheres").then((m) => m.Spheres), {
+  ssr: false,
+  loading: () => <div className="absolute inset-0" style={{ background: "#d80f1d" }} />,
+});
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -79,10 +85,10 @@ function Slashes() {
 }
 
 /**
- * The dragon in a red room, framed like a comic page. Everything laid over it is pointer-events:
- * none except the one link, because the dragon is also the admin door -
- * charging it to a max sneeze navigates to /admin - and an overlay that
- * ate clicks would quietly lock the streamer out.
+ * The sphere cluster in a red room, framed like a comic page. Everything laid over it is
+ * pointer-events: none except the one link, because the big centre sphere is also the admin
+ * door - five taps inside three seconds navigate to /admin - and an overlay that ate clicks
+ * would quietly lock the streamer out.
  */
 export function Hero() {
   const clock = useClock();
@@ -90,7 +96,7 @@ export function Hero() {
 
   return (
     <section className="relative h-screen w-full overflow-hidden">
-      <Dragon />
+      <Spheres />
       <Slashes />
 
       <div className="pointer-events-none absolute inset-x-4 top-4 z-20 flex items-start justify-end gap-3 md:inset-x-10 md:top-8">

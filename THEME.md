@@ -14,8 +14,8 @@ slanted, with a white stroke and a red shadow offset down and right. Panel names
 with black text, or red). The important words are stamped: Anton caps with a red offset, or ransom-note
 letters cut from five papers. Things arrive by slamming in and overshooting a little, then they hold still.
 
-- **Homepage**: the dragon now lives in a red room (fog, floor and ground bounce in
-  `public/dragon-original.js` and `#world` in `Dragon.tsx` are all `#d80f1d`, and must stay equal). A black
+- **Homepage**: a cluster of soft ink-black and paper-white spheres (two ink to one paper) in a red room
+  (`ROOM` `#d80f1d` in `components/Spheres.tsx`); five taps on the big centre sphere open `/admin`. A black
   starburst turns slowly behind the title, a black slash carries it, and DUALBLADEX is cut out in ransom
   letters that slam in one by one. Sections below are black with a faint red halftone; the donate wall is
   the red field.

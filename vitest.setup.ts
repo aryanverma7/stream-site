@@ -12,7 +12,7 @@ import "@testing-library/jest-dom/vitest";
  * Also runs global auto-cleanup for every test file - registered via
  * vitest.config.ts's setupFiles. Without this, DOM cleanup between tests
  * isn't reliably happening in this project (confirmed the hard way twice:
- * once in Dragon.test.tsx, once in MergedChat.test.tsx, both needing their
+ * once in the old Dragon.test.tsx, once in MergedChat.test.tsx, both needing their
  * own explicit afterEach(cleanup) before this file existed). Any test file
  * that queries for the same text across multiple `it()` blocks was at
  * real risk of silently accumulating un-cleaned-up renders and hitting a

@@ -282,8 +282,9 @@ async function main() {
     for (const [w, suffix] of [[1440, "desktop"], [390, "phone"]]) {
       const p = await page(w, w > 500 ? 900 : 844);
       await p.goto(backend.origin + "/");
-      await p.waitForFunction(() => document.querySelector("#world canvas"), null, { timeout: 30_000 }).catch(() => console.log("  no dragon canvas"));
-      await settle(p, 2500);
+      await p.waitForFunction(() => document.querySelector("[data-testid=spheres] canvas"), null, { timeout: 30_000 }).catch(() => console.log("  no spheres canvas"));
+      // The intro runs about 4.6 s (last sphere's delay + 2.6 s of swing); shoot once it rests.
+      await settle(p, 5500);
       await shot(p, `home-${suffix}`);
       await p.context().close();
     }

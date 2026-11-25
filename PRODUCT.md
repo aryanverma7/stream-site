@@ -31,7 +31,7 @@ The site is served by the streamer's own backend, so it shows things no link-in-
 
 - Public: live status, Twitch embed, merged chat over `/ws/widgets?widget=chat`, offline YouTube recommendations, clips (video files from backend), Streamlabs donate link (outbound, never framed), social links from `/api/public/site-config`.
 - Admin tabs: Status, Logs, Config (raw JSON + Streamlabs/Spotify connect), Points, Agent, Break.
-- The 3D dragon hero stays, and so does its gesture: charging it to a max sneeze navigates to `/admin` with a real document navigation.
+- The 3D sphere hero replaced the dragon (2026-11-24); its gesture is five taps on the big centre sphere within 3 s, which navigates to `/admin` with a real document navigation.
 - Google Fonts only through a plain `<link>`, never `next/font/google`.
 - Existing vitest suites assert on text and roles in these components.
 
