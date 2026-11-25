@@ -333,6 +333,25 @@ describe("ReviewPlayer", () => {
     expect(document.querySelector("video")).not.toBe(v);
   });
 
+  it.each(["pause", "error", "emptied"] as const)("takes the buffering overlay down on %s", async (ev) => {
+    await open();
+    const v = await watch();
+    fireEvent.waiting(v);
+    expect(screen.getByText("Buffering…")).toBeInTheDocument();
+    fireEvent[ev](v);
+    expect(screen.queryByText("Buffering…")).toBeNull();
+  });
+
+  it("takes the buffering overlay down when Try again reloads the video", async () => {
+    await open();
+    const v = await watch();
+    fireEvent.error(v);
+    fireEvent.waiting(v); // a late waiting from the failed element
+    expect(screen.getByText("Buffering…")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(screen.queryByText("Buffering…")).toBeNull();
+  });
+
   it("ignores keys when focus is on something outside the player", async () => {
     await open();
     await watch();

@@ -91,8 +91,9 @@ function ensureCanvas() {
 function size() {
   dpr = Math.min(2.5, window.devicePixelRatio || 1);
   if (canvas) {
-    canvas.width = innerWidth * dpr;
-    canvas.height = innerHeight * dpr;
+    // the box the CSS gave it, not innerHeight/100vh: they disagree while a mobile toolbar shows
+    canvas.width = (canvas.clientWidth || innerWidth) * dpr;
+    canvas.height = (canvas.clientHeight || innerHeight) * dpr;
   }
 }
 
