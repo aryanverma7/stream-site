@@ -314,13 +314,16 @@ function dragSmoke(el: HTMLElement, e0: PointerEvent) {
     lx = e.clientX;
     lt = now;
   };
-  const up = (e: PointerEvent) => {
-    slash(e.clientX, centre(el).y, { len: 46, thick: 8, life: 0.34 });
+  // a touch scrub that turns into a pan ends in pointercancel, not pointerup: no slash, but stop listening
+  const end = (e: PointerEvent) => {
+    if (e.type === "pointerup") slash(e.clientX, centre(el).y, { len: 46, thick: 8, life: 0.34 });
     removeEventListener("pointermove", move);
-    removeEventListener("pointerup", up);
+    removeEventListener("pointerup", end);
+    removeEventListener("pointercancel", end);
   };
   addEventListener("pointermove", move);
-  addEventListener("pointerup", up);
+  addEventListener("pointerup", end);
+  addEventListener("pointercancel", end);
 }
 
 function onClick(e: MouseEvent) {

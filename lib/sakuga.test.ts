@@ -57,6 +57,20 @@ describe("install", () => {
     dispatchEvent(new PointerEvent("pointerup"));
   });
 
+  it("stops listening when a touch scrub is cancelled into a pan", () => {
+    motion(false);
+    off = install();
+    document.body.innerHTML = '<div role="slider" tabindex="0"></div>';
+    const add = vi.spyOn(window, "addEventListener");
+    const remove = vi.spyOn(window, "removeEventListener");
+    document.querySelector('[role="slider"]')!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    dispatchEvent(new PointerEvent("pointercancel"));
+    for (const t of ["pointermove", "pointerup", "pointercancel"]) {
+      const added = add.mock.calls.find(([type]) => type === t)![1];
+      expect(remove).toHaveBeenCalledWith(t, added);
+    }
+  });
+
   it("does nothing under reduced motion: no squash, no effects canvas", async () => {
     motion(true);
     off = install();

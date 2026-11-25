@@ -267,6 +267,7 @@ function Watch({ projectId, editId, iterationId, seekS, role, username, now = Da
     reloadAt.current = video.current?.currentTime ?? lastTime.current;
     wantPlay.current = false;
     setPaused(true); // the new element starts paused, and its play event is what says otherwise
+    setBuffering(false); // iOS never fires canplay on a paused reload
     setVideoError(null);
     setStartError(null);
     setVideoKey((k) => k + 1);
@@ -462,6 +463,7 @@ function Watch({ projectId, editId, iterationId, seekS, role, username, now = Da
               onPlay={() => setPaused(false)}
               onPause={() => {
                 setPaused(true);
+                setBuffering(false);
                 save();
               }}
             />
