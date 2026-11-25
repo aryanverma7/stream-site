@@ -45,6 +45,18 @@ describe("install", () => {
     await vi.waitFor(() => expect(unset).toHaveBeenCalledWith("scale"), { timeout: 3000 });
   });
 
+  it("never squashes the scrub slider, so the seek point stays under the cursor", async () => {
+    motion(false);
+    off = install();
+    document.body.innerHTML = '<div role="slider" tabindex="0"></div>';
+    const s = document.querySelector<HTMLElement>('[role="slider"]')!;
+    const set = vi.spyOn(s.style, "setProperty");
+    s.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 60));
+    expect(set).not.toHaveBeenCalledWith("scale", expect.anything());
+    dispatchEvent(new PointerEvent("pointerup"));
+  });
+
   it("does nothing under reduced motion: no squash, no effects canvas", async () => {
     motion(true);
     off = install();

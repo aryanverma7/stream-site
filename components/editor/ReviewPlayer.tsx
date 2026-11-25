@@ -454,9 +454,11 @@ function Watch({ projectId, editId, iterationId, seekS, role, username, now = Da
                 setCurrent(e.currentTarget.currentTime);
                 if (!e.currentTarget.paused) save();
               }}
-              onError={(e) =>
-                isCodecError(it.checks?.codec, e.currentTarget.error?.code) ? setCannotDecode(true) : setVideoError("The video could not be played")
-              }
+              onError={(e) => {
+                setBuffering(false);
+                if (isCodecError(it.checks?.codec, e.currentTarget.error?.code)) setCannotDecode(true);
+                else setVideoError("The video could not be played");
+              }}
               onPlay={() => setPaused(false)}
               onPause={() => {
                 setPaused(true);

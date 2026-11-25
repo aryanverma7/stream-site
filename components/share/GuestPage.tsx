@@ -301,15 +301,17 @@ export function GuestPage() {
               onWaiting={() => setBuffering(true)}
               onPlaying={() => setBuffering(false)}
               onCanPlay={() => setBuffering(false)}
+              onEmptied={() => setBuffering(false)}
+              onPause={() => setBuffering(false)}
               onTimeUpdate={(e) => setAt(e.currentTarget.currentTime)}
               onLoadedMetadata={(e) =>
                 !e.currentTarget.videoWidth && setCannotDecode(true)
               }
-              onError={(e) =>
-                isCodecError(view.codec, e.currentTarget.error?.code)
-                  ? setCannotDecode(true)
-                  : setVideoFailed(true)
-              }
+              onError={(e) => {
+                setBuffering(false);
+                if (isCodecError(view.codec, e.currentTarget.error?.code)) setCannotDecode(true);
+                else setVideoFailed(true);
+              }}
             />
             </div>
             {videoFailed && (

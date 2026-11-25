@@ -281,13 +281,16 @@ export function press(el: HTMLElement, down: boolean, { low = 0.86, wide = 0.45 
   start();
 }
 
-const PRESSABLE = 'button, a.wallpaper, [role="tab"], [role="slider"], input[type="checkbox"]';
+// not [role="slider"]: squashing the scrub bar would move the seek point off the cursor; it only gets smoke
+const PRESSABLE = 'button, a.wallpaper, [role="tab"], input[type="checkbox"]';
 const centre = (el: Element) => {
   const r = el.getBoundingClientRect();
   return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, r };
 };
 
 function onDown(e: PointerEvent) {
+  const slider = (e.target as Element).closest?.('[role="slider"]') as HTMLElement | null;
+  if (slider) return dragSmoke(slider, e);
   const el = (e.target as Element).closest?.(PRESSABLE) as HTMLElement | null;
   if (!el || (el as HTMLButtonElement).disabled) return;
   press(el, true);
@@ -298,7 +301,6 @@ function onDown(e: PointerEvent) {
   };
   addEventListener("pointerup", up);
   addEventListener("pointercancel", up);
-  if (el.getAttribute("role") === "slider") dragSmoke(el, e);
 }
 
 function dragSmoke(el: HTMLElement, e0: PointerEvent) {
