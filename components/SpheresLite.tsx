@@ -45,6 +45,8 @@ const POSITIONS = [
   4, 0.08, 1.8,
 ];
 const N = RADII.length;
+/** The last sphere's intro ends here: its 0.02 s stagger plus 2.6 s of swing. */
+export const INTRO_END = (N - 1) * 0.02 + 2.6;
 
 const INIT_Y = -25;
 const REVOLUTION_RADIUS = 4;
@@ -486,7 +488,7 @@ export function SpheresLite() {
           introPosition(i, s, tmp);
           pos.set(tmp, i * 3);
         }
-        if (s >= 3) loadingComplete = true;
+        if (s >= INTRO_END) loadingComplete = true;
         return;
       }
       const time = reduced ? 0 : Date.now() * BREATHING_SPEED;

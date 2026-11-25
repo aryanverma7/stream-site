@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { SpheresLite, introPosition, nearest, pick } from "./SpheresLite";
+import { INTRO_END, SpheresLite, introPosition, nearest, pick } from "./SpheresLite";
 import { HeroScene2 } from "./HeroScene2";
 
 // jsdom has no WebGL2, so SpheresLite takes its fallback path: the static red room.
@@ -30,6 +30,17 @@ describe("SpheresLite", () => {
     expect(p).toEqual([1.2, 0.9, -0.5]);
   });
 
+  it("runs the intro until the last sphere is home", () => {
+    const end = [0, 0, 0];
+    const last = 100;
+    introPosition(last, 99, end);
+    const p = [0, 0, 0];
+    introPosition(last, INTRO_END, p);
+    p.forEach((v, k) => expect(v).toBeCloseTo(end[k], 9));
+    introPosition(last, 3, p); // the old 3 s cut-off left it mid-swing
+    expect(p[1]).not.toBeCloseTo(end[1], 1);
+  });
+
   it("lists the eight closest surfaces, nearest first, never itself", () => {
     const pos = new Float32Array(101 * 3).fill(100);
     for (let j = 0; j <= 9; j++) pos.set([j * 3, 0, 0], j * 3);
@@ -51,6 +62,14 @@ describe("SpheresLite", () => {
 });
 
 describe("HeroScene2", () => {
+  it("clears the door's flash when Back restores the page from the bfcache", () => {
+    const { container } = render(<HeroScene2 />);
+    const flash = container.querySelector<HTMLDivElement>(".z-40")!;
+    flash.style.opacity = "1";
+    window.dispatchEvent(Object.assign(new Event("pageshow"), { persisted: true }));
+    expect(flash.style.opacity).toBe("0");
+  });
+
   it("opens the door on the fifth tap on the card", () => {
     vi.useFakeTimers();
     const assign = vi.fn();
