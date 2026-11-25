@@ -71,6 +71,27 @@ describe("install", () => {
     }
   });
 
+  it("lets go of a held button when reduced motion turns on mid-hold", async () => {
+    const mq = { matches: false, onchange: () => {}, addEventListener(_: string, f: () => void) { mq.onchange = f; }, removeEventListener() {} };
+    vi.stubGlobal("matchMedia", () => mq);
+    vi.stubGlobal("requestAnimationFrame", (f: FrameRequestCallback) => setTimeout(() => f(performance.now()), 16));
+    off = install();
+    document.body.innerHTML = "<button>Go</button>";
+    const b = document.querySelector("button")!;
+    const set = vi.spyOn(b.style, "setProperty");
+    const unset = vi.spyOn(b.style, "removeProperty");
+    b.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 60));
+    expect(set).toHaveBeenCalledWith("scale", expect.any(String));
+    mq.matches = true;
+    mq.onchange();
+    dispatchEvent(new PointerEvent("pointerup"));
+    expect(unset).toHaveBeenCalledWith("scale");
+    set.mockClear();
+    await new Promise((r) => setTimeout(r, 60));
+    expect(set).not.toHaveBeenCalled(); // the frame loop no longer steps it
+  });
+
   it("does nothing under reduced motion: no squash, no effects canvas", async () => {
     motion(true);
     off = install();

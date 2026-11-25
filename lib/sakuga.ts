@@ -262,7 +262,16 @@ export function sfx(word: string, x: number, y: number, { size = 34, rot = -0.14
 /** Squash flat while held, overshoot on release. Uses `scale`/`rotate`, so a CSS transform (skew, menu lean) still applies. */
 const squashes = new WeakMap<HTMLElement, { s: Spring; pop: Spring; step: (dt: number) => boolean }>();
 export function press(el: HTMLElement, down: boolean, { low = 0.86, wide = 0.45 } = {}) {
-  if (calm) return;
+  if (calm) {
+    // reduced motion may have turned on mid-hold: a release still lets go of the squash
+    if (!down) {
+      const held = squashes.get(el);
+      if (held) frames.delete(held.step);
+      squashes.delete(el);
+      el.style.removeProperty("scale");
+    }
+    return;
+  }
   let q = squashes.get(el);
   if (!q) {
     const s = new Spring(1, 520, 15), pop = new Spring(1, 300, 12);
