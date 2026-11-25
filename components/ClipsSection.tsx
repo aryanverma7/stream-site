@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading } from "@/components/Loading";
 import { useState } from "react";
 import { useClips, Clip } from "@/lib/useClips";
 import { ClipCard } from "./ClipCard";
@@ -18,7 +19,7 @@ export function ClipsSection() {
       <div className="mx-auto flex max-w-6xl flex-col gap-8">
         <h2 className="stencil tilt text-[clamp(3rem,9vw,5.5rem)] text-phosphor">Clips</h2>
 
-        {loading && <p className="label text-xs text-dim">Loading clips...</p>}
+        {loading && <p className="text-lg"><Loading label="Loading clips..." /></p>}
 
         {!loading && clips.length === 0 && (
           <div className="slab slab-sm relative flex items-center gap-4 p-6">

@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading } from "@/components/Loading";
 import { useState } from "react";
 import { editorApi } from "@/lib/editorApi";
 import { routeHash } from "@/lib/useHashRoute";
@@ -35,7 +36,7 @@ export function ProjectView({ projectId, role, username }: { projectId: number; 
     return (
       <section className="space-y-5">
         {heading}
-        {error ? <p className="text-rec">{error}</p> : <p className="osd text-xl text-dim">Loading…</p>}
+        {error ? <p className="text-rec">{error}</p> : <p className="text-xl"><Loading /></p>}
       </section>
     );
   }

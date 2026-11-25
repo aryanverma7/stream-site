@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading } from "@/components/Loading";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { routeHash } from "@/lib/useHashRoute";
 import { useEdit, type Iteration } from "@/lib/useEdit";
@@ -23,7 +24,7 @@ export function CompareView({ projectId, editId, leftId, rightId }: { projectId:
   const left = playable(leftId);
   const right = playable(rightId);
   if (error) return <p className="text-rec">{error}</p>;
-  if (!edit) return <p className="osd text-xl text-dim">Loading…</p>;
+  if (!edit) return <p className="text-xl"><Loading /></p>;
   if (!left || !right)
     return (
       <p className="text-amber">

@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading } from "@/components/Loading";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isTyping } from "@/lib/isTyping";
 import { formatTime } from "@/lib/timecode";
@@ -118,6 +119,7 @@ export function GuestPage() {
   const [error, setError] = useState<string | null>(null);
   const [cannotDecode, setCannotDecode] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
+  const [buffering, setBuffering] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   const text = useRef<HTMLTextAreaElement>(null);
 
@@ -265,7 +267,7 @@ export function GuestPage() {
     return (
       <Frame>
         <main className="mx-auto max-w-xl p-6">
-          <p className="osd text-xl text-dim">Loading…</p>
+          <p className="text-xl"><Loading /></p>
         </main>
       </Frame>
     );
@@ -287,6 +289,8 @@ export function GuestPage() {
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="relative self-start border-2 border-phosphor bg-ink p-2 shadow-[8px_8px_0_var(--field-deep)]">
             <PlaybackBar problem={problem} />
+            <div className="relative">
+            {buffering && <Loading overlay label="Buffering…" />}
             <video
               ref={video}
               src={src}
@@ -294,16 +298,22 @@ export function GuestPage() {
               playsInline
               preload="metadata"
               className="aspect-video w-full bg-black"
+              onWaiting={() => setBuffering(true)}
+              onPlaying={() => setBuffering(false)}
+              onCanPlay={() => setBuffering(false)}
+              onEmptied={() => setBuffering(false)}
+              onPause={() => setBuffering(false)}
               onTimeUpdate={(e) => setAt(e.currentTarget.currentTime)}
               onLoadedMetadata={(e) =>
                 !e.currentTarget.videoWidth && setCannotDecode(true)
               }
-              onError={(e) =>
-                isCodecError(view.codec, e.currentTarget.error?.code)
-                  ? setCannotDecode(true)
-                  : setVideoFailed(true)
-              }
+              onError={(e) => {
+                setBuffering(false);
+                if (isCodecError(view.codec, e.currentTarget.error?.code)) setCannotDecode(true);
+                else setVideoFailed(true);
+              }}
             />
+            </div>
             {videoFailed && (
               <p className="p-2 text-sm text-rec">
                 The video could not load. If many people watched it today,

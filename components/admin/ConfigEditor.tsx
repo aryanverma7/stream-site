@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading } from "@/components/Loading";
 import { useMemo, useState } from "react";
 import { useConfigEditor } from "@/lib/useConfigEditor";
 import {
@@ -131,7 +132,7 @@ export function ConfigEditor() {
       {saveError && <p className="mb-2 text-sm text-rec">Save failed: {saveError}</p>}
       {saveSuccess && !reloadFailed && <p className="burst label mb-4 ml-6 mt-2 inline-block px-2 py-1 text-sm text-phosphor">Saved.</p>}
       {reloadFailed && <p className="mb-2 text-sm text-amber">Saved, but reloading the settings failed. Reload the page to see them.</p>}
-      {loading && <p className="text-sm text-dim">Loading config...</p>}
+      {loading && <p className="text-lg"><Loading label="Loading config..." /></p>}
 
       {!loading && !error && config && <SettingsEditor {...editor} config={config} />}
     </div>

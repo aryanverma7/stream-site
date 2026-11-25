@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading } from "@/components/Loading";
 import { useState } from "react";
 import { useAgent } from "@/lib/useAgent";
 
@@ -33,7 +34,7 @@ export function AgentPicker() {
       <div className="mb-5">
         <p className="text-xs uppercase tracking-widest text-dim">Playing</p>
         {loading ? (
-          <p className="text-sm text-dim">Loading...</p>
+          <p className="text-lg"><Loading label="Loading..." /></p>
         ) : current ? (
           <p className="text-sm text-phosphor">
             <span className="font-semibold text-field">{current}</span>

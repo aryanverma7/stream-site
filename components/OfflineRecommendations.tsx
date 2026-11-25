@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading } from "@/components/Loading";
 import { useVideoRecommendations } from "@/lib/useVideoRecommendations";
 
 /**
@@ -11,7 +12,7 @@ export function OfflineRecommendations() {
   const { videos, loading } = useVideoRecommendations();
 
   if (loading) {
-    return <p className="label text-xs text-dim">Loading recommendations...</p>;
+    return <p className="text-lg"><Loading label="Loading recommendations..." /></p>;
   }
 
   if (videos.length === 0) {

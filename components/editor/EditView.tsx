@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading } from "@/components/Loading";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { editorApi } from "@/lib/editorApi";
 import { useEdit } from "@/lib/useEdit";
@@ -115,7 +116,7 @@ export function EditView({
     return (
       <section className="space-y-5">
         {heading}
-        {error ? <p className="text-rec">{error}</p> : <p className="osd text-xl text-dim">Loading…</p>}
+        {error ? <p className="text-rec">{error}</p> : <p className="text-xl"><Loading /></p>}
       </section>
     );
   }

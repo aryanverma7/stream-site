@@ -74,6 +74,16 @@ describe("GuestPage", () => {
     expect(ids[0]).toBe(ids[1]);
   });
 
+  it.each(["pause", "error", "emptied"] as const)("takes the buffering overlay down on %s", async (ev) => {
+    render(<GuestPage />);
+    await screen.findByText("Clutch v2");
+    const v = document.querySelector("video")!;
+    fireEvent.waiting(v);
+    expect(screen.getByText("Buffering…")).toBeInTheDocument();
+    fireEvent[ev](v);
+    expect(screen.queryByText("Buffering…")).toBeNull();
+  });
+
   it("reads the token from the fragment, and a mangled one as no token instead of crashing", () => {
     expect(tokenFromHash("#abc%2Ddef")).toBe("abc-def");
     expect(tokenFromHash("#abc%E0")).toBe("");
