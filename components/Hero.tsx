@@ -4,14 +4,14 @@ import { useEffect, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import { useLiveStatus } from "@/lib/useLiveStatus";
 
-// The hand-written WebGL2 spheres; the red room shows until the chunk loads. `?hero=2` swaps in
-// the comparison scene (HeroScene2) for screenshots; Spheres.tsx (three + gsap) is kept until
-// the owner picks.
+// The hero is HeroScene2 ("Calling card", pure CSS; the card is the admin door). The red room
+// shows until the chunk loads. `?hero=lite` loads SpheresLite (hand-written WebGL2 spheres) so the
+// owner can compare; the three + gsap Spheres.tsx is gone.
 const Spheres = dynamic(
   () =>
-    new URLSearchParams(window.location.search).get("hero") === "2"
-      ? import("./HeroScene2").then((m) => m.HeroScene2)
-      : import("./SpheresLite").then((m) => m.SpheresLite),
+    new URLSearchParams(window.location.search).get("hero") === "lite"
+      ? import("./SpheresLite").then((m) => m.SpheresLite)
+      : import("./HeroScene2").then((m) => m.HeroScene2),
   {
     ssr: false,
     loading: () => <div className="absolute inset-0" style={{ background: "#d80f1d" }} />,
