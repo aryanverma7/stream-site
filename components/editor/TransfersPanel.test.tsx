@@ -18,7 +18,7 @@ import { cancelTransfer, dismissNotice, dismissTransfer, refreshLocks, refreshSt
 
 const MB = 1e6;
 const t = (over: Partial<Transfer>): Transfer => ({
-  key: "k", tapeId: 5, projectId: 12, name: "jett.mp4", size: 100 * MB, version: 3, sent: 62 * MB, speed: null, state: "uploading", message: null, ...over,
+  key: "k", editId: 5, projectId: 12, name: "jett.mp4", size: 100 * MB, version: 3, sent: 62 * MB, speed: null, state: "uploading", message: null, ...over,
 });
 const beforeUnloadBlocked = () => {
   const e = new Event("beforeunload", { cancelable: true });
@@ -62,12 +62,12 @@ describe("TransfersPanel", () => {
     expect(refreshStored).toHaveBeenCalledOnce();
   });
 
-  it("shows an unfinished upload from an earlier visit, with a link to its tape", () => {
+  it("shows an unfinished upload from an earlier visit, with a link to its edit", () => {
     store.list = [t({ state: "paused" })];
     const { getByText, getByRole } = render(<TransfersPanel />);
     expect(getByText("jett.mp4 v3")).toBeTruthy();
-    expect(getByText("62% sent - paused, drop jett.mp4 again on its tape to continue")).toBeTruthy();
-    expect(getByRole("link", { name: "Open tape" }).getAttribute("href")).toBe("#/p/12/t/5");
+    expect(getByText("62% sent - paused, drop jett.mp4 again on the same video, clip or reel to continue")).toBeTruthy();
+    expect(getByRole("link", { name: "Open" }).getAttribute("href")).toBe("#/p/12/t/5");
     fireEvent.click(getByRole("button", { name: "Cancel jett.mp4" }));
     expect(cancelTransfer).toHaveBeenCalledWith("k");
     expect(beforeUnloadBlocked()).toBe(false);
@@ -80,7 +80,7 @@ describe("TransfersPanel", () => {
     expect(getByText("Uploading in another tab · 62%")).toBeTruthy();
     expect(getByText("Another tab")).toBeTruthy();
     expect(queryByRole("button", { name: "Cancel jett.mp4" })).toBeNull();
-    expect(queryByRole("link", { name: "Open tape" })).toBeNull();
+    expect(queryByRole("link", { name: "Open" })).toBeNull();
     expect(beforeUnloadBlocked()).toBe(false);
     expect(refreshLocks).not.toHaveBeenCalled();
     vi.advanceTimersByTime(5000);

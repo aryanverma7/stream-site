@@ -17,14 +17,14 @@ export interface FixComment {
 
 export interface FixItem {
   comment: FixComment;
-  tape_id: number;
-  tape_name: string;
+  edit_id: number;
+  edit_name: string;
   project_id: number;
   iteration_id: number;
   version: number;
 }
 
-/** Every open comment on every tape's latest version, grouped by tape in the server's (oldest first) order. */
+/** Every open comment on every edit's latest version, grouped by edit in the server's (oldest first) order. */
 export function useFixList(): { groups: FixItem[][]; error: string | null } {
   const [groups, setGroups] = useState<FixItem[][]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -32,9 +32,9 @@ export function useFixList(): { groups: FixItem[][]; error: string | null } {
   useEffect(() => {
     editorApi<{ items: FixItem[] }>("/fix-list")
       .then(({ items }) => {
-        const byTape = new Map<number, FixItem[]>();
-        for (const i of items) byTape.set(i.tape_id, [...(byTape.get(i.tape_id) ?? []), i]);
-        setGroups([...byTape.values()]);
+        const byEdit = new Map<number, FixItem[]>();
+        for (const i of items) byEdit.set(i.edit_id, [...(byEdit.get(i.edit_id) ?? []), i]);
+        setGroups([...byEdit.values()]);
       })
       .catch((e: Error) => setError(e.message));
   }, []);

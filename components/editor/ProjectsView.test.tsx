@@ -5,10 +5,10 @@ import { editorBackend } from "@/lib/testUtils";
 
 const vod = {
   id: 12, name: "Ranked grind", stream_date: "2026-10-27", kind: "vod", vod_status: "ready", vod_file_id: "FILE_vod",
-  vod_filename: "ranked.mp4", download_clicked_at: null, tape_count: 2, has_new: true, created_at: 50, reel_tape_id: null, duration_s: null,
+  vod_filename: "ranked.mp4", download_clicked_at: null, edit_count: 2, has_new: true, created_at: 50, reel_edit_id: null, duration_s: null,
 };
-const clip = (id: number, created_at: number, reel: number, extra = {}) => ({
-  id, name: `Clip ${id}`, kind: "clip", vod_status: "ready", created_at, reel_tape_id: reel, duration_s: 42, tape_count: 1, has_new: false,
+const tape = (id: number, created_at: number, reel: number, extra = {}) => ({
+  id, name: `Tape ${id}`, kind: "tape", vod_status: "ready", created_at, reel_edit_id: reel, duration_s: 42, edit_count: 1, has_new: false,
   vod_file_id: `FILE_c${id}`, vod_filename: `c${id}.mp4`, download_clicked_at: null, ...extra,
 });
 const limbo = (target_id: number) => ({ id: 2, kind: "project", target_id, label: "x", requested_by: "aryan", delete_at: 1, remaining_seconds: 600, status: "pending" });
@@ -18,9 +18,9 @@ const reel = (id: number, project_id: number, sources: number[]) => ({
 
 function base(extra: Record<string, unknown> = {}) {
   return editorBackend({
-    "/projects": { projects: [clip(4, 40, 61), vod, clip(3, 20, 60)] },
-    "/projects/3": { tapes: [reel(60, 3, [3])] },
-    "/projects/4": { tapes: [reel(61, 4, [4])] },
+    "/projects": { projects: [tape(4, 40, 61), vod, tape(3, 20, 60)] },
+    "/projects/3": { edits: [reel(60, 3, [3])] },
+    "/projects/4": { edits: [reel(61, 4, [4])] },
     "/deletions": { pending: [] },
     ...extra,
   });
@@ -29,21 +29,21 @@ function base(extra: Record<string, unknown> = {}) {
 describe("ProjectsView", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("lists clips oldest first", async () => {
+  it("lists tapes oldest first", async () => {
     base();
     const { findAllByRole } = render(<ProjectsView role="admin" username="aryan" />);
     const boxes = await findAllByRole("checkbox");
-    expect(boxes.map((b) => b.getAttribute("aria-label"))).toEqual(["Select Clip 3", "Select Clip 4"]);
+    expect(boxes.map((b) => b.getAttribute("aria-label"))).toEqual(["Select Tape 3", "Select Tape 4"]);
   });
 
-  it("combines the selected clips by name, and shows the server's refusal", async () => {
+  it("combines the selected tapes by name, and shows the server's refusal", async () => {
     const fetchMock = base({
-      "POST /clips/combine": { status: 400, body: { error: "Reel 60 already has a version - clips can only be combined before that" } },
+      "POST /tapes/combine": { status: 400, body: { error: "Reel 60 already has a version - tapes can only be combined before that" } },
     });
     const { findByLabelText, getByLabelText, getByRole, findByRole } = render(<ProjectsView role="editor" username="cutter" />);
 
-    fireEvent.click(await findByLabelText("Select Clip 3"));
-    fireEvent.click(getByLabelText("Select Clip 4"));
+    fireEvent.click(await findByLabelText("Select Tape 3"));
+    fireEvent.click(getByLabelText("Select Tape 4"));
     fireEvent.click(getByRole("button", { name: /Combine/ }));
     const field = await findByLabelText("Name for the combined reel");
     expect(getByRole("button", { name: "Combine" })).toBeDisabled();
@@ -51,15 +51,15 @@ describe("ProjectsView", () => {
     fireEvent.click(getByRole("button", { name: "Combine" }));
 
     expect((await findByRole("alert")).textContent).toMatch("already has a version");
-    const call = fetchMock.mock.calls.find(([u]) => u === "/api/editor/clips/combine")!;
+    const call = fetchMock.mock.calls.find(([u]) => u === "/api/editor/tapes/combine")!;
     expect(JSON.parse(String(call[1]!.body))).toEqual({ project_ids: [3, 4], name: "Best of October" });
   });
 
-  it("shows a combined reel as 'used in' with one Uncombine, on the hosting clip", async () => {
+  it("shows a combined reel as 'used in' with one Uncombine, on the hosting tape", async () => {
     base({
-      "/projects": { projects: [clip(4, 40, 60), clip(3, 20, 60)] },
-      "/projects/3": { tapes: [reel(60, 3, [3, 4])] },
-      "/projects/4": { tapes: [] },
+      "/projects": { projects: [tape(4, 40, 60), tape(3, 20, 60)] },
+      "/projects/3": { edits: [reel(60, 3, [3, 4])] },
+      "/projects/4": { edits: [] },
     });
     const { findAllByText, getAllByRole } = render(<ProjectsView role="admin" username="aryan" />);
     expect(await findAllByText("used in")).toHaveLength(2);
@@ -86,20 +86,20 @@ describe("ProjectsView", () => {
     expect(drive.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
-  it("gives each clip its own Download, Open in Drive and, after the editor's download, Delete", async () => {
+  it("gives each tape its own Download, Open in Drive and, after the editor's download, Delete", async () => {
     const fetchMock = base({
-      "/projects": { projects: [clip(4, 40, 61), clip(3, 20, 60, { download_clicked_at: 9 })] },
+      "/projects": { projects: [tape(4, 40, 61), tape(3, 20, 60, { download_clicked_at: 9 })] },
       "POST /deletions": { request_id: 1 },
     });
     const { findAllByRole, getByLabelText, getByRole } = render(<ProjectsView role="editor" username="cutter" />);
     const [c3, c4] = (await findAllByRole("listitem")).slice(-2).map((li) => within(li));
-    expect(c3.getByRole("link", { name: "Download clip" }).getAttribute("href")).toBe("https://drive.usercontent.google.com/download?id=FILE_c3&export=download");
+    expect(c3.getByRole("link", { name: "Download tape" }).getAttribute("href")).toBe("https://drive.usercontent.google.com/download?id=FILE_c3&export=download");
     expect(c3.getByRole("link", { name: /Open in Drive/ }).getAttribute("href")).toBe("https://drive.google.com/file/d/FILE_c3/view");
-    expect(c4.queryByRole("button", { name: "Delete clip file" })).toBeNull(); // not downloaded by the editor yet
-    fireEvent.click(c4.getByRole("link", { name: "Download clip" }));
+    expect(c4.queryByRole("button", { name: "Delete tape file" })).toBeNull(); // not downloaded by the editor yet
+    fireEvent.click(c4.getByRole("link", { name: "Download tape" }));
     expect(fetchMock.mock.calls.some(([u, i]) => u === "/api/editor/projects/4/download" && i?.method === "POST")).toBe(true);
 
-    fireEvent.click(c3.getByRole("button", { name: "Delete clip file" }));
+    fireEvent.click(c3.getByRole("button", { name: "Delete tape file" }));
     fireEvent.change(getByLabelText("Type the name to confirm"), { target: { value: "c3.mp4" } });
     fireEvent.click(getByRole("button", { name: "Delete in an hour" }));
     await waitFor(() => {
@@ -108,43 +108,43 @@ describe("ProjectsView", () => {
     });
   });
 
-  it("a clip in delete limbo cannot be downloaded, deleted, combined or uncombined", async () => {
+  it("a tape in delete limbo cannot be downloaded, deleted, combined or uncombined", async () => {
     base({
-      "/projects": { projects: [clip(4, 40, 60, { download_clicked_at: 9 }), clip(3, 20, 60, { download_clicked_at: 9 })] },
-      "/projects/3": { tapes: [reel(60, 3, [3, 4])] },
-      "/projects/4": { tapes: [] },
+      "/projects": { projects: [tape(4, 40, 60, { download_clicked_at: 9 }), tape(3, 20, 60, { download_clicked_at: 9 })] },
+      "/projects/3": { edits: [reel(60, 3, [3, 4])] },
+      "/projects/4": { edits: [] },
       "/deletions": { pending: [limbo(3)] },
     });
     const { findByText, getByLabelText, getAllByRole, queryByRole } = render(<ProjectsView role="admin" username="aryan" />);
     const c3 = within((await findByText("Deleting in 10 min")).closest("li") as HTMLElement);
-    expect((getByLabelText("Select Clip 3") as HTMLInputElement).disabled).toBe(true);
-    expect((getByLabelText("Select Clip 4") as HTMLInputElement).disabled).toBe(false);
+    expect((getByLabelText("Select Tape 3") as HTMLInputElement).disabled).toBe(true);
+    expect((getByLabelText("Select Tape 4") as HTMLInputElement).disabled).toBe(false);
     expect(queryByRole("button", { name: "Uncombine" })).toBeNull();
-    expect((c3.getByRole("button", { name: "Download clip" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(c3.queryByRole("button", { name: "Delete clip file" })).toBeNull();
-    expect(getAllByRole("button", { name: "Delete clip file" })).toHaveLength(1); // Clip 4's
+    expect((c3.getByRole("button", { name: "Download tape" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(c3.queryByRole("button", { name: "Delete tape file" })).toBeNull();
+    expect(getAllByRole("button", { name: "Delete tape file" })).toHaveLength(1); // Tape 4's
   });
 
-  it("a clip whose file delete goes live is unselectable, marked Being deleted, and drops out of the Combine count", async () => {
+  it("a tape whose file delete goes live is unselectable, marked Being deleted, and drops out of the Combine count", async () => {
     vi.useFakeTimers({ toFake: ["setInterval"] });
     try {
       let pending: unknown[] = [];
       base({
-        "/projects": { projects: [clip(5, 50, 62), clip(4, 40, 61), clip(3, 20, 60)] },
-        "/projects/5": { tapes: [reel(62, 5, [5])] },
+        "/projects": { projects: [tape(5, 50, 62), tape(4, 40, 61), tape(3, 20, 60)] },
+        "/projects/5": { edits: [reel(62, 5, [5])] },
         "/deletions": () => ({ pending }),
       });
       const { findByLabelText, getByLabelText, getByRole, findByText } = render(<ProjectsView role="admin" username="aryan" />);
-      fireEvent.click(await findByLabelText("Select Clip 3"));
-      fireEvent.click(getByLabelText("Select Clip 4"));
-      fireEvent.click(getByLabelText("Select Clip 5"));
+      fireEvent.click(await findByLabelText("Select Tape 3"));
+      fireEvent.click(getByLabelText("Select Tape 4"));
+      fireEvent.click(getByLabelText("Select Tape 5"));
       expect(getByRole("button", { name: "Combine 3" })).toBeTruthy();
       pending = [{ ...limbo(5), kind: "vod" }];
       await act(() => vi.advanceTimersByTimeAsync(30_000));
-      const box = getByLabelText("Select Clip 5") as HTMLInputElement;
+      const box = getByLabelText("Select Tape 5") as HTMLInputElement;
       expect(box.disabled).toBe(true);
       expect(box.checked).toBe(false);
-      expect(within((await findByText("Being deleted")).closest("li") as HTMLElement).getByLabelText("Select Clip 5")).toBe(box);
+      expect(within((await findByText("Being deleted")).closest("li") as HTMLElement).getByLabelText("Select Tape 5")).toBe(box);
       expect(getByRole("button", { name: "Combine 2" })).toBeTruthy();
     } finally {
       vi.useRealTimers();

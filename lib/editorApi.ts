@@ -21,7 +21,7 @@ export class EditorApiError extends Error {
  * to confirm") are written to be shown as they are.
  *
  * A 401 means the session expired mid-use: the browser goes to login with
- * the hash kept, so it comes back to the same tape rather than to the
+ * the hash kept, so it comes back to the same edit rather than to the
  * projects list. It still throws, so the caller stops what it was doing.
  */
 export async function editorApi<T>(
@@ -59,7 +59,7 @@ export const driveDownloadUrl = (fileId: string) =>
 export const driveViewUrl = (fileId: string) => `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view`;
 
 /**
- * Records a VOD or clip Download click (an editor's click is what lets them
+ * Records a VOD or tape Download click (an editor's click is what lets them
  * delete it). Called inside the click and never awaited before the link
  * opens, so the click stays a user gesture; keepalive lets it outlive the
  * tab switch. Never rejects: the download goes ahead either way.

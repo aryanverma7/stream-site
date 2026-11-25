@@ -1,6 +1,6 @@
 /**
  * The review player in a real browser: service-worker range playback, the
- * OPFS download, resume after the tab closes, Start watching now, and a clip
+ * OPFS download, resume after the tab closes, Start watching now, and a short reel
  * under one chunk. Each test gets its own mock backend and mock Drive (own
  * ports, so its own origin and an empty OPFS).
  */
@@ -14,11 +14,11 @@ const CHUNK = 32 * 1024 * 1024; // lib/opfsMedia.ts CHUNK_BYTES; not overridable
 
 // read when used: test files load before global-setup makes the videos
 const size = (f: string) => statSync(path.join(MEDIA, f)).size;
-const VOD: Fixture = { projectId: 1, tapeId: 10, iterationId: 100, fileId: "bigfile", filename: "big.webm", get size() { return size("big.webm"); }, kind: "vod" };
-const CLIP: Fixture = { projectId: 2, tapeId: 20, iterationId: 200, fileId: "clipfile", filename: "clip.webm", get size() { return size("clip.webm"); }, kind: "clip" };
+const VOD: Fixture = { projectId: 1, editId: 10, iterationId: 100, fileId: "bigfile", filename: "big.webm", get size() { return size("big.webm"); }, kind: "vod" };
+const CLIP: Fixture = { projectId: 2, editId: 20, iterationId: 200, fileId: "clipfile", filename: "clip.webm", get size() { return size("clip.webm"); }, kind: "tape" };
 const CLIP2: Fixture = { ...CLIP, iterationId: 201, fileId: "clipfile2", version: 2, get size() { return size("clip.webm"); } };
 const dir = (f: Fixture) => `it-${f.projectId}-${f.iterationId}-${f.fileId}`;
-const hash = (f: Fixture) => `#/p/${f.projectId}/t/${f.tapeId}/v/${f.iterationId}`;
+const hash = (f: Fixture) => `#/p/${f.projectId}/t/${f.editId}/v/${f.iterationId}`;
 
 // fixtures name their callback `provide`, not `use`: the React hooks lint rule reads `use` as a hook
 const test = base.extend<{ drive: Drive; backend: Backend }>({
@@ -173,7 +173,7 @@ test("Start watching now streams before the download finishes", async ({ page, b
   noMediaHits(backend);
 });
 
-test("a clip under one chunk downloads and plays", async ({ page, backend, drive }) => {
+test("a tape reel under one chunk downloads and plays", async ({ page, backend, drive }) => {
   expect(CLIP.size).toBeLessThan(CHUNK);
   await open(page, backend, CLIP);
   await downloaded(page);

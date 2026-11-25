@@ -6,17 +6,17 @@ import type { Route } from "./useHashRoute";
 
 export interface CrumbNames {
   project: string | null;
-  tape: string | null;
+  edit: string | null;
   version: number | null;
 }
 
-const NONE: CrumbNames = { project: null, tape: null, version: null };
+const NONE: CrumbNames = { project: null, edit: null, version: null };
 
 const isGone = (e: unknown) => e instanceof EditorApiError && e.status === 404;
 
 /**
  * The names the breadcrumb shows, fetched for the route being shown. The
- * version comes from the tape's own iteration list rather than from
+ * version comes from the edit's own iteration list rather than from
  * /iterations/{id}, which carries the upload URL the breadcrumb has no
  * business holding.
  *
@@ -24,7 +24,7 @@ const isGone = (e: unknown) => e instanceof EditorApiError && e.status === 404;
  * onMissing gets the nearest parent that loaded. Any other failure leaves
  * the names blank and moves nobody - a backend restart is not a deletion.
  *
- * Deliberately not cached: a cached tape would not know about the version
+ * Deliberately not cached: a cached edit would not know about the version
  * just uploaded, and would send its link to "deleted".
  */
 export function useCrumbNames(route: Route, onMissing: (parent: Route) => void): CrumbNames {
@@ -32,18 +32,18 @@ export function useCrumbNames(route: Route, onMissing: (parent: Route) => void):
   // shows "…" rather than the previous project's name for a moment.
   const [loaded, setLoaded] = useState<{ key: string; names: CrumbNames }>({ key: "", names: NONE });
   const projectId = "projectId" in route ? route.projectId : null;
-  const tapeId = "tapeId" in route ? route.tapeId : null;
+  const editId = "editId" in route ? route.editId : null;
   const iterationId = "iterationId" in route ? route.iterationId : null;
-  const key = `${projectId}/${tapeId}/${iterationId}`;
+  const key = `${projectId}/${editId}/${iterationId}`;
 
   useEffect(() => {
     if (projectId === null) return;
     let live = true;
-    type Tape = { tape: { name: string; project_id: number }; iterations: { id: number; version: number }[] };
+    type Edit = { edit: { name: string; project_id: number }; iterations: { id: number; version: number }[] };
 
     Promise.allSettled([
       editorApi<{ project: { name: string } }>(`/projects/${projectId}`),
-      tapeId === null ? Promise.resolve(null) : editorApi<Tape>(`/tapes/${tapeId}`),
+      editId === null ? Promise.resolve(null) : editorApi<Edit>(`/edits/${editId}`),
     ]).then(([p, t]) => {
       if (!live) return;
       if (p.status === "rejected") {
@@ -51,22 +51,22 @@ export function useCrumbNames(route: Route, onMissing: (parent: Route) => void):
         return;
       }
       const project = p.value.project.name;
-      if (t.status === "rejected" || (t.value && t.value.tape.project_id !== projectId)) {
+      if (t.status === "rejected" || (t.value && t.value.edit.project_id !== projectId)) {
         if (t.status === "fulfilled" || isGone(t.reason)) onMissing({ view: "project", projectId });
         setLoaded({ key, names: { ...NONE, project } });
         return;
       }
-      const tape = t.value;
-      const version = tape?.iterations.find((i) => i.id === iterationId)?.version ?? null;
-      if (tape && iterationId !== null && version === null) {
-        onMissing({ view: "tape", projectId, tapeId: tapeId! });
+      const edit = t.value;
+      const version = edit?.iterations.find((i) => i.id === iterationId)?.version ?? null;
+      if (edit && iterationId !== null && version === null) {
+        onMissing({ view: "edit", projectId, editId: editId! });
       }
-      setLoaded({ key, names: { project, tape: tape?.tape.name ?? null, version } });
+      setLoaded({ key, names: { project, edit: edit?.edit.name ?? null, version } });
     });
     return () => {
       live = false;
     };
-  }, [key, projectId, tapeId, iterationId, onMissing]);
+  }, [key, projectId, editId, iterationId, onMissing]);
 
   return loaded.key === key ? loaded.names : NONE;
 }

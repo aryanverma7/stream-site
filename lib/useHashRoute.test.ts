@@ -9,9 +9,9 @@ const FORMS: [string, Route][] = [
   ["#/storage", { view: "storage" }],
   ["#/todo", { view: "todo" }],
   ["#/p/12", { view: "project", projectId: 12 }],
-  ["#/p/12/t/5", { view: "tape", projectId: 12, tapeId: 5 }],
-  ["#/p/12/t/5/v/3", { view: "iteration", projectId: 12, tapeId: 5, iterationId: 3 }],
-  ["#/p/12/t/5/v/3@222.5", { view: "iteration", projectId: 12, tapeId: 5, iterationId: 3, seekS: 222.5 }],
+  ["#/p/12/t/5", { view: "edit", projectId: 12, editId: 5 }],
+  ["#/p/12/t/5/v/3", { view: "iteration", projectId: 12, editId: 5, iterationId: 3 }],
+  ["#/p/12/t/5/v/3@222.5", { view: "iteration", projectId: 12, editId: 5, iterationId: 3, seekS: 222.5 }],
   ["#/quota", { view: "quota" }],
 ];
 
@@ -30,14 +30,14 @@ describe("parseHash / routeHash", () => {
 
 it("drops a seek that is not a finite number of seconds", () => {
   expect(parseHash(`#/p/12/t/5/v/3@${"9".repeat(400)}`)).toEqual({
-    view: "iteration", projectId: 12, tapeId: 5, iterationId: 3,
+    view: "iteration", projectId: 12, editId: 5, iterationId: 3,
   });
 });
 
 describe("parentRoute", () => {
   it("goes one level out from each level", () => {
-    expect(parentRoute(FORMS[8][1])).toEqual({ view: "tape", projectId: 12, tapeId: 5 });
-    expect(parentRoute(FORMS[7][1])).toEqual({ view: "tape", projectId: 12, tapeId: 5 });
+    expect(parentRoute(FORMS[8][1])).toEqual({ view: "edit", projectId: 12, editId: 5 });
+    expect(parentRoute(FORMS[7][1])).toEqual({ view: "edit", projectId: 12, editId: 5 });
     expect(parentRoute(FORMS[6][1])).toEqual({ view: "project", projectId: 12 });
     expect(parentRoute(FORMS[5][1])).toEqual({ view: "projects" });
   });
@@ -63,13 +63,13 @@ describe("useHashRoute", () => {
       window.location.hash = "#/p/12/t/5";
       window.dispatchEvent(new HashChangeEvent("hashchange"));
     });
-    expect(result.current.route).toEqual({ view: "tape", projectId: 12, tapeId: 5 });
+    expect(result.current.route).toEqual({ view: "edit", projectId: 12, editId: 5 });
   });
 
   it("go() writes the hash and up() moves one level out", () => {
     const { result } = renderHook(() => useHashRoute());
     act(() => {
-      result.current.go({ view: "iteration", projectId: 12, tapeId: 5, iterationId: 3 });
+      result.current.go({ view: "iteration", projectId: 12, editId: 5, iterationId: 3 });
       window.dispatchEvent(new HashChangeEvent("hashchange"));
     });
     expect(window.location.hash).toBe("#/p/12/t/5/v/3");
@@ -90,7 +90,7 @@ describe("useHashRoute", () => {
 });
 
 it("writes seekS to at most 3 decimals with trailing zeros trimmed", () => {
-  const at = (seekS: number) => routeHash({ view: "iteration", projectId: 1, tapeId: 2, iterationId: 3, seekS });
+  const at = (seekS: number) => routeHash({ view: "iteration", projectId: 1, editId: 2, iterationId: 3, seekS });
   expect(at(0.1 + 0.2)).toBe("#/p/1/t/2/v/3@0.3");
   expect(at(12)).toBe("#/p/1/t/2/v/3@12");
   expect(at(83.4567)).toBe("#/p/1/t/2/v/3@83.457");
@@ -99,9 +99,9 @@ it("writes seekS to at most 3 decimals with trailing zeros trimmed", () => {
 
 it("round-trips side-by-side compare, and Esc's parent is the left version", () => {
   const r = parseHash("#/p/1/t/2/v/7/vs/5@12.5");
-  expect(r).toEqual({ view: "iteration", projectId: 1, tapeId: 2, iterationId: 7, vsId: 5, seekS: 12.5 });
+  expect(r).toEqual({ view: "iteration", projectId: 1, editId: 2, iterationId: 7, vsId: 5, seekS: 12.5 });
   expect(routeHash(r)).toBe("#/p/1/t/2/v/7/vs/5@12.5");
-  expect(parentRoute(r)).toEqual({ view: "iteration", projectId: 1, tapeId: 2, iterationId: 7 });
-  expect(parseHash("#/p/1/t/2/v/7/vs/7")).toEqual({ view: "iteration", projectId: 1, tapeId: 2, iterationId: 7 });
-  expect(parseHash("#/p/1/t/2/v/7/vs/0")).toEqual({ view: "iteration", projectId: 1, tapeId: 2, iterationId: 7 });
+  expect(parentRoute(r)).toEqual({ view: "iteration", projectId: 1, editId: 2, iterationId: 7 });
+  expect(parseHash("#/p/1/t/2/v/7/vs/7")).toEqual({ view: "iteration", projectId: 1, editId: 2, iterationId: 7 });
+  expect(parseHash("#/p/1/t/2/v/7/vs/0")).toEqual({ view: "iteration", projectId: 1, editId: 2, iterationId: 7 });
 });

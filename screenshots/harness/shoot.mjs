@@ -152,18 +152,18 @@ const ADMIN = {
 };
 
 // ---------------------------------------------------------------- editor
-const VOD = { projectId: 1, tapeId: 10, iterationId: 102, fileId: "clipfile", filename: "main-cut-v3.webm", get size() { return statSync(CLIP).size; }, kind: "vod" };
+const VOD = { projectId: 1, editId: 10, iterationId: 102, fileId: "clipfile", filename: "main-cut-v3.webm", get size() { return statSync(CLIP).size; }, kind: "vod" };
 const project = (id, name, extra = {}) => ({
   id, name, stream_date: "2026-10-28", stream_title: "", vod_filename: `${name.toLowerCase().replace(/\W+/g, "-")}.mkv`, vod_size: 41_800_000_000,
-  vod_file_id: `vod-${id}`, vod_status: "ready", download_clicked_at: null, kind: "vod", duration_s: 14_820, reel_tape_id: null,
-  tape_count: 2, has_new: false, created_at: now - 2 * 86400, ...extra,
+  vod_file_id: `vod-${id}`, vod_status: "ready", download_clicked_at: null, kind: "vod", duration_s: 14_820, reel_edit_id: null,
+  edit_count: 2, has_new: false, created_at: now - 2 * 86400, ...extra,
 });
-const tape = (id, pid, name, status, extra = {}) => ({
-  id, project_id: pid, name, kind: "tape", status, notes: "", files_deleted_at: null, source_project_ids: [], created_at: now - 86400, ...extra,
+const edit = (id, pid, name, status, extra = {}) => ({
+  id, project_id: pid, name, kind: "video", status, notes: "", files_deleted_at: null, source_project_ids: [], created_at: now - 86400, ...extra,
 });
 const checks = (res, fps, br) => ({ resolution: { state: res, value: "1920x1080" }, fps: { state: fps, value: 60 }, bitrate: { state: br, value: "14 Mbit/s" }, duration_s: 642 });
 const iteration = (id, version, status, extra = {}) => ({
-  id, tape_id: 10, version, filename: `main-cut-v${version}.webm`, size: 1_240_000_000, status, drive_file_id: `f${id}`,
+  id, edit_id: 10, version, filename: `main-cut-v${version}.webm`, size: 1_240_000_000, status, drive_file_id: `f${id}`,
   uploaded_at: now - (4 - version) * 6 * H, created_at: now - (4 - version) * 6 * H, checks: checks("pass", "pass", "pass"), has_thumbnail: false, ...extra,
 });
 const ITERATIONS = [
@@ -188,35 +188,35 @@ const COMMENTS = [
   comment(4, "fix", "dualbladex", "Music is louder than my voice here.", null, { resolved: true }),
 ];
 const PROJECTS = [
-  project(1, "Ranked grind to Ascendant", { has_new: true, tape_count: 2 }),
-  project(2, "Chat picks every gun", { tape_count: 1, stream_date: "2026-10-25" }),
-  project(3, "Operator only on Ascent", { tape_count: 0, stream_date: "2026-10-21", vod_status: "uploading" }),
+  project(1, "Ranked grind to Ascendant", { has_new: true, edit_count: 2 }),
+  project(2, "Chat picks every gun", { edit_count: 1, stream_date: "2026-10-25" }),
+  project(3, "Operator only on Ascent", { edit_count: 0, stream_date: "2026-10-21", vod_status: "uploading" }),
 ];
-const TAPES = [
-  tape(10, 1, "Main cut", "in_review", { has_new: true, latest_version: 3, latest_iteration_id: 102, open_comments: 3 }),
-  tape(11, 1, "Shorts: best moments", "cutting", { latest_version: 1, latest_iteration_id: 110, open_comments: 0 }),
+const EDITS = [
+  edit(10, 1, "Main cut", "in_review", { has_new: true, latest_version: 3, latest_iteration_id: 102, open_comments: 3 }),
+  edit(11, 1, "Shorts: best moments", "cutting", { kind: "clip", latest_version: 1, latest_iteration_id: 110, open_comments: 0 }),
 ];
 const EDITOR = {
   "/me": { username: "dualbladex", role: "admin", brand_kit_url: "https://drive.google.com/drive/folders/example" },
   "/notifications": {
     unseen: 2,
     items: [
-      { id: 31, at: now - 20 * 60, actor: "editor1", kind: "iteration_ready", summary: "editor1 uploaded Main cut v3", project_id: 1, tape_id: 10, iteration_id: 102 },
-      { id: 30, at: now - 90 * 60, actor: "editor1", kind: "reply_added", summary: "editor1 replied on Main cut v3", project_id: 1, tape_id: 10, iteration_id: 102 },
-      { id: 28, at: now - 26 * H, actor: "agent", kind: "vod_ready", summary: "Ranked grind to Ascendant is ready", project_id: 1, tape_id: null, iteration_id: null },
+      { id: 31, at: now - 20 * 60, actor: "editor1", kind: "iteration_ready", summary: "editor1 uploaded Main cut v3", project_id: 1, edit_id: 10, iteration_id: 102 },
+      { id: 30, at: now - 90 * 60, actor: "editor1", kind: "reply_added", summary: "editor1 replied on Main cut v3", project_id: 1, edit_id: 10, iteration_id: 102 },
+      { id: 28, at: now - 26 * H, actor: "agent", kind: "vod_ready", summary: "Ranked grind to Ascendant is ready", project_id: 1, edit_id: null, iteration_id: null },
     ],
   },
   "/home": {
     vods_ready: [project(2, "Chat picks every gun", { stream_date: "2026-10-25" })],
     deletes_to_confirm: [project(4, "Bind retakes practice", { stream_date: "2026-10-12", download_clicked_at: now - 5 * 86400 })],
-    open_tapes: [
-      { tape: TAPES[0], project_name: "Ranked grind to Ascendant", latest_iteration_id: 102, latest_version: 3, open_comments: 3 },
-      { tape: tape(21, 2, "Main cut", "changes_asked"), project_name: "Chat picks every gun", latest_iteration_id: 210, latest_version: 2, open_comments: 1 },
+    open_edits: [
+      { edit: EDITS[0], project_name: "Ranked grind to Ascendant", latest_iteration_id: 102, latest_version: 3, open_comments: 3 },
+      { edit: edit(21, 2, "Main cut", "changes_asked"), project_name: "Chat picks every gun", latest_iteration_id: 210, latest_version: 2, open_comments: 1 },
     ],
   },
   "/projects": { projects: PROJECTS },
-  "/projects/1": { project: PROJECTS[0], tapes: TAPES },
-  "/tapes/10": { tape: TAPES[0], iterations: ITERATIONS },
+  "/projects/1": { project: PROJECTS[0], edits: EDITS },
+  "/edits/10": { edit: EDITS[0], iterations: ITERATIONS },
   "/iterations/102": { iteration: ITERATIONS[2], position_s: null, comments: COMMENTS },
   "/deletions": { pending: [] },
   "/drive/space": { limit: 2_199_023_255_552, free: 1_402_000_000_000 },
@@ -224,8 +224,8 @@ const EDITOR = {
   "/todos": { todos: [] },
   "/share-links": {
     links: [
-      { id: 4, iteration_id: 102, tape_id: 10, project_id: 1, tape: "Main cut", version: 3, expires_at: now + 72 * 60, state: "live" },
-      { id: 3, iteration_id: 101, tape_id: 10, project_id: 1, tape: "Main cut", version: 2, expires_at: now + 5 * 86400, state: "live" },
+      { id: 4, iteration_id: 102, edit_id: 10, project_id: 1, edit: "Main cut", version: 3, expires_at: now + 72 * 60, state: "live" },
+      { id: 3, iteration_id: 101, edit_id: 10, project_id: 1, edit: "Main cut", version: 2, expires_at: now + 5 * 86400, state: "live" },
     ],
   },
   "/iterations/102/guest-notes": {

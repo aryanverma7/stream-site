@@ -1,11 +1,14 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { fpsFrom, grade, jpegUnder, measureMedia, THUMBNAIL_MAX_BYTES, type Measure } from "./mediaChecks";
+import { mp4Info } from "./mp4Codec";
+
+vi.mock("./mp4Codec", () => ({ mp4Info: vi.fn(async () => null) }));
 
 const m = (over: Partial<Measure> = {}): Measure => ({ width: 1920, height: 1080, duration_s: 90, fps: 60, bitrate_mbps: 55, ...over });
 
 describe("grade", () => {
-  it("passes a 1080p60 55 Mbps tape on every check", () => {
-    expect(grade(m(), "tape")).toEqual({
+  it("passes a 1080p60 55 Mbps video on every check", () => {
+    expect(grade(m())).toEqual({
       resolution: { state: "pass", value: "1920x1080" },
       fps: { state: "pass", value: 60 },
       bitrate: { state: "pass", value: "≈ 55.0 Mbps" },
@@ -16,35 +19,35 @@ describe("grade", () => {
   });
 
   it("warns on a resolution under the target", () => {
-    expect(grade(m({ width: 1280, height: 720 }), "tape").resolution.state).toBe("warn");
+    expect(grade(m({ width: 1280, height: 720 })).resolution.state).toBe("warn");
   });
 
   it("grades frame rate: only 60 passes (59.94 counts), 50, 30, 29.97 and 24 fail", () => {
-    expect(grade(m({ fps: 60 }), "tape").fps.state).toBe("pass");
-    expect(grade(m({ fps: 59.94 }), "tape").fps.state).toBe("pass");
-    expect(grade(m({ fps: 59.9 }), "reel").fps.state).toBe("pass");
-    for (const fps of [59.5, 50, 30, 29.97, 24]) expect(grade(m({ fps }), "tape").fps.state).toBe("fail");
+    expect(grade(m({ fps: 60 })).fps.state).toBe("pass");
+    expect(grade(m({ fps: 59.94 })).fps.state).toBe("pass");
+    expect(grade(m({ fps: 59.9 })).fps.state).toBe("pass");
+    for (const fps of [59.5, 50, 30, 29.97, 24]) expect(grade(m({ fps })).fps.state).toBe("fail");
   });
 
   it("fails a 40 Mbps bitrate", () => {
-    expect(grade(m({ bitrate_mbps: 40 }), "tape").bitrate).toEqual({ state: "fail", value: "≈ 40.0 Mbps" });
+    expect(grade(m({ bitrate_mbps: 40 })).bitrate).toEqual({ state: "fail", value: "≈ 40.0 Mbps" });
   });
 
   it("reads an unmeasured check as unknown, never pass", () => {
-    const g = grade(m({ fps: null, bitrate_mbps: null, width: null, height: null, duration_s: null }), "tape");
+    const g = grade(m({ fps: null, bitrate_mbps: null, width: null, height: null, duration_s: null }));
     expect([g.resolution.state, g.fps.state, g.bitrate.state]).toEqual(["unknown", "unknown", "unknown"]);
     expect(g.duration_s).toBeNull();
     // An audio-only file reports 0x0.
-    expect(grade(m({ width: 0, height: 0 }), "tape").resolution.state).toBe("unknown");
+    expect(grade(m({ width: 0, height: 0 })).resolution.state).toBe("unknown");
   });
 
-  it("holds a reel to 1080x1920, so a tape-sized reel warns", () => {
-    expect(grade(m({ width: 1080, height: 1920 }), "reel").resolution.state).toBe("pass");
-    expect(grade(m(), "reel").resolution.state).toBe("warn");
+  it("holds a vertical file (clip or reel) to 1080x1920", () => {
+    expect(grade(m({ width: 1080, height: 1920 })).resolution.state).toBe("pass");
+    expect(grade(m({ width: 720, height: 1280 })).resolution.state).toBe("warn");
   });
 
   it("fits in the backend's 16384-byte checks limit", () => {
-    expect(JSON.stringify(grade(m(), "tape")).length).toBeLessThan(16384);
+    expect(JSON.stringify(grade(m())).length).toBeLessThan(16384);
   });
 });
 
@@ -125,7 +128,7 @@ describe("measureMedia", () => {
     fakeVideo({ duration: 90, videoWidth: 0, videoHeight: 0 });
     const got = await measureMedia(new File([new Uint8Array(1000)], "a.mp4"));
     expect(got).toEqual({ width: null, height: null, duration_s: 90, fps: null, bitrate_mbps: null, codec: null, playable: false });
-    expect(grade(got, "tape").bitrate.state).toBe("unknown");
+    expect(grade(got).bitrate.state).toBe("unknown");
   });
 
   it("marks a file the browser cannot decode playable: false instead of failing, so it still uploads", async () => {
@@ -141,9 +144,27 @@ describe("measureMedia", () => {
     });
     const got = await measureMedia(new File([new Uint8Array(10)], "a.mp4"));
     expect(got.playable).toBe(false);
-    const g = grade(got, "tape");
+    const g = grade(got);
     expect(g.playable).toBe(false);
     expect(g.codec).toBeNull();
+  });
+
+  it("takes size and duration from the MP4/MOV header when the browser cannot decode the file (ProRes)", async () => {
+    vi.mocked(mp4Info).mockResolvedValueOnce({ codec: "apcn", width: 1080, height: 1920, duration_s: 42.5 });
+    fakeVideo({ duration: NaN, videoWidth: 0, videoHeight: 0 });
+    const got = await measureMedia(new File([new Uint8Array(10)], "a.mov"));
+    expect(got).toEqual({ width: 1080, height: 1920, duration_s: 42.5, fps: null, bitrate_mbps: null, codec: "apcn", playable: false });
+  });
+
+  it("keeps the browser's size over the header's when it can decode the file", async () => {
+    vi.mocked(mp4Info).mockResolvedValueOnce({ codec: "avc1", width: 1, height: 1, duration_s: 1 });
+    fakeVideo({ duration: Infinity, videoWidth: 1920, videoHeight: 1080 });
+    expect(await measureMedia(new File([new Uint8Array(10)], "a.mp4"))).toMatchObject({ width: 1920, height: 1080, duration_s: 1, playable: true });
+  });
+
+  it("sends the duration unrounded, so 180.04 s stays a clip on the backend", async () => {
+    fakeVideo({ duration: 180.04, videoWidth: 1080, videoHeight: 1920 });
+    expect((await measureMedia(new File([new Uint8Array(10)], "a.mp4"))).duration_s).toBe(180.04);
   });
 
   it("marks a file with a picture playable", async () => {

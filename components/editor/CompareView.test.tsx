@@ -12,7 +12,7 @@ const sync = vi.fn(() => () => {});
 vi.mock("@/lib/compareSync", () => ({ syncVideos: (...a: unknown[]) => sync(...(a as [])) }));
 
 const it_ = (id: number, version: number, status = "ready") => ({ id, version, status, filename: `v${version}.mp4`, size: 2, drive_file_id: `F${id}`, checks: null });
-const serve = (...its: ReturnType<typeof it_>[]) => editorBackend({ "/tapes/2": { tape: { id: 2, name: "Jett" }, iterations: its } });
+const serve = (...its: ReturnType<typeof it_>[]) => editorBackend({ "/edits/2": { edit: { id: 2, name: "Jett" }, iterations: its } });
 
 beforeEach(() => {
   worker.provide.mockClear();
@@ -24,7 +24,7 @@ beforeEach(() => {
 describe("CompareView", () => {
   it("downloads both, protecting each other, then plays them synced with sound from the left", async () => {
     serve(it_(5, 2), it_(7, 3));
-    render(<CompareView projectId={1} tapeId={2} leftId={7} rightId={5} />);
+    render(<CompareView projectId={1} editId={2} leftId={7} rightId={5} />);
     await screen.findByText("v3 ↔ v2");
     expect(mediaSpy).toHaveBeenCalledWith({ id: 7, drive_file_id: "F7", size: 2 }, 1, 5);
     expect(mediaSpy).toHaveBeenCalledWith({ id: 5, drive_file_id: "F5", size: 2 }, 1, 7);
@@ -43,19 +43,19 @@ describe("CompareView", () => {
 
   it("says so when one of the two is not uploaded", async () => {
     serve(it_(5, 2, "uploading"), it_(7, 3));
-    render(<CompareView projectId={1} tapeId={2} leftId={7} rightId={5} />);
+    render(<CompareView projectId={1} editId={2} leftId={7} rightId={5} />);
     expect(await screen.findByText(/Both versions must be uploaded/)).toBeInTheDocument();
   });
 
   it("Swap sides puts the right one on the left", async () => {
     serve(it_(5, 2), it_(7, 3));
-    render(<CompareView projectId={1} tapeId={2} leftId={7} rightId={5} />);
+    render(<CompareView projectId={1} editId={2} leftId={7} rightId={5} />);
     expect(await screen.findByRole("link", { name: "Swap sides" })).toHaveAttribute("href", "#/p/1/t/2/v/5/vs/7");
   });
 
   it("shows the codec bar on the pane this browser cannot decode", async () => {
     serve(it_(5, 2), it_(7, 3));
-    render(<CompareView projectId={1} tapeId={2} leftId={7} rightId={5} />);
+    render(<CompareView projectId={1} editId={2} leftId={7} rightId={5} />);
     fireEvent.click(await screen.findByRole("button", { name: "Play side by side" }));
     const right = (await screen.findByLabelText("v2")) as HTMLVideoElement;
     Object.defineProperty(right, "error", { value: { code: 4 } });

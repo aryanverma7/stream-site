@@ -1,7 +1,7 @@
 "use client";
 
 import { codecLabel, codecProbe } from "@/lib/mp4Codec";
-import type { Checks } from "@/lib/useTape";
+import type { Checks } from "@/lib/useEdit";
 
 const canPlayHere = (mime: string) => (typeof document === "undefined" ? "maybe" : document.createElement("video").canPlayType(mime));
 

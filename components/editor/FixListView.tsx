@@ -12,13 +12,13 @@ export function fixHref(i: FixItem): string {
   return routeHash({
     view: "iteration",
     projectId: i.project_id,
-    tapeId: i.tape_id,
+    editId: i.edit_id,
     iterationId: i.iteration_id,
     ...(start !== null && { seekS: start }),
   });
 }
 
-/** Every open comment on every tape's latest version, by tape. */
+/** Every open comment on every edit's latest version, by edit. */
 export function FixListView() {
   const { groups, error } = useFixList();
   return (
@@ -33,10 +33,10 @@ export function FixListView() {
       )}
       {!error && groups.length === 0 && <p className="text-sm text-dim">Nothing open.</p>}
       {groups.map((g) => (
-        <div key={g[0].tape_id} className="space-y-2">
+        <div key={g[0].edit_id} className="space-y-2">
           <h3 className="label text-sm text-dim">
-            <a href={routeHash({ view: "tape", projectId: g[0].project_id, tapeId: g[0].tape_id })} className="hover:text-phosphor">
-              {g[0].tape_name}
+            <a href={routeHash({ view: "edit", projectId: g[0].project_id, editId: g[0].edit_id })} className="hover:text-phosphor">
+              {g[0].edit_name}
             </a>
           </h3>
           <ul className="grid gap-2">

@@ -7,7 +7,7 @@ export type Hit = {
   kind: "comment" | "reply";
   comment_id: number;
   iteration_id: number;
-  tape_id: number;
+  edit_id: number;
   project_id: number;
   version: number;
   snippet: string;

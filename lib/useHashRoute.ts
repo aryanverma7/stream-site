@@ -10,9 +10,9 @@ import { useCallback, useMemo, useSyncExternalStore } from "react";
 export type Route =
   | { view: "projects" | "home" | "fixes" | "storage" | "todo" | "quota" }
   | { view: "project"; projectId: number }
-  | { view: "tape"; projectId: number; tapeId: number }
+  | { view: "edit"; projectId: number; editId: number }
   /** `vsId`: side-by-side compare with that version on the right. */
-  | { view: "iteration"; projectId: number; tapeId: number; iterationId: number; seekS?: number; vsId?: number };
+  | { view: "iteration"; projectId: number; editId: number; iterationId: number; seekS?: number; vsId?: number };
 
 const TOP = { "": "projects", home: "home", fixes: "fixes", storage: "storage", todo: "todo", quota: "quota" } as const;
 const NESTED = /^#\/p\/(\d+)(?:\/t\/(\d+)(?:\/v\/(\d+)(?:\/vs\/(\d+))?(?:@(\d+(?:\.\d+)?))?)?)?$/;
@@ -23,18 +23,18 @@ export function parseHash(hash: string): Route {
   if (top && Object.hasOwn(TOP, top[1])) return { view: TOP[top[1] as keyof typeof TOP] };
   const m = hash.match(NESTED);
   if (!m) return { view: "projects" };
-  const [projectId, tapeId, iterationId] = [m[1], m[2], m[3]].map(Number);
+  const [projectId, editId, iterationId] = [m[1], m[2], m[3]].map(Number);
   // An id the backend could never have issued is a bad link, not a lookup.
   const bad = (id: number) => !(Number.isSafeInteger(id) && id > 0);
-  if (bad(projectId) || (m[2] !== undefined && bad(tapeId)) || (m[3] !== undefined && bad(iterationId))) {
+  if (bad(projectId) || (m[2] !== undefined && bad(editId)) || (m[3] !== undefined && bad(iterationId))) {
     return { view: "projects" };
   }
   const vsId = Number(m[4]);
   const vs = m[4] !== undefined && !bad(vsId) && vsId !== iterationId;
   const seekS = Number(m[5]);
   if (m[2] === undefined) return { view: "project", projectId };
-  if (m[3] === undefined) return { view: "tape", projectId, tapeId };
-  return { view: "iteration", projectId, tapeId, iterationId, ...(vs && { vsId }), ...(Number.isFinite(seekS) && seekS >= 0 && { seekS }) };
+  if (m[3] === undefined) return { view: "edit", projectId, editId };
+  return { view: "iteration", projectId, editId, iterationId, ...(vs && { vsId }), ...(Number.isFinite(seekS) && seekS >= 0 && { seekS }) };
 }
 
 /** Milliseconds at most, no trailing zeros: 222.5, 12, never 12.300000000000001 or 1e-7. */
@@ -46,10 +46,10 @@ export function routeHash(route: Route): string {
       return "#/";
     case "project":
       return `#/p/${route.projectId}`;
-    case "tape":
-      return `#/p/${route.projectId}/t/${route.tapeId}`;
+    case "edit":
+      return `#/p/${route.projectId}/t/${route.editId}`;
     case "iteration":
-      return `#/p/${route.projectId}/t/${route.tapeId}/v/${route.iterationId}${route.vsId ? `/vs/${route.vsId}` : ""}${route.seekS !== undefined ? `@${seconds(route.seekS)}` : ""}`;
+      return `#/p/${route.projectId}/t/${route.editId}/v/${route.iterationId}${route.vsId ? `/vs/${route.vsId}` : ""}${route.seekS !== undefined ? `@${seconds(route.seekS)}` : ""}`;
     default:
       return `#/${route.view}`;
   }
@@ -59,10 +59,10 @@ export function routeHash(route: Route): string {
 export function parentRoute(route: Route): Route | null {
   switch (route.view) {
     case "iteration":
-      // Esc out of side-by-side lands on the left version, not the tape
-      if (route.vsId) return { view: "iteration", projectId: route.projectId, tapeId: route.tapeId, iterationId: route.iterationId };
-      return { view: "tape", projectId: route.projectId, tapeId: route.tapeId };
-    case "tape":
+      // Esc out of side-by-side lands on the left version, not the edit
+      if (route.vsId) return { view: "iteration", projectId: route.projectId, editId: route.editId, iterationId: route.iterationId };
+      return { view: "edit", projectId: route.projectId, editId: route.editId };
+    case "edit":
       return { view: "project", projectId: route.projectId };
     case "project":
       return { view: "projects" };

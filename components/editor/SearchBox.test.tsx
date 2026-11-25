@@ -3,8 +3,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { SearchBox } from "./SearchBox";
 
 const hits = [
-  { kind: "comment", comment_id: 1, iteration_id: 9, tape_id: 4, project_id: 2, version: 3, snippet: "fix <b>jet</b> dash", start_s: 222 },
-  { kind: "reply", comment_id: 2, iteration_id: 8, tape_id: 4, project_id: 2, version: 2, snippet: "general note", start_s: null },
+  { kind: "comment", comment_id: 1, iteration_id: 9, edit_id: 4, project_id: 2, version: 3, snippet: "fix <b>jet</b> dash", start_s: 222 },
+  { kind: "reply", comment_id: 2, iteration_id: 8, edit_id: 4, project_id: 2, version: 2, snippet: "general note", start_s: null },
 ];
 vi.mock("@/lib/useSearch", () => ({ useSearch: () => ({ hits, loading: false, error: null }) }));
 

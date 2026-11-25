@@ -10,7 +10,7 @@ const project = (id: number, extra = {}) => ({
 const HOME = {
   vods_ready: [project(1)],
   deletes_to_confirm: [project(2, { download_clicked_at: 5 })],
-  open_tapes: [{ tape: { id: 5, project_id: 3, name: "Jett dash", status: "changes_asked" }, project_name: "Stream 3", latest_iteration_id: 8, latest_version: 2, open_comments: 3 }],
+  open_edits: [{ edit: { id: 5, project_id: 3, name: "Jett dash", status: "changes_asked" }, project_name: "Stream 3", latest_iteration_id: 8, latest_version: 2, open_comments: 3 }],
 };
 
 describe("HomeView", () => {

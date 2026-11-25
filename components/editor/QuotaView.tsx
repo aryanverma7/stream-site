@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { routeHash } from "@/lib/useHashRoute";
+import { KIND_LABEL } from "@/lib/useProject";
 import { daysLeft, useQuota, weekLabel, type QuotaCounts, type QuotaWeek } from "@/lib/useQuota";
 import { useAsk } from "./AskDialog";
 
@@ -20,14 +21,16 @@ export function StatusChip({ status }: { status: QuotaWeek["status"] }) {
   return <span className={`label inline-block px-2 py-0.5 text-xs ${tone}`}>{label}</span>;
 }
 
-/** "1 video, 3 reels" short, or "+1 reel" extra; "" when exactly on target. */
+const NAMES = { videos: ["video", "videos"], reels: ["reel or clip", "reels & clips"] } as const;
+
+/** "1 video, 3 reels & clips" short, or "+1 reel" extra; "" when exactly on target. */
 export function gap(w: QuotaWeek): string {
-  const part = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
-  const short = (["videos", "reels"] as const).filter((k) => w.short[k]).map((k) => part(w.short[k], k.slice(0, -1)));
+  const part = (n: number, k: "videos" | "reels") => `${n} ${NAMES[k][n === 1 ? 0 : 1]}`;
+  const short = (["videos", "reels"] as const).filter((k) => w.short[k]).map((k) => part(w.short[k], k));
   if (short.length) return `${short.join(", ")} short`;
   const extra = (["videos", "reels"] as const)
     .filter((k) => w.done[k] > w.target[k])
-    .map((k) => `+${part(w.done[k] - w.target[k], k.slice(0, -1))}`);
+    .map((k) => `+${part(w.done[k] - w.target[k], k)}`);
   return extra.join(", ");
 }
 
@@ -65,7 +68,7 @@ export function QuotaWeekCard({ week, endsAt, link = false }: { week: QuotaWeek;
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Meter label="Videos" done={week.done.videos} target={week.target.videos} />
-        <Meter label="Reels" done={week.done.reels} target={week.target.reels} />
+        <Meter label="Reels & clips" done={week.done.reels} target={week.target.reels} />
       </div>
     </div>
   );
@@ -106,7 +109,7 @@ function Settings({ targets, start, onTargets, onStart }: {
           <input type="number" min={0} max={100} value={videos} onChange={(e) => setVideos(e.target.value)} className={`${field} w-24`} />
         </label>
         <label className="space-y-1 text-xs text-dim">
-          <span className="label block">Reels a week</span>
+          <span className="label block">Reels & clips a week</span>
           <input type="number" min={0} max={100} value={reels} onChange={(e) => setReels(e.target.value)} className={`${field} w-24`} />
         </label>
         <button
@@ -170,7 +173,7 @@ export function QuotaView({ role }: { role: "admin" | "editor" }) {
         <>
           {quota.weeks[0] && <QuotaWeekCard week={quota.weeks[0]} endsAt={quota.week_ends_at} />}
           <p className="text-sm text-dim">
-            {quota.targets.videos} videos and {quota.targets.reels} reels a week. A tape or reel counts in the week its Final version was
+            {quota.targets.videos} videos and {quota.targets.reels} reels & clips a week. A video, clip or reel counts in the week its Final version was
             uploaded.
             {past.length > 0 && ` ${missed} of ${past.length} past week${past.length === 1 ? "" : "s"} missed.`}
           </p>
@@ -182,7 +185,7 @@ export function QuotaView({ role }: { role: "admin" | "editor" }) {
                 <tr>
                   <th className="px-2 py-2">Week</th>
                   <th className="px-2 py-2">Videos</th>
-                  <th className="px-2 py-2">Reels</th>
+                  <th className="px-2 py-2">Reels & clips</th>
                   <th className="px-2 py-2">Status</th>
                   <th className="px-2 py-2">Difference</th>
                 </tr>
@@ -208,13 +211,13 @@ export function QuotaView({ role }: { role: "admin" | "editor" }) {
                     <td colSpan={5} className="px-2 pb-3">
                       <details>
                         <summary className="cursor-pointer text-xs text-dim">
-                          {w.tapes.length} delivered
+                          {w.edits.length} delivered
                         </summary>
                         <ul className="mt-2 grid gap-1">
-                          {w.tapes.map((t) => (
+                          {w.edits.map((t) => (
                             <li key={t.id} className="flex flex-wrap gap-2">
-                              <span className="label text-xs text-dim">{t.kind === "reel" ? "Reel" : "Video"}</span>
-                              <a href={routeHash({ view: "tape", projectId: t.project_id, tapeId: t.id })} className="hover:underline">
+                              <span className="label text-xs text-dim">{KIND_LABEL[t.kind]}</span>
+                              <a href={routeHash({ view: "edit", projectId: t.project_id, editId: t.id })} className="hover:underline">
                                 {t.name}
                               </a>
                               <span className="text-dim">

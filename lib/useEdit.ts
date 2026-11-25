@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { editorApi } from "./editorApi";
-import type { Tape } from "./useProject";
+import type { Edit } from "./useProject";
 
 /** The checks Task 4 measures; any of them may be missing or malformed. */
 export type CheckState = "pass" | "warn" | "fail" | "unknown";
@@ -12,10 +12,10 @@ export type Checks = Partial<Record<"resolution" | "fps" | "bitrate", { state?: 
   playable?: unknown;
 };
 
-/** An iteration (a "version") as GET /tapes/{id} lists it. */
+/** An iteration (a "version") as GET /edits/{id} lists it. */
 export interface Iteration {
   id: number;
-  tape_id: number;
+  edit_id: number;
   version: number;
   filename: string;
   size: number;
@@ -28,29 +28,29 @@ export interface Iteration {
 }
 
 /**
- * One tape and its versions (oldest first, as sent). Reading it marks the
- * tape seen for this user - that is the backend's doing, and the reason
- * the projects list never reads tapes.
+ * One edit and its versions (oldest first, as sent). Reading it marks the
+ * edit seen for this user - that is the backend's doing, and the reason
+ * the projects list never reads edits.
  *
  * update() PATCHes and keeps the server's answer; it throws EditorApiError
  * so the caller can show the refusal.
  */
 /** quota_exempt is the streamer's "doesn't count toward the quota" switch. */
-export type TapePatch = Partial<Pick<Tape, "name" | "notes" | "status">> & { quota_exempt?: boolean };
+export type EditPatch = Partial<Pick<Edit, "name" | "notes" | "status">> & { quota_exempt?: boolean };
 
-export function useTape(id: number): {
-  tape: Tape | null;
+export function useEdit(id: number): {
+  edit: Edit | null;
   iterations: Iteration[];
   error: string | null;
   refresh: () => Promise<void>;
-  update: (patch: TapePatch) => Promise<void>;
+  update: (patch: EditPatch) => Promise<void>;
 } {
-  const [data, setData] = useState<{ tape: Tape | null; iterations: Iteration[] }>({ tape: null, iterations: [] });
+  const [data, setData] = useState<{ edit: Edit | null; iterations: Iteration[] }>({ edit: null, iterations: [] });
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      setData(await editorApi<{ tape: Tape; iterations: Iteration[] }>(`/tapes/${id}`));
+      setData(await editorApi<{ edit: Edit; iterations: Iteration[] }>(`/edits/${id}`));
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -58,9 +58,9 @@ export function useTape(id: number): {
   }, [id]);
 
   const update = useCallback(
-    async (patch: TapePatch) => {
-      const tape = await editorApi<Tape>(`/tapes/${id}`, { method: "PATCH", body: patch });
-      setData((d) => ({ ...d, tape }));
+    async (patch: EditPatch) => {
+      const edit = await editorApi<Edit>(`/edits/${id}`, { method: "PATCH", body: patch });
+      setData((d) => ({ ...d, edit }));
     },
     [id],
   );

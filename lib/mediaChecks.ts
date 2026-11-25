@@ -6,7 +6,7 @@
  * in pure functions so it can be tested without a video decoder.
  */
 
-import { mp4VideoCodec } from "./mp4Codec";
+import { mp4Info } from "./mp4Codec";
 
 export interface Measure {
   width: number | null;
@@ -31,7 +31,6 @@ export interface GradedChecks {
 }
 
 export const THUMBNAIL_MAX_BYTES = 262144;
-const TARGET = { tape: [1920, 1080], reel: [1080, 1920] } as const;
 const COMMON_FPS = [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60];
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -40,9 +39,10 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
  * Only 60 fps passes (the streamer's rule): >= 59.9, so 59.94 counts as 60;
  * anything lower, 29.97 and 30 included, fails. Bitrate is the whole file's (audio included), hence the "≈".
  */
-export function grade(m: Measure, kind: "tape" | "reel"): GradedChecks {
-  const [tw, th] = TARGET[kind];
+export function grade(m: Measure): GradedChecks {
   const sized = !!m.width && !!m.height;
+  // The backend holds every version to its kind's shape (videos horizontal, clips and reels vertical), so the shape picks the target.
+  const [tw, th] = sized && m.height! > m.width! ? [1080, 1920] : [1920, 1080];
   return {
     resolution: sized
       ? { state: m.width! >= tw && m.height! >= th ? "pass" : "warn", value: `${m.width}x${m.height}` }
@@ -152,16 +152,24 @@ function capped<T>(p: Promise<T | null>, ms: number): Promise<T | null> {
   return Promise.race([p, new Promise<null>((r) => (t = setTimeout(() => r(null), ms)))]).finally(() => clearTimeout(t));
 }
 
-/** The browser's measure of `file`; a file it cannot decode is `playable: false`, never an error, so it still uploads. */
+/**
+ * The browser's measure of `file`; a file it cannot decode is `playable: false`, never an error, so it still uploads.
+ * Size and duration the browser cannot give come from the MP4/MOV header (ProRes, some HEVC .mov).
+ */
 export async function measureMedia(file: File): Promise<Measure> {
-  const codec = await mp4VideoCodec(file);
+  const head = await mp4Info(file);
+  const codec = head?.codec ?? null;
+  let m: Measure;
   try {
-    const m = await measureWith(file);
-    return { ...m, codec, playable: m.width !== null };
-  } catch (e) {
-    if (!(e instanceof Unreadable)) throw e;
-    return { width: null, height: null, duration_s: null, fps: null, bitrate_mbps: null, codec, playable: false };
+    m = await measureWith(file);
+  } catch {
+    // Unreadable, or metadata that never loads: the header may still know.
+    m = { width: null, height: null, duration_s: null, fps: null, bitrate_mbps: null };
   }
+  const playable = m.width !== null;
+  if (!playable && head?.width && head.height) [m.width, m.height] = [head.width, head.height];
+  m.duration_s ??= head?.duration_s ?? null;
+  return { ...m, codec, playable };
 }
 
 function measureWith(file: File): Promise<Measure> {
@@ -170,7 +178,7 @@ function measureWith(file: File): Promise<Measure> {
     return {
       width: v.videoWidth || null,
       height: v.videoHeight || null,
-      duration_s: d === null ? null : round1(d),
+      duration_s: d, // unrounded: the backend decides clip vs project on it
       // play() can wait forever on a file the browser half-understands; the upload must not.
       fps:
         d === null || !v.videoWidth

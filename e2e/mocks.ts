@@ -94,8 +94,8 @@ export async function startDrive(files: Record<string, string>): Promise<Drive> 
   return drive;
 }
 
-/** One version the mock backend knows: project -> tape -> iteration. */
-export type Fixture = { projectId: number; tapeId: number; iterationId: number; fileId: string; filename: string; size: number; kind: "vod" | "clip"; version?: number };
+/** One version the mock backend knows: project -> edit -> iteration. */
+export type Fixture = { projectId: number; editId: number; iterationId: number; fileId: string; filename: string; size: number; kind: "vod" | "tape"; version?: number };
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -136,7 +136,7 @@ export async function startBackend(outDir: string, drive: Drive, fixtures: Fixtu
   const log: string[] = [];
   const iteration = (f: Fixture) => ({
     id: f.iterationId,
-    tape_id: f.tapeId,
+    edit_id: f.editId,
     version: f.version ?? 1,
     filename: f.filename,
     size: f.size,
@@ -147,20 +147,20 @@ export async function startBackend(outDir: string, drive: Drive, fixtures: Fixtu
     checks: null,
     has_thumbnail: false,
   });
-  const tape = (f: Fixture) => ({
-    id: f.tapeId,
+  const edit = (f: Fixture) => ({
+    id: f.editId,
     project_id: f.projectId,
-    name: f.kind === "clip" ? "Clip reel" : "Main tape",
-    kind: f.kind === "clip" ? "reel" : "tape",
+    name: f.kind === "tape" ? "Tape reel" : "Main video",
+    kind: f.kind === "tape" ? "reel" : "video",
     status: "in_review",
     notes: "",
     files_deleted_at: null,
-    source_project_ids: f.kind === "clip" ? [f.projectId] : [],
+    source_project_ids: f.kind === "tape" ? [f.projectId] : [],
     created_at: 1_700_000_000,
   });
   const project = (f: Fixture) => ({
     id: f.projectId,
-    name: f.kind === "clip" ? "Test clip" : "Test VOD",
+    name: f.kind === "tape" ? "Test tape" : "Test VOD",
     stream_date: "2026-10-30",
     stream_title: "",
     vod_filename: f.filename,
@@ -170,7 +170,7 @@ export async function startBackend(outDir: string, drive: Drive, fixtures: Fixtu
     download_clicked_at: null,
     kind: f.kind,
     duration_s: null,
-    reel_tape_id: f.kind === "clip" ? f.tapeId : null,
+    reel_edit_id: f.kind === "tape" ? f.editId : null,
   });
 
   function api(method: string, p: string): unknown {
@@ -179,7 +179,7 @@ export async function startBackend(outDir: string, drive: Drive, fixtures: Fixtu
       return m ? Number(m[1]) : null;
     };
     const byIt = fixtures.find((f) => f.iterationId === n(/^\/iterations\/(\d+)/));
-    const byTape = fixtures.find((f) => f.tapeId === n(/^\/tapes\/(\d+)$/));
+    const byEdit = fixtures.find((f) => f.editId === n(/^\/edits\/(\d+)$/));
     const byProject = fixtures.find((f) => f.projectId === n(/^\/projects\/(\d+)$/));
     if (p === "/me") return { username: "editor1", role: "editor", brand_kit_url: null };
     if (p === "/notifications") return { items: [], unseen: 0 };
@@ -188,8 +188,8 @@ export async function startBackend(outDir: string, drive: Drive, fixtures: Fixtu
     if (byIt && p.endsWith("/media-link")) return { url: drive.url(byIt.fileId), access_token: TOKEN, expires_in: 3600 };
     if (byIt && p.endsWith("/seen")) return { previous_seen_at: null };
     if (byIt && (p.endsWith("/position") || p.endsWith("/comments"))) return { ok: true };
-    if (byTape) return { tape: tape(byTape), iterations: fixtures.filter((f) => f.tapeId === byTape.tapeId).map(iteration) };
-    if (byProject) return { project: project(byProject), tapes: [tape(byProject)] };
+    if (byEdit) return { edit: edit(byEdit), iterations: fixtures.filter((f) => f.editId === byEdit.editId).map(iteration) };
+    if (byProject) return { project: project(byProject), edits: [edit(byProject)] };
     return undefined;
   }
 

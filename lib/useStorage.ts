@@ -8,11 +8,11 @@ export interface StorageFile {
   label: string;
   size: number | null;
   project_id: number;
-  tape_id: number | null;
+  edit_id: number | null;
   status: "ready" | "deleting";
   /** The names a delete is confirmed against. */
   project_name: string;
-  tape_name: string | null;
+  edit_name: string | null;
   vod_filename: string | null;
 }
 

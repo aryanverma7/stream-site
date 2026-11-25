@@ -11,28 +11,28 @@ const file = (name = "jett.mp4") => new File(["x"], name, { type: "video/mp4" })
 describe("UploadDrop", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("uploads a dropped file to this tape", () => {
+  it("uploads a dropped file to this edit", () => {
     const onUploaded = vi.fn();
-    const { getByText } = render(<UploadDrop tapeId={5} projectId={12} kind="reel" disabled={false} onUploaded={onUploaded} />);
+    const { getByText } = render(<UploadDrop editId={5} projectId={12} disabled={false} onUploaded={onUploaded} />);
     fireEvent.drop(getByText(/Drop a new version/), { dataTransfer: { files: [file()] } });
-    expect(startUpload).toHaveBeenCalledWith({ tapeId: 5, projectId: 12, kind: "reel" }, expect.any(File), onUploaded);
+    expect(startUpload).toHaveBeenCalledWith({ editId: 5, projectId: 12 }, expect.any(File), onUploaded);
   });
 
   it("uploads a picked file", () => {
-    const { getByLabelText } = render(<UploadDrop tapeId={5} projectId={12} kind="tape" disabled={false} onUploaded={() => {}} />);
+    const { getByLabelText } = render(<UploadDrop editId={5} projectId={12} disabled={false} onUploaded={() => {}} />);
     fireEvent.change(getByLabelText(/choose a file/), { target: { files: [file()] } });
     expect(startUpload).toHaveBeenCalledOnce();
   });
 
   it("takes one file per drop", () => {
-    const { getByText, getByRole } = render(<UploadDrop tapeId={5} projectId={12} kind="tape" disabled={false} onUploaded={() => {}} />);
+    const { getByText, getByRole } = render(<UploadDrop editId={5} projectId={12} disabled={false} onUploaded={() => {}} />);
     fireEvent.drop(getByText(/Drop a new version/), { dataTransfer: { files: [file("a.mp4"), file("b.mp4")] } });
     expect(startUpload).not.toHaveBeenCalled();
     expect(getByRole("alert").textContent).toBe("One file at a time.");
   });
 
   it("refuses while a delete is pending", () => {
-    const { getByText, getByLabelText } = render(<UploadDrop tapeId={5} projectId={12} kind="tape" disabled onUploaded={() => {}} />);
+    const { getByText, getByLabelText } = render(<UploadDrop editId={5} projectId={12} disabled onUploaded={() => {}} />);
     fireEvent.drop(getByText(/Drop a new version/), { dataTransfer: { files: [file()] } });
     expect(startUpload).not.toHaveBeenCalled();
     expect(getByLabelText(/choose a file/)).toBeDisabled();

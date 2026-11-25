@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { editorApi } from "@/lib/editorApi";
 import { routeHash } from "@/lib/useHashRoute";
-import type { Iteration } from "@/lib/useTape";
+import type { Iteration } from "@/lib/useEdit";
 import { useMediaFile } from "@/lib/useMediaFile";
 import { dirName, holdLocks, projectLock, versionLock } from "@/lib/opfsMedia";
 import { mediaUrl, useMediaWorker } from "@/lib/useMediaWorker";
-import { useTape } from "@/lib/useTape";
+import { useEdit } from "@/lib/useEdit";
 import { useComments, type SeenFn } from "@/lib/useComments";
 import { usePlayerKeys } from "@/lib/usePlayerKeys";
 import { formatTime } from "@/lib/timecode";
@@ -59,7 +59,7 @@ type Loaded = { iteration: Iteration; position_s: number | null };
 
 export type ReviewPlayerProps = {
   projectId: number;
-  tapeId: number;
+  editId: number;
   iterationId: number;
   seekS?: number;
   role: "admin" | "editor";
@@ -73,10 +73,10 @@ export function ReviewPlayer(props: ReviewPlayerProps) {
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const { iterations, tape, error: tapeError } = useTape(props.tapeId);
-  // The tape list decides the compare partner, which useMediaFile must know
+  const { iterations, edit, error: editError } = useEdit(props.editId);
+  // The edit list decides the compare partner, which useMediaFile must know
   // before its first run (it protects the partner's cached copy); so wait for it.
-  const tapeReady = tape !== null || tapeError !== null;
+  const editReady = edit !== null || editError !== null;
   const cur = data?.iteration;
   const partner = useMemo(() => {
     if (!cur) return null;
@@ -145,12 +145,12 @@ export function ReviewPlayer(props: ReviewPlayerProps) {
     );
   // after a version switch the old version's data must not render under the new id
   if (!data || data.iteration.id !== iterationId) return <p className="osd text-xl text-dim">Loading…</p>;
-  return <Watch key={`${iterationId}-${attempt}`} {...props} data={data} retry={() => setAttempt(attempt + 1)} partner={partner} tapeReady={tapeReady} seen={seen} tapeName={tape?.name ?? "Tape"} />;
+  return <Watch key={`${iterationId}-${attempt}`} {...props} data={data} retry={() => setAttempt(attempt + 1)} partner={partner} editReady={editReady} seen={seen} editName={edit?.name ?? "Untitled"} />;
 }
 
-function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Date.now, data, retry, partner, tapeReady, seen, tapeName }: ReviewPlayerProps & { data: Loaded; retry(): void; partner: Iteration | null; tapeReady: boolean; seen: SeenFn; tapeName: string }) {
+function Watch({ projectId, editId, iterationId, seekS, role, username, now = Date.now, data, retry, partner, editReady, seen, editName }: ReviewPlayerProps & { data: Loaded; retry(): void; partner: Iteration | null; editReady: boolean; seen: SeenFn; editName: string }) {
   const it = data.iteration;
-  const media = useMediaFile(it.drive_file_id && tapeReady ? { id: it.id, drive_file_id: it.drive_file_id, size: it.size } : null, projectId, partner?.id ?? null);
+  const media = useMediaFile(it.drive_file_id && editReady ? { id: it.id, drive_file_id: it.drive_file_id, size: it.size } : null, projectId, partner?.id ?? null);
   const [toast, setToast] = useState<string | null>(null);
   useEffect(() => {
     if (!toast) return;
@@ -308,7 +308,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
       setComposer({ start: null, end: null });
     },
     compare: () => {
-      if (!tapeReady) return;
+      if (!editReady) return;
       if (!partner) return setToast("No earlier version to compare");
       const at = started ? video.current?.currentTime : undefined;
       if (started && video.current && !video.current.paused) {
@@ -318,12 +318,12 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
           /* no storage: the other version opens paused */
         }
       }
-      window.location.hash = routeHash({ view: "iteration", projectId, tapeId, iterationId: partner.id, ...(at !== undefined && { seekS: Math.round(at * 100) / 100 }) });
+      window.location.hash = routeHash({ view: "iteration", projectId, editId, iterationId: partner.id, ...(at !== undefined && { seekS: Math.round(at * 100) / 100 }) });
     },
     sideBySide: () => {
-      if (!tapeReady) return;
+      if (!editReady) return;
       if (!partner) return setToast("No earlier version to compare");
-      window.location.hash = routeHash({ view: "iteration", projectId, tapeId, iterationId: it.id, vsId: partner.id });
+      window.location.hash = routeHash({ view: "iteration", projectId, editId, iterationId: it.id, vsId: partner.id });
     },
     help: () => setSheet((s) => !s),
     escape: () => {
@@ -367,7 +367,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
           </span>
         )}
         {partner && (
-          <a className={btn} href={routeHash({ view: "iteration", projectId, tapeId, iterationId: it.id, vsId: partner.id })}>
+          <a className={btn} href={routeHash({ view: "iteration", projectId, editId, iterationId: it.id, vsId: partner.id })}>
             Side by side
           </a>
         )}
@@ -417,7 +417,7 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
                   Try again
                 </button>
               )}
-              <button type="button" className={btn} onClick={() => (window.location.hash = routeHash({ view: "tape", projectId, tapeId }))}>
+              <button type="button" className={btn} onClick={() => (window.location.hash = routeHash({ view: "edit", projectId, editId }))}>
                 Cancel
               </button>
             </div>
@@ -518,10 +518,10 @@ function Watch({ projectId, tapeId, iterationId, seekS, role, username, now = Da
           <ExportMarkers
             comments={cm.comments}
             fps={typeof it.checks?.fps?.value === "number" ? it.checks.fps.value : null}
-            title={`${tapeName} v${it.version}`}
+            title={`${editName} v${it.version}`}
           />
           {/* no seeking until there is something to seek */}
-          <CommentPanel cm={cm} initialTab={checklistFirst ? "Checklist" : "Open"} username={username} projectId={projectId} tapeId={tapeId} currentTime={current} onSeek={started ? seekTo : undefined} now={now} />
+          <CommentPanel cm={cm} initialTab={checklistFirst ? "Checklist" : "Open"} username={username} projectId={projectId} editId={editId} currentTime={current} onSeek={started ? seekTo : undefined} now={now} />
         </div>
       </div>
       {!started && sheet && <KeySheet onClose={() => setSheet(false)} />}

@@ -16,7 +16,7 @@ const card = "slab slab-sm relative flex flex-wrap items-center gap-3 px-4 py-3"
 
 /**
  * Download, Open in Drive and Delete for a project's own file: a VOD, or a
- * clip's source (spec: clips are downloaded and deleted one by one, with the
+ * tape's source (spec: tapes are downloaded and deleted one by one, with the
  * normal two-step). The editor may delete only after his own Download click
  * (server-enforced); a live delete disables Download and hides Delete.
  */
@@ -28,25 +28,25 @@ function FileActions({ p, pending, role, onDownload, onDelete }: {
   onDelete: () => void;
 }) {
   if (p.vod_status !== "ready" || !p.vod_file_id) return null;
-  const clip = p.kind === "clip";
+  const tape = p.kind === "tape";
   return (
     <>
       <DownloadLink fileId={p.vod_file_id} disabled={!!pending} onClick={onDownload} className={btn}>
-        {clip ? "Download clip" : "Download VOD"}
+        {tape ? "Download tape" : "Download VOD"}
       </DownloadLink>
       <OpenInDrive fileId={p.vod_file_id} />
       {!pending && (role === "admin" || p.download_clicked_at !== null) && (
         <button type="button" onClick={onDelete} className={`${btn} border-rec! text-rec! hover:bg-rec! hover:text-ink!`}>
-          {clip ? "Delete clip file" : "Delete VOD"}
+          {tape ? "Delete tape file" : "Delete VOD"}
         </button>
       )}
     </>
   );
 }
 
-/** Every project: VODs newest first, then clips oldest first with Combine / Uncombine. */
+/** Every project: VODs newest first, then tapes oldest first with Combine / Uncombine. */
 export function ProjectsView({ role, username }: { role: "admin" | "editor"; username: string }) {
-  const { vods, clips, reels, error, refresh } = useProjects();
+  const { vods, tapes, reels, error, refresh } = useProjects();
   // An Undo (or any delete appearing or finishing) changes the target too: refetch it.
   const deletions = useDeletions(() => refresh());
   const ask = useAsk();
@@ -54,7 +54,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [deleting, setDeleting] = useState<Project | null>(null);
-  // A clip with any live delete (its file, or the whole project) cannot be combined; the server refuses it.
+  // A tape with any live delete (its file, or the whole project) cannot be combined; the server refuses it.
   const liveDelete = (id: number) => deletions.find("vod", id) ?? deletions.find("project", id);
   const chosen = selected.filter((id) => !liveDelete(id));
 
@@ -79,7 +79,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
     const name = await ask.prompt({ title: "Combine into one reel", label: "Name for the combined reel", confirmLabel: "Combine" });
     if (!name) return;
     run(async () => {
-      await editorApi("/clips/combine", { method: "POST", body: { project_ids: chosen, name } });
+      await editorApi("/tapes/combine", { method: "POST", body: { project_ids: chosen, name } });
       setSelected([]);
       await refresh();
     });
@@ -110,7 +110,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
                 </a>
                 {p.has_new && <span className="tag bg-field text-[11px] text-ink">New</span>}
                 <span className="label text-[11px] text-dim">VOD {p.vod_status}</span>
-                <span className="text-xs text-dim">{p.tape_count === 1 ? "1 tape" : `${p.tape_count} tapes`}</span>
+                <span className="text-xs text-dim">{p.edit_count === 1 ? "1 video or clip" : `${p.edit_count} videos & clips`}</span>
                 {pending && <PendingDelete request={pending} onUndo={deletions.undo} me={me} />}
                 <span className="ml-auto flex flex-wrap items-center gap-2">
                   {role === "admin" && (
@@ -128,18 +128,18 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
 
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          <h3 className="label text-sm text-dim">Clips</h3>
+          <h3 className="label text-sm text-dim">Tapes</h3>
           <button type="button" disabled={chosen.length < 2} onClick={combine} className={`${btn} ml-auto`}>
             Combine{chosen.length >= 2 ? ` ${chosen.length}` : ""}
           </button>
         </div>
-        {clips.length === 0 && <p className="text-sm text-dim">No clips yet.</p>}
+        {tapes.length === 0 && <p className="text-sm text-dim">No tapes yet.</p>}
         <ul className="grid gap-2">
-          {clips.map((c) => {
-            const reel = c.reel_tape_id === null ? undefined : reels[c.reel_tape_id];
+          {tapes.map((c) => {
+            const reel = c.reel_edit_id === null ? undefined : reels[c.reel_edit_id];
             const combined = !!reel && reel.source_project_ids.length >= 2;
             const pending = liveDelete(c.id);
-            // The server refuses both while any clip involved is being deleted.
+            // The server refuses both while any tape involved is being deleted.
             const reelLocked = !!reel && reel.source_project_ids.some((id) => deletions.find("project", id));
             return (
               <li key={c.id} className={card}>
@@ -162,12 +162,12 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
                   {combined && (
                     <span className="flex items-center gap-2 text-xs text-dim">
                       used in
-                      <a href={routeHash({ view: "tape", projectId: reel.project_id, tapeId: reel.id })} className="text-phosphor hover:underline">
+                      <a href={routeHash({ view: "edit", projectId: reel.project_id, editId: reel.id })} className="text-phosphor hover:underline">
                         {reel.name}
                       </a>
-                      {/* The reel lives in its first clip's project: one Uncombine, on that card. */}
+                      {/* The reel lives in its first tape's project: one Uncombine, on that card. */}
                       {reel.project_id === c.id && !reelLocked && (
-                        <button type="button" onClick={() => run(() => editorApi(`/tapes/${reel.id}/uncombine`, { method: "POST" }).then(refresh))} className={btn}>
+                        <button type="button" onClick={() => run(() => editorApi(`/edits/${reel.id}/uncombine`, { method: "POST" }).then(refresh))} className={btn}>
                           Uncombine
                         </button>
                       )}
@@ -186,7 +186,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
           kind="vod"
           targetId={deleting.id}
           label={deleting.vod_filename}
-          title={deleting.kind === "clip" ? `Delete ${deleting.name}'s clip file` : `Delete ${deleting.name}'s VOD`}
+          title={deleting.kind === "tape" ? `Delete ${deleting.name}'s tape file` : `Delete ${deleting.name}'s VOD`}
           onClose={() => setDeleting(null)}
           onDone={() => {
             setDeleting(null);

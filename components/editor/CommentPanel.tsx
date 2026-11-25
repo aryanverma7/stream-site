@@ -22,7 +22,7 @@ export function CommentPanel({
   initialTab = "Open",
   username,
   projectId,
-  tapeId,
+  editId,
   currentTime,
   onSeek,
   now = Date.now,
@@ -32,7 +32,7 @@ export function CommentPanel({
   initialTab?: CommentTab;
   username: string;
   projectId: number;
-  tapeId: number;
+  editId: number;
   currentTime: number;
   /** Absent while nothing is playable: the go-to buttons are then disabled. */
   onSeek?(s: number): void;
@@ -127,7 +127,7 @@ export function CommentPanel({
             username={username}
             active={c.id === activeId}
             projectId={projectId}
-            tapeId={tapeId}
+            editId={editId}
             pendingReplies={cm.unsent.filter((e) => e.kind === "reply" && e.commentId === c.id)}
             onSeek={onSeek}
           />

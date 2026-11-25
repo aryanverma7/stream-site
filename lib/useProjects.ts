@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { editorApi } from "./editorApi";
-import type { Tape } from "./useProject";
+import type { Edit } from "./useProject";
 
 /** A row of GET /projects (editor_store.list_projects, minus the upload URL). */
 export interface Project {
@@ -15,10 +15,10 @@ export interface Project {
   vod_file_id: string | null;
   vod_status: "uploading" | "ready" | "deleting" | "deleted";
   download_clicked_at: number | null;
-  kind: "vod" | "clip";
+  kind: "vod" | "tape";
   duration_s: number | null;
-  reel_tape_id: number | null;
-  tape_count: number;
+  reel_edit_id: number | null;
+  edit_count: number;
   has_new: boolean;
   created_at: number;
 }
@@ -26,20 +26,20 @@ export interface Project {
 export interface ProjectsData {
   /** Newest first, as the backend sends them. */
   vods: Project[];
-  /** Oldest first (spec): clips are cut in the order they happened. */
-  clips: Project[];
-  /** Every clip's reel by tape id, so a clip card can show its status and where it went. */
-  reels: Record<number, Tape>;
+  /** Oldest first (spec): tapes are cut in the order they happened. */
+  tapes: Project[];
+  /** Every tape's reel by edit id, so a tape card can show its status and where it went. */
+  reels: Record<number, Edit>;
 }
 
-const EMPTY: ProjectsData = { vods: [], clips: [], reels: {} };
+const EMPTY: ProjectsData = { vods: [], tapes: [], reels: {} };
 
 /**
- * The projects list. A clip's reel can live in another clip's project
- * (combined reels stay with the first clip), so the reels come from each
- * clip's own project read - the host's read carries the reel.
+ * The projects list. A tape's reel can live in another tape's project
+ * (combined reels stay with the first tape), so the reels come from each
+ * tape's own project read - the host's read carries the reel.
  *
- * ponytail: one GET per clip; a `reel` field on GET /projects if the list ever gets long.
+ * ponytail: one GET per tape; a `reel` field on GET /projects if the list ever gets long.
  */
 export function useProjects(): ProjectsData & { error: string | null; refresh: () => Promise<void> } {
   const [data, setData] = useState<ProjectsData>(EMPTY);
@@ -48,14 +48,14 @@ export function useProjects(): ProjectsData & { error: string | null; refresh: (
   const refresh = useCallback(async () => {
     try {
       const { projects } = await editorApi<{ projects: Project[] }>("/projects");
-      const clips = projects
-        .filter((p) => p.kind === "clip")
+      const tapes = projects
+        .filter((p) => p.kind === "tape")
         .sort((a, b) => a.created_at - b.created_at || a.id - b.id);
-      // A clip deleted between the two reads just has no reel shown; it must not empty the list.
-      const reads = await Promise.allSettled(clips.map((c) => editorApi<{ tapes: Tape[] }>(`/projects/${c.id}`)));
-      const reels: Record<number, Tape> = {};
-      for (const r of reads) if (r.status === "fulfilled") for (const t of r.value.tapes) reels[t.id] = t;
-      setData({ vods: projects.filter((p) => p.kind !== "clip"), clips, reels });
+      // A tape deleted between the two reads just has no reel shown; it must not empty the list.
+      const reads = await Promise.allSettled(tapes.map((c) => editorApi<{ edits: Edit[] }>(`/projects/${c.id}`)));
+      const reels: Record<number, Edit> = {};
+      for (const r of reads) if (r.status === "fulfilled") for (const t of r.value.edits) reels[t.id] = t;
+      setData({ vods: projects.filter((p) => p.kind !== "tape"), tapes, reels });
       setError(null);
     } catch (e) {
       setError((e as Error).message);

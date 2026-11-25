@@ -9,8 +9,8 @@ vi.mock("@/lib/opfsMedia", async () => ({ ...(await vi.importActual<object>("@/l
 
 const ADMIN = { username: "aryan", role: "admin", brand_kit_url: "https://drive.google.com/drive/folders/kit" };
 const EDITOR = { username: "cutter", role: "editor", brand_kit_url: null };
-const PROJECT = { project: { id: 12, name: "Ranked grind" }, tapes: [] };
-const TAPE = { tape: { id: 5, name: "Main", project_id: 12 }, iterations: [{ id: 3, version: 2 }] };
+const PROJECT = { project: { id: 12, name: "Ranked grind" }, edits: [] };
+const TAPE = { edit: { id: 5, name: "Main", project_id: 12 }, iterations: [{ id: 3, version: 2 }] };
 
 function backend(table: Record<string, unknown>) {
   global.fetch = asFetchMock(
@@ -97,7 +97,7 @@ describe("EditorShell", () => {
 
   it("renders the breadcrumb with names, and Esc zooms out one level", async () => {
     window.location.hash = "#/p/12/t/5/v/3";
-    backend({ "/me": ADMIN, "/projects/12": PROJECT, "/tapes/5": TAPE });
+    backend({ "/me": ADMIN, "/projects/12": PROJECT, "/edits/5": TAPE });
     const { findByRole } = render(<EditorShell />);
 
     expect(await findByRole("link", { name: "v2" })).toBeTruthy();
@@ -153,7 +153,7 @@ describe("EditorShell", () => {
 
   it("shows the deleted notice once, not on every later visit to that parent", async () => {
     window.location.hash = "#/p/12/t/5";
-    backend({ "/me": ADMIN, "/projects/12": PROJECT, "/tapes/6": { ...TAPE, tape: { ...TAPE.tape, id: 6 } } });
+    backend({ "/me": ADMIN, "/projects/12": PROJECT, "/edits/6": { ...TAPE, edit: { ...TAPE.edit, id: 6 } } });
     const { findByText, queryByText, findByRole } = render(<EditorShell />);
     expect(await findByText("That was deleted or never existed")).toBeTruthy();
     expect(window.location.hash).toBe("#/p/12");
@@ -161,7 +161,7 @@ describe("EditorShell", () => {
     act(() => {
       window.location.hash = "#/p/12/t/6";
     });
-    await findByRole("heading", { name: "Tape" });
+    await findByRole("heading", { name: /…|Main/ });
     await waitFor(() => expect(queryByText("That was deleted or never existed")).toBeNull());
 
     act(() => {

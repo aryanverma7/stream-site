@@ -16,10 +16,12 @@ function stateText(t: Transfer, pct: number): string {
       return `${pct}% - connection trouble, retrying`;
     case "waiting":
       return "Sent - waiting for the Mac Mini";
+    case "measuring":
+      return "Checking the file…";
     case "checking":
       return "Checking the file";
     case "paused":
-      return `${pct}% sent - paused, drop ${t.name} again on its tape to continue`;
+      return `${pct}% sent - paused, drop ${t.name} again on the same video, clip or reel to continue`;
     case "elsewhere":
       return `Uploading in another tab · ${pct}%`;
     case "done":
@@ -74,7 +76,7 @@ export function TransfersPanel() {
     return () => clearInterval(h);
   }, [stored]);
 
-  const sending = transfers.some((t) => ["uploading", "offline", "retrying", "checking"].includes(t.state));
+  const sending = transfers.some((t) => ["uploading", "offline", "retrying", "measuring", "checking"].includes(t.state));
   useEffect(() => {
     if (!sending) return;
     const ask = (e: BeforeUnloadEvent) => {
@@ -134,8 +136,8 @@ export function TransfersPanel() {
               {t.spaceNote && <p className="text-xs text-dim">{t.spaceNote}</p>}
               {t.message && t.state !== "failed" && <p className="text-xs text-amber">{t.message}</p>}
               {t.state === "paused" && (
-                <a href={routeHash({ view: "tape", projectId: t.projectId, tapeId: t.tapeId })} className="text-xs text-phosphor underline">
-                  Open tape
+                <a href={routeHash({ view: "edit", projectId: t.projectId, editId: t.editId })} className="text-xs text-phosphor underline">
+                  Open
                 </a>
               )}
             </li>

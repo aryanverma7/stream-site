@@ -5,8 +5,8 @@ import { duration, editorApi } from "@/lib/editorApi";
 import { routeHash } from "@/lib/useHashRoute";
 import { useTransfers } from "@/lib/useTransfers";
 import { useRunChecks } from "@/lib/useRunChecks";
-import type { Checks, CheckState, Iteration } from "@/lib/useTape";
-import type { Tape, TapeStatus } from "@/lib/useProject";
+import type { Checks, CheckState, Iteration } from "@/lib/useEdit";
+import type { Edit, EditStatus } from "@/lib/useProject";
 import { StatusSelect } from "./StatusLabel";
 import { DownloadLink, OpenInDrive } from "./DriveLinks";
 import { useAsk } from "./AskDialog";
@@ -115,24 +115,24 @@ function CommentSummary({ iterationId }: { iterationId: number }) {
 const btn = "menu-pop label border-2 border-phosphor bg-ink px-2 py-1 text-[11px] text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
 
 /**
- * One version on a tape. Its menu opens on hover (and keyboard focus) on a
+ * One version on an edit. Its menu opens on hover (and keyboard focus) on a
  * pointer, and on the ⋯ button on touch.
  */
 export function IterationCard({
   iteration,
-  tape,
+  edit,
   role,
   onStatus,
   locked,
   onChanged,
 }: {
   iteration: Iteration;
-  tape: Tape;
+  edit: Edit;
   role: "admin" | "editor";
-  onStatus: (s: TapeStatus) => void;
+  onStatus: (s: EditStatus) => void;
   /** A delete covering this version is in its undo hour. */
   locked: boolean;
-  /** The version changed on the server (an upload was cancelled): refetch the tape. */
+  /** The version changed on the server (an upload was cancelled): refetch the edit. */
   onChanged?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -140,8 +140,8 @@ export function IterationCard({
   const [cancelError, setCancelError] = useState<string | null>(null);
   const ready = iteration.status === "ready";
   // An upload this tab is sending has its own Cancel in the Transfers panel; the card's is for an orphan
-  // (closed tab, other computer), which otherwise blocks the tape's deletes for 8 days.
-  const sendingHere = useTransfers().some((t) => t.tapeId === tape.id && t.version === iteration.version && t.state !== "done" && t.state !== "failed");
+  // (closed tab, other computer), which otherwise blocks the edit's deletes for 8 days.
+  const sendingHere = useTransfers().some((t) => t.editId === edit.id && t.version === iteration.version && t.state !== "done" && t.state !== "failed");
   const cancelUpload = async () => {
     const yes = await ask.confirm({
       title: `Cancel the upload of v${iteration.version}?`,
@@ -160,10 +160,10 @@ export function IterationCard({
     }
   };
   // No checks on a ready version: its tab closed while checking, or reconcile completed it. Pick the file again.
-  const checks = useRunChecks(iteration, tape.kind, onChanged);
+  const checks = useRunChecks(iteration, onChanged);
   const picker = useRef<HTMLInputElement>(null);
   const canRunChecks = ready && !iteration.checks && !sendingHere;
-  const play = routeHash({ view: "iteration", projectId: tape.project_id, tapeId: tape.id, iterationId: iteration.id });
+  const play = routeHash({ view: "iteration", projectId: edit.project_id, editId: edit.id, iterationId: iteration.id });
   return (
     <article className="slab slab-sm group relative p-[3px]">
       <Thumbnail iteration={iteration} />
@@ -246,7 +246,7 @@ export function IterationCard({
               Edit checklist
             </button>
           )}
-          <StatusSelect name={tape.name} status={tape.status} role={role} onChange={onStatus} />
+          <StatusSelect name={edit.name} status={edit.status} role={role} onChange={onStatus} />
           {iteration.status === "uploading" && !sendingHere && (
             <button type="button" className={btn} onClick={cancelUpload}>
               Cancel this upload

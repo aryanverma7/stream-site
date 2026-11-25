@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { editorApi } from "./editorApi";
 import { grade, measureMedia, thumbnail } from "./mediaChecks";
-import type { Iteration } from "./useTape";
+import type { Iteration } from "./useEdit";
 
 const NOTHING = { width: null, height: null, duration_s: null, fps: null, bitrate_mbps: null };
 const mb = (b: number) => `${(b / 1e6).toFixed(1)} MB`;
@@ -14,7 +14,7 @@ const mb = (b: number) => `${(b / 1e6).toFixed(1)} MB`;
  * same file again (same name and size), and it is measured here exactly as
  * an upload is, then PUT to /media. The file never leaves the browser.
  */
-export function useRunChecks(iteration: Pick<Iteration, "id" | "version" | "filename" | "size">, kind: "tape" | "reel", onDone?: () => void) {
+export function useRunChecks(iteration: Pick<Iteration, "id" | "version" | "filename" | "size">, onDone?: () => void) {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +30,7 @@ export function useRunChecks(iteration: Pick<Iteration, "id" | "version" | "file
         // as on upload: what cannot be measured grades "unknown", never a pass
         const measured = await measureMedia(file).catch(() => null);
         const thumb = await thumbnail(file).catch(() => null);
-        await editorApi(`/iterations/${iteration.id}/media`, { method: "PUT", body: { checks: grade(measured ?? NOTHING, kind), thumbnail_b64: thumb } });
+        await editorApi(`/iterations/${iteration.id}/media`, { method: "PUT", body: { checks: grade(measured ?? NOTHING), thumbnail_b64: thumb } });
         onDone?.();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not save the checks");
@@ -38,7 +38,7 @@ export function useRunChecks(iteration: Pick<Iteration, "id" | "version" | "file
         setRunning(false);
       }
     },
-    [iteration.id, iteration.version, iteration.filename, iteration.size, kind, onDone],
+    [iteration.id, iteration.version, iteration.filename, iteration.size, onDone],
   );
 
   return { running, error, run };

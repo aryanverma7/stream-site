@@ -8,7 +8,7 @@ const week = (w: string, done: [number, number], status: QuotaWeek["status"], ex
   const target = { videos: 2, reels: 10 };
   const d = { videos: done[0], reels: done[1] };
   return {
-    week: w, target, done: d, status, excused: status === "excused", note: "", tapes: [],
+    week: w, target, done: d, status, excused: status === "excused", note: "", edits: [],
     short: { videos: Math.max(0, 2 - d.videos), reels: Math.max(0, 10 - d.reels) }, ...extra,
   };
 };
@@ -21,7 +21,7 @@ const quota = {
   weeks: [
     week("2026-11-23", [1, 4], "in_progress"),
     week("2026-11-16", [2, 7], "missed", {
-      tapes: [{ id: 5, name: "Ace clutch", kind: "tape", project_id: 3, project_name: "Stream A", final_upload_at: 1763380800 }],
+      edits: [{ id: 5, name: "Ace clutch", kind: "video", project_id: 3, project_name: "Stream A", final_upload_at: 1763380800 }],
     }),
     week("2026-11-09", [3, 10], "met"),
   ],
@@ -37,19 +37,19 @@ describe("quota", () => {
   });
 
   it("says what was short, or what was extra", () => {
-    expect(gap(quota.weeks[1])).toBe("3 reels short");
-    expect(gap(week("2026-11-16", [1, 9], "missed"))).toBe("1 video, 1 reel short");
+    expect(gap(quota.weeks[1])).toBe("3 reels & clips short");
+    expect(gap(week("2026-11-16", [1, 9], "missed"))).toBe("1 video, 1 reel or clip short");
     expect(gap(quota.weeks[2])).toBe("+1 video");
     expect(gap(week("2026-11-16", [2, 10], "met"))).toBe("");
   });
 
-  it("shows every week with its status and what counted, and links each tape", async () => {
+  it("shows every week with its status and what counted, and links each edit", async () => {
     editorBackend({ "/quota": quota });
     const { findByText, getAllByRole, getByText } = render(<QuotaView role="editor" />);
     expect(await findByText("16 Nov - 22 Nov")).toBeTruthy();
     expect(getAllByRole("row").filter((r) => r.querySelector("td.font-bold")).map((r) => r.textContent)).toEqual([
-      "23 Nov - 29 Nov1/24/10This week1 video, 6 reels short",
-      "16 Nov - 22 Nov2/27/10Missed3 reels short",
+      "23 Nov - 29 Nov1/24/10This week1 video, 6 reels & clips short",
+      "16 Nov - 22 Nov2/27/10Missed3 reels & clips short",
       "9 Nov - 15 Nov3/210/10Met+1 video",
     ]);
     expect(getByText("Ace clutch").getAttribute("href")).toBe("#/p/3/t/5");

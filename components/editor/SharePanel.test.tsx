@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { editorBackend } from "@/lib/testUtils";
 import { GuestNotesPanel, LiveLinks, SharePanel, left } from "./SharePanel";
 
-const LINK = { id: 4, iteration_id: 7, tape_id: 2, project_id: 1, tape: "Clutch", version: 3, expires_at: Date.now() / 1000 + 4320 };
+const LINK = { id: 4, iteration_id: 7, edit_id: 2, project_id: 1, edit: "Clutch", version: 3, expires_at: Date.now() / 1000 + 4320 };
 
 describe("SharePanel", () => {
   it("defaults to 2 hours, shows the new link once, and lists this version's live links with Revoke", async () => {

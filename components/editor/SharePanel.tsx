@@ -15,7 +15,7 @@ export const SHARE_HOURS: [number, string][] = [
   [168, "7 days"],
 ];
 
-export type LiveLink = { id: number; iteration_id: number; tape_id: number; project_id: number; tape: string; version: number; expires_at: number; state?: "live" | "revoking" };
+export type LiveLink = { id: number; iteration_id: number; edit_id: number; project_id: number; edit: string; version: number; expires_at: number; state?: "live" | "revoking" };
 
 /** "1 h 12 m", "5 m", "2 d 3 h" until `at` (seconds). */
 export function left(at: number, now = Date.now() / 1000): string {
@@ -44,7 +44,7 @@ export function LiveLinks({ iterationId, reloadKey = 0 }: { iterationId?: number
   }, [load, reloadKey]);
   const shown = (links ?? []).filter((l) => iterationId === undefined || l.iteration_id === iterationId);
   const revoke = async (l: LiveLink) => {
-    if (!(await ask.confirm({ title: `Revoke the link to ${l.tape} v${l.version}?`, message: "Anyone with it stops being able to open it.", confirmLabel: "Revoke", danger: true }))) return;
+    if (!(await ask.confirm({ title: `Revoke the link to ${l.edit} v${l.version}?`, message: "Anyone with it stops being able to open it.", confirmLabel: "Revoke", danger: true }))) return;
     let note: string | null = null;
     try {
       const r = await editorApi<{ revoked: boolean }>(`/share-links/${l.id}/revoke`, { method: "POST" });
@@ -63,8 +63,8 @@ export function LiveLinks({ iterationId, reloadKey = 0 }: { iterationId?: number
       <ul className="space-y-1">
         {shown.map((l) => (
           <li key={l.id} className="flex flex-wrap items-center gap-2 text-sm">
-            <a className="hover:underline" href={routeHash({ view: "iteration", projectId: l.project_id, tapeId: l.tape_id, iterationId: l.iteration_id })}>
-              {l.tape} v{l.version}
+            <a className="hover:underline" href={routeHash({ view: "iteration", projectId: l.project_id, editId: l.edit_id, iterationId: l.iteration_id })}>
+              {l.edit} v{l.version}
             </a>
             {l.state === "revoking" ? (
               <span className="text-xs text-amber">Removing: still viewable until Google confirms</span>

@@ -4,7 +4,7 @@ import { Bell } from "./Bell";
 import { editorBackend } from "@/lib/testUtils";
 
 const ev = (id: number, kind: string, extra = {}) => ({
-  id, at: 1_700_000_000, actor: "cutter", kind, summary: `event ${id}`, project_id: 1, tape_id: 2, iteration_id: 3, ...extra,
+  id, at: 1_700_000_000, actor: "cutter", kind, summary: `event ${id}`, project_id: 1, edit_id: 2, iteration_id: 3, ...extra,
 });
 
 function seenBodies(fetchMock: ReturnType<typeof editorBackend>) {
