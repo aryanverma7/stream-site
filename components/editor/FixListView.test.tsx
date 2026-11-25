@@ -3,15 +3,15 @@ import { render } from "@testing-library/react";
 import { FixListView } from "./FixListView";
 import { editorBackend } from "@/lib/testUtils";
 
-const item = (id: number, tape_id: number, comment = {}) => ({
+const item = (id: number, edit_id: number, comment = {}) => ({
   comment: { id, kind: "fix", body: `body ${id}`, start_s: 222.5, carried: false, origin_version: 3, created_at: id, ...comment },
-  tape_id, tape_name: `Tape ${tape_id}`, project_id: 1, iteration_id: 30 + tape_id, version: 3,
+  edit_id, edit_name: `Edit ${edit_id}`, project_id: 1, iteration_id: 30 + edit_id, version: 3,
 });
 
 describe("FixListView", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("groups by tape in order, links to the version with the start appended, and shows carried origins", async () => {
+  it("groups by edit in order, links to the version with the start appended, and shows carried origins", async () => {
     editorBackend({
       "/fix-list": {
         items: [item(1, 2), item(2, 4, { start_s: null, kind: "question" }), item(3, 2, { carried: true, origin_version: 1, start_s: 3725 })],
@@ -19,7 +19,7 @@ describe("FixListView", () => {
     });
     const { findAllByRole, getAllByRole, getByText } = render(<FixListView />);
     const headings = await findAllByRole("heading", { level: 3 });
-    expect(headings.map((h) => h.textContent)).toEqual(["Tape 2", "Tape 4"]);
+    expect(headings.map((h) => h.textContent)).toEqual(["Edit 2", "Edit 4"]);
 
     const links = getAllByRole("link").filter((a) => a.getAttribute("href")!.includes("/v/"));
     expect(links.map((a) => [a.textContent, a.getAttribute("href")])).toEqual([

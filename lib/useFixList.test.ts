@@ -3,15 +3,15 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { useFixList } from "./useFixList";
 import { editorBackend } from "./testUtils";
 
-const item = (id: number, tape_id: number) => ({
+const item = (id: number, edit_id: number) => ({
   comment: { id, kind: "fix", body: `c${id}`, start_s: null, carried: false, origin_version: 1, created_at: id },
-  tape_id, tape_name: `T${tape_id}`, project_id: 1, iteration_id: 10 + tape_id, version: 1,
+  edit_id, edit_name: `T${edit_id}`, project_id: 1, iteration_id: 10 + edit_id, version: 1,
 });
 
 describe("useFixList", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("groups by tape in first-appearance order, keeping the server's order inside each", async () => {
+  it("groups by edit in first-appearance order, keeping the server's order inside each", async () => {
     editorBackend({ "/fix-list": { items: [item(1, 5), item(2, 6), item(3, 5)] } });
     const { result } = renderHook(() => useFixList());
     await waitFor(() => expect(result.current.groups).toHaveLength(2));

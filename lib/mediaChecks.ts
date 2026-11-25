@@ -31,7 +31,6 @@ export interface GradedChecks {
 }
 
 export const THUMBNAIL_MAX_BYTES = 262144;
-const TARGET = { tape: [1920, 1080], reel: [1080, 1920] } as const;
 const COMMON_FPS = [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60];
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -40,9 +39,10 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
  * Only 60 fps passes (the streamer's rule): >= 59.9, so 59.94 counts as 60;
  * anything lower, 29.97 and 30 included, fails. Bitrate is the whole file's (audio included), hence the "≈".
  */
-export function grade(m: Measure, kind: "tape" | "reel"): GradedChecks {
-  const [tw, th] = TARGET[kind];
+export function grade(m: Measure): GradedChecks {
   const sized = !!m.width && !!m.height;
+  // The backend holds every version to its kind's shape (videos horizontal, clips and reels vertical), so the shape picks the target.
+  const [tw, th] = sized && m.height! > m.width! ? [1080, 1920] : [1920, 1080];
   return {
     resolution: sized
       ? { state: m.width! >= tw && m.height! >= th ? "pass" : "warn", value: `${m.width}x${m.height}` }

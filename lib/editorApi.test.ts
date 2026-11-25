@@ -27,7 +27,7 @@ describe("editorApi", () => {
     const fetchMock = respond(201, { id: 3 });
     global.fetch = asFetchMock(fetchMock);
 
-    await editorApi("/projects/1/tapes", { method: "POST", body: { name: "Main" } });
+    await editorApi("/projects/1/edits", { method: "POST", body: { name: "Main" } });
     const [, init] = fetchMock.mock.calls[0];
     expect(init.method).toBe("POST");
     expect(init.body).toBe('{"name":"Main"}');

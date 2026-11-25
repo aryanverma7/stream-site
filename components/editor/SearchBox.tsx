@@ -10,7 +10,7 @@ const go = (h: Hit) => {
   window.location.hash = routeHash({
     view: "iteration",
     projectId: h.project_id,
-    tapeId: h.tape_id,
+    editId: h.edit_id,
     iterationId: h.iteration_id,
     ...(h.start_s !== null && { seekS: h.start_s }),
   });

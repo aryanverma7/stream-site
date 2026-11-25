@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { BELL_POLL_MS, useBell } from "./useBell";
 import { editorBackend } from "./testUtils";
 
-const ITEM = { id: 7, at: 1, actor: "cutter", kind: "iteration_ready", summary: "v2 is up", project_id: 1, tape_id: 2, iteration_id: 3 };
+const ITEM = { id: 7, at: 1, actor: "cutter", kind: "iteration_ready", summary: "v2 is up", project_id: 1, edit_id: 2, iteration_id: 3 };
 
 describe("useBell", () => {
   afterEach(() => {

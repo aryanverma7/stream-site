@@ -10,6 +10,7 @@ import { DeleteDialog } from "./DeleteDialog";
 import { PendingDelete } from "./PendingDelete";
 import { DownloadLink, OpenInDrive } from "./DriveLinks";
 import { QuotaCard } from "./QuotaView";
+import { NoticeBoard } from "./NoticeBoard";
 
 const btn = "menu-pop label border-2 border-phosphor bg-ink px-3 py-1.5 text-xs text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
 const card = "slab slab-sm relative flex flex-wrap items-center gap-3 px-4 py-3";
@@ -27,7 +28,7 @@ function ProjectLink({ p }: { p: HomeProject }) {
   );
 }
 
-/** What is waiting on someone: VODs to download, downloaded VODs to delete, tapes with open comments. */
+/** What is waiting on someone: VODs to download, downloaded VODs to delete, edits with open comments. */
 export function HomeView({ role, username }: { role: "admin" | "editor"; username: string }) {
   const { home, error, refresh } = useHome();
   // The streamer can schedule a VOD delete before anyone downloads it; it shows here too.
@@ -38,7 +39,7 @@ export function HomeView({ role, username }: { role: "admin" | "editor"; usernam
   const live = (projectId: number) => !deletions.find("project", projectId);
   const vodsReady = home?.vods_ready.filter((p) => live(p.id)) ?? [];
   const toConfirm = home?.deletes_to_confirm.filter((p) => live(p.id)) ?? [];
-  const openTapes = home?.open_tapes.filter((o) => live(o.tape.project_id)) ?? [];
+  const openEdits = home?.open_edits.filter((o) => live(o.edit.project_id)) ?? [];
 
   return (
     <section className="space-y-6">
@@ -50,6 +51,7 @@ export function HomeView({ role, username }: { role: "admin" | "editor"; usernam
           {error}
         </p>
       )}
+      {home && <NoticeBoard notices={home.notices ?? []} role={role} onChanged={() => void refresh()} />}
       <QuotaCard />
       {home && (
         <>
@@ -95,15 +97,15 @@ export function HomeView({ role, username }: { role: "admin" | "editor"; usernam
 
           <div className="space-y-2">
             <h3 className="label text-sm text-dim">Open comments</h3>
-            {openTapes.length === 0 && <p className="text-sm text-dim">No open comments.</p>}
+            {openEdits.length === 0 && <p className="text-sm text-dim">No open comments.</p>}
             <ul className="grid gap-2">
-              {openTapes.map((o) => (
-                <li key={o.tape.id} className={card}>
+              {openEdits.map((o) => (
+                <li key={o.edit.id} className={card}>
                   <span className="text-sm text-dim">{o.project_name}</span>
-                  <a href={routeHash({ view: "tape", projectId: o.tape.project_id, tapeId: o.tape.id })} className="font-bold hover:underline">
-                    {o.tape.name}
+                  <a href={routeHash({ view: "edit", projectId: o.edit.project_id, editId: o.edit.id })} className="font-bold hover:underline">
+                    {o.edit.name}
                   </a>
-                  <StatusLabel status={o.tape.status} />
+                  <StatusLabel status={o.edit.status} />
                   <span className="ml-auto text-xs text-dim">
                     v{o.latest_version} · {o.open_comments === 1 ? "1 open comment" : `${o.open_comments} open comments`}
                   </span>

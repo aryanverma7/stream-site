@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { editorApi } from "./editorApi";
 
-export type DeleteKind = "vod" | "tape_files" | "project";
+export type DeleteKind = "vod" | "edit_files" | "project";
 
 /** A live delete request, as GET /deletions lists them (deletions.pending). */
 export interface DeleteRequest {

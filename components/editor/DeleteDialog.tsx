@@ -7,7 +7,7 @@ import type { DeleteKind } from "@/lib/useDeletions";
 /**
  * The one delete confirmation: type the exact name, then the backend
  * waits an hour with an Undo. `label` is what the backend compares
- * against (the VOD's file name, the tape's or project's name).
+ * against (the VOD's file name, the edit's or project's name).
  *
  * Esc closes it and goes no further, so it never also zooms out of the
  * view behind it - caught on window in the capture phase, so it works

@@ -2,7 +2,7 @@ import { routeHash, type Route } from "@/lib/useHashRoute";
 import type { CrumbNames } from "@/lib/useCrumbNames";
 
 /**
- * All projects › project › tape › vN, each a real link to its level. The
+ * All projects › project › edit › vN, each a real link to its level. The
  * last one is where you are. A name still loading reads "…" rather than
  * collapsing the trail, so the crumbs don't jump when it arrives.
  */
@@ -11,13 +11,13 @@ export function Breadcrumb({ route, names }: { route: Route; names: CrumbNames }
   if ("projectId" in route) {
     crumbs.push({ label: names.project ?? "…", to: { view: "project", projectId: route.projectId } });
   }
-  if ("tapeId" in route) {
-    crumbs.push({ label: names.tape ?? "…", to: { view: "tape", projectId: route.projectId, tapeId: route.tapeId } });
+  if ("editId" in route) {
+    crumbs.push({ label: names.edit ?? "…", to: { view: "edit", projectId: route.projectId, editId: route.editId } });
   }
   if (route.view === "iteration") {
     crumbs.push({
       label: names.version === null ? "…" : `v${names.version}`,
-      to: { view: "iteration", projectId: route.projectId, tapeId: route.tapeId, iterationId: route.iterationId },
+      to: { view: "iteration", projectId: route.projectId, editId: route.editId, iterationId: route.iterationId },
     });
   }
 

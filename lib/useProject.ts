@@ -4,15 +4,19 @@ import { useCallback, useEffect, useState } from "react";
 import { editorApi } from "./editorApi";
 import type { Project } from "./useProjects";
 
-export type TapeStatus = "cutting" | "in_review" | "changes_asked" | "final";
+/** null until the first version is uploaded: its shape decides video or clip (a tape's reel is always a reel). */
+export type EditKind = "video" | "clip" | "reel";
+export const KIND_LABEL: Record<EditKind, string> = { video: "Video", clip: "Clip", reel: "Reel" };
 
-/** A tape as GET /projects/{id} lists it (GET /tapes/{id} lacks the last four). */
-export interface Tape {
+export type EditStatus = "cutting" | "in_review" | "changes_asked" | "final";
+
+/** An edit as GET /projects/{id} lists it (GET /edits/{id} lacks the last four). */
+export interface Edit {
   id: number;
   project_id: number;
   name: string;
-  kind: "tape" | "reel";
-  status: TapeStatus;
+  kind: EditKind | null;
+  status: EditStatus;
   notes: string;
   files_deleted_at: number | null;
   /** 1 when the streamer switched it out of the weekly quota (older backends leave it out). */
@@ -26,19 +30,19 @@ export interface Tape {
   open_comments?: number;
 }
 
-/** One project and its tapes. `project` stays null until loaded or on failure. */
+/** One project and its edits. `project` stays null until loaded or on failure. */
 export function useProject(id: number): {
-  project: Omit<Project, "tape_count" | "has_new"> | null;
-  tapes: Tape[];
+  project: Omit<Project, "edit_count" | "has_new"> | null;
+  edits: Edit[];
   error: string | null;
   refresh: () => Promise<void>;
 } {
-  const [data, setData] = useState<{ project: Project | null; tapes: Tape[] }>({ project: null, tapes: [] });
+  const [data, setData] = useState<{ project: Project | null; edits: Edit[] }>({ project: null, edits: [] });
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      setData(await editorApi<{ project: Project; tapes: Tape[] }>(`/projects/${id}`));
+      setData(await editorApi<{ project: Project; edits: Edit[] }>(`/projects/${id}`));
       setError(null);
     } catch (e) {
       setError((e as Error).message);

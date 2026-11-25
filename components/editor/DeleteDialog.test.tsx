@@ -5,7 +5,7 @@ import { editorBackend } from "@/lib/testUtils";
 
 function open(onDone = vi.fn(), onClose = vi.fn()) {
   const utils = render(
-    <DeleteDialog kind="tape_files" targetId={5} label="Jett dash" title="Delete files" onClose={onClose} onDone={onDone} />,
+    <DeleteDialog kind="edit_files" targetId={5} label="Jett dash" title="Delete files" onClose={onClose} onDone={onDone} />,
   );
   return { ...utils, input: utils.getByLabelText("Type the name to confirm"), button: utils.getByRole("button", { name: "Delete in an hour" }) as HTMLButtonElement };
 }
@@ -28,7 +28,7 @@ describe("DeleteDialog", () => {
 
     fireEvent.click(button);
     await waitFor(() => expect(onDone).toHaveBeenCalled());
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1]!.body))).toEqual({ kind: "tape_files", target_id: 5, confirm: "Jett dash" });
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]!.body))).toEqual({ kind: "edit_files", target_id: 5, confirm: "Jett dash" });
   });
 
   it("shows the server's refusal and stays open", async () => {

@@ -1,23 +1,23 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/react";
-import { TapeView } from "./TapeView";
+import { EditView } from "./EditView";
 import { editorBackend } from "@/lib/testUtils";
 
-const tape = (status: string, extra = {}) => ({
-  id: 5, project_id: 12, name: "Jett dash", kind: "tape", status, notes: "", files_deleted_at: null, source_project_ids: [], ...extra,
+const edit = (status: string, extra = {}) => ({
+  id: 5, project_id: 12, name: "Jett dash", kind: "edit", status, notes: "", files_deleted_at: null, source_project_ids: [], ...extra,
 });
 const iteration = (id: number, version: number) => ({
-  id, tape_id: 5, version, filename: `cut${version}.mp4`, size: 1, status: "ready", drive_file_id: `FILE_${id}`,
+  id, edit_id: 5, version, filename: `cut${version}.mp4`, size: 1, status: "ready", drive_file_id: `FILE_${id}`,
   uploaded_at: 100, created_at: 100, checks: null, has_thumbnail: false,
 });
 
 function base(status: string, extra: Record<string, unknown> = {}) {
   return editorBackend({
-    "/tapes/5": { tape: tape(status), iterations: [iteration(1, 1), iteration(2, 2)] },
+    "/edits/5": { edit: edit(status), iterations: [iteration(1, 1), iteration(2, 2)] },
     "/iterations/1": { comments: [] },
     "/iterations/2": { comments: [{ resolved: true }, { resolved: false }, { resolved: true }] },
     "/deletions": { pending: [] },
-    "PATCH /tapes/5": (body: unknown) => tape((body as { status?: string }).status ?? status),
+    "PATCH /edits/5": (body: unknown) => edit((body as { status?: string }).status ?? status),
     ...extra,
   });
 }
@@ -25,28 +25,28 @@ function base(status: string, extra: Record<string, unknown> = {}) {
 const statusSelect = (getAll: (role: string, o: { name: string }) => HTMLElement[]) =>
   getAll("combobox", { name: "Status" })[0] as HTMLSelectElement;
 
-describe("TapeView", () => {
+describe("EditView", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("shows versions newest first with their comment summary", async () => {
     base("in_review");
-    const { findByText, getAllByRole } = render(<TapeView projectId={12} tapeId={5} role="editor" username="cutter" />);
+    const { findByText, getAllByRole } = render(<EditView projectId={12} editId={5} role="editor" username="cutter" />);
     expect(await findByText("2 of 3 resolved")).toBeTruthy();
     expect(getAllByRole("heading", { level: 4 }).map((h) => h.textContent)).toEqual(["v2", "v1"]);
   });
 
   it("never offers the editor Final, Start over or the files delete", async () => {
     base("in_review");
-    const { findByRole, getAllByRole, queryByRole } = render(<TapeView projectId={12} tapeId={5} role="editor" username="cutter" />);
+    const { findByRole, getAllByRole, queryByRole } = render(<EditView projectId={12} editId={5} role="editor" username="cutter" />);
     await findByRole("heading", { name: "Jett dash" });
     const options = [...statusSelect(getAllByRole).options].map((o) => o.value);
     expect(options).toEqual(["cutting", "in_review", "changes_asked"]);
     expect(queryByRole("button", { name: /Start over/ })).toBeNull();
   });
 
-  it("shows the editor a Final tape as a label, with no way out of it", async () => {
+  it("shows the editor a Final edit as a label, with no way out of it", async () => {
     base("final");
-    const { findByRole, queryByRole, queryAllByText } = render(<TapeView projectId={12} tapeId={5} role="editor" username="cutter" />);
+    const { findByRole, queryByRole, queryAllByText } = render(<EditView projectId={12} editId={5} role="editor" username="cutter" />);
     await findByRole("link", { name: "Download Final" });
     expect(queryByRole("combobox", { name: "Status" })).toBeNull();
     expect(queryAllByText("Final").length).toBeGreaterThan(0);
@@ -55,13 +55,13 @@ describe("TapeView", () => {
 
   it("gives only the streamer the quota switch, and sends quota_exempt", async () => {
     base("final");
-    const editorView = render(<TapeView projectId={12} tapeId={5} role="editor" username="cutter" />);
+    const editorView = render(<EditView projectId={12} editId={5} role="editor" username="cutter" />);
     await editorView.findByRole("heading", { name: "Jett dash" });
     expect(editorView.queryByRole("checkbox", { name: /weekly quota/ })).toBeNull();
     editorView.unmount();
 
-    const fetchMock = base("final", { "PATCH /tapes/5": (body: unknown) => tape("final", { quota_exempt: (body as { quota_exempt: boolean }).quota_exempt ? 1 : 0 }) });
-    const { findByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
+    const fetchMock = base("final", { "PATCH /edits/5": (body: unknown) => edit("final", { quota_exempt: (body as { quota_exempt: boolean }).quota_exempt ? 1 : 0 }) });
+    const { findByRole } = render(<EditView projectId={12} editId={5} role="admin" username="aryan" />);
     const box = (await findByRole("checkbox", { name: /weekly quota/ })) as HTMLInputElement;
     expect(box.checked).toBe(true);
     fireEvent.click(box);
@@ -72,7 +72,7 @@ describe("TapeView", () => {
 
   it("asks the streamer before marking Final, and sends it only on yes", async () => {
     const fetchMock = base("in_review");
-    const { findByRole, getAllByRole, getByRole, queryByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
+    const { findByRole, getAllByRole, getByRole, queryByRole } = render(<EditView projectId={12} editId={5} role="admin" username="aryan" />);
     await findByRole("heading", { name: "Jett dash" });
 
     fireEvent.change(statusSelect(getAllByRole), { target: { value: "final" } });
@@ -91,8 +91,8 @@ describe("TapeView", () => {
   });
 
   it("shows a refused status change", async () => {
-    base("in_review", { "PATCH /tapes/5": { status: 403, body: { error: "Only the streamer can do this." } } });
-    const { findByRole, getAllByRole } = render(<TapeView projectId={12} tapeId={5} role="editor" username="cutter" />);
+    base("in_review", { "PATCH /edits/5": { status: 403, body: { error: "Only the streamer can do this." } } });
+    const { findByRole, getAllByRole } = render(<EditView projectId={12} editId={5} role="editor" username="cutter" />);
     await findByRole("heading", { name: "Jett dash" });
     fireEvent.change(statusSelect(getAllByRole), { target: { value: "cutting" } });
     expect((await findByRole("alert")).textContent).toBe("Only the streamer can do this.");
@@ -100,7 +100,7 @@ describe("TapeView", () => {
 
   it("downloads the Final from a new-tab link for the latest version, with Drive beside it, and no media-link", async () => {
     const fetchMock = base("final");
-    const { findByRole, getByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
+    const { findByRole, getByRole } = render(<EditView projectId={12} editId={5} role="admin" username="aryan" />);
     const link = await findByRole("link", { name: "Download Final" });
     expect(link.getAttribute("href")).toBe("https://drive.usercontent.google.com/download?id=FILE_2&export=download");
     expect([link.getAttribute("target"), link.getAttribute("rel")]).toEqual(["_blank", "noopener noreferrer"]);
@@ -111,7 +111,7 @@ describe("TapeView", () => {
 
   it("lets the streamer start over on the latest version after a confirm", async () => {
     const fetchMock = base("changes_asked", { "POST /iterations/2/start-over": { resolved: 1 } });
-    const { findByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
+    const { findByRole } = render(<EditView projectId={12} editId={5} role="admin" username="aryan" />);
     fireEvent.click(await findByRole("button", { name: "Start over on v2" }));
     expect(fetchMock.mock.calls.some(([u]) => u === "/api/editor/iterations/2/start-over")).toBe(false);
     fireEvent.click(await findByRole("button", { name: "Start over" }));
@@ -121,8 +121,8 @@ describe("TapeView", () => {
   });
 
   it("saves notes on blur", async () => {
-    const fetchMock = base("cutting", { "PATCH /tapes/5": (b: unknown) => tape("cutting", b as object) });
-    const { findByLabelText } = render(<TapeView projectId={12} tapeId={5} role="editor" username="cutter" />);
+    const fetchMock = base("cutting", { "PATCH /edits/5": (b: unknown) => edit("cutting", b as object) });
+    const { findByLabelText } = render(<EditView projectId={12} editId={5} role="editor" username="cutter" />);
     const notes = await findByLabelText("Notes");
     fireEvent.change(notes, { target: { value: "Trim the intro" } });
     expect(fetchMock.mock.calls.some(([, i]) => i?.method === "PATCH")).toBe(false);
@@ -133,7 +133,7 @@ describe("TapeView", () => {
   });
 
   it("saves a second after typing stops (injected clock) and once more only if changed on blur", async () => {
-    const fetchMock = base("cutting", { "PATCH /tapes/5": (b: unknown) => tape("cutting", b as object) });
+    const fetchMock = base("cutting", { "PATCH /edits/5": (b: unknown) => edit("cutting", b as object) });
     const timers: { fn: () => void; live: boolean }[] = [];
     const delay = (fn: () => void) => {
       const t = { fn, live: true };
@@ -142,7 +142,7 @@ describe("TapeView", () => {
     };
     const fire = () => timers.filter((t) => t.live).forEach((t) => ((t.live = false), t.fn()));
     const patches = () => fetchMock.mock.calls.filter(([, i]) => i?.method === "PATCH").map(([, i]) => JSON.parse(String(i!.body)));
-    const { findByLabelText } = render(<TapeView projectId={12} tapeId={5} role="editor" username="cutter" delay={delay} />);
+    const { findByLabelText } = render(<EditView projectId={12} editId={5} role="editor" username="cutter" delay={delay} />);
     const notes = await findByLabelText("Notes");
     fireEvent.change(notes, { target: { value: "Trim" } });
     fireEvent.change(notes, { target: { value: "Trim the intro" } });
@@ -154,9 +154,9 @@ describe("TapeView", () => {
     expect(patches()).toHaveLength(1);
   });
 
-  it("saves an edited name when the tape is left mid-edit", async () => {
-    const fetchMock = base("cutting", { "PATCH /tapes/5": (b: unknown) => tape("cutting", b as object) });
-    const { findByLabelText, unmount } = render(<TapeView projectId={12} tapeId={5} role="editor" username="cutter" delay={() => () => {}} />);
+  it("saves an edited name when the edit is left mid-edit", async () => {
+    const fetchMock = base("cutting", { "PATCH /edits/5": (b: unknown) => edit("cutting", b as object) });
+    const { findByLabelText, unmount } = render(<EditView projectId={12} editId={5} role="editor" username="cutter" delay={() => () => {}} />);
     fireEvent.change(await findByLabelText("Name"), { target: { value: "Jett dash v2 " } });
     unmount();
     await waitFor(() => expect(fetchMock.mock.calls.some(([, i]) => i?.method === "PATCH")).toBe(true));
@@ -165,10 +165,10 @@ describe("TapeView", () => {
   });
 
   it("shows a pending files delete with Undo, and Undo brings the Final block back", async () => {
-    let pending = [{ id: 3, kind: "tape_files", target_id: 5, label: "Jett dash", requested_by: "aryan", delete_at: 1, remaining_seconds: 3600, status: "pending" }];
+    let pending = [{ id: 3, kind: "edit_files", target_id: 5, label: "Jett dash", requested_by: "aryan", delete_at: 1, remaining_seconds: 3600, status: "pending" }];
     let itStatus = "deleting";
     base("final", {
-      "/tapes/5": () => ({ tape: tape("final"), iterations: [{ ...iteration(1, 1), status: itStatus }, { ...iteration(2, 2), status: itStatus }] }),
+      "/edits/5": () => ({ edit: edit("final"), iterations: [{ ...iteration(1, 1), status: itStatus }, { ...iteration(2, 2), status: itStatus }] }),
       "/deletions": () => ({ pending }),
       "POST /deletions/3/undo": () => {
         pending = [];
@@ -176,7 +176,7 @@ describe("TapeView", () => {
         return { request_id: 3, status: "cancelled" };
       },
     });
-    const { findByText, findByRole, getByRole, queryByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
+    const { findByText, findByRole, getByRole, queryByRole } = render(<EditView projectId={12} editId={5} role="admin" username="aryan" />);
     expect(await findByText("Deleting in 60 min")).toBeTruthy();
     // Every version is "deleting", so there is no Final to download meanwhile.
     expect(queryByRole("button", { name: "Download Final" })).toBeNull();
@@ -192,7 +192,7 @@ describe("TapeView", () => {
     base("final", {
       "/deletions": { pending: [{ id: 4, kind: "project", target_id: 12, label: "Ranked", requested_by: "aryan", delete_at: 1, remaining_seconds: 300, status: "pending" }] },
     });
-    const { findByText, getByRole } = render(<TapeView projectId={12} tapeId={5} role="admin" username="aryan" />);
+    const { findByText, getByRole } = render(<EditView projectId={12} editId={5} role="admin" username="aryan" />);
     await findByText("Deleting in 5 min");
     expect((getByRole("button", { name: "Download Final" }) as HTMLButtonElement).disabled).toBe(true);
   });

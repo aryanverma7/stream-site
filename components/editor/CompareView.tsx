@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { routeHash } from "@/lib/useHashRoute";
-import { useTape, type Iteration } from "@/lib/useTape";
+import { useEdit, type Iteration } from "@/lib/useEdit";
 import { useMediaFile, type MediaFile } from "@/lib/useMediaFile";
 import { dirName, holdLocks, projectLock, versionLock } from "@/lib/opfsMedia";
 import { mediaUrl, useMediaWorker } from "@/lib/useMediaWorker";
@@ -16,29 +16,29 @@ import { ScrubBar } from "./ScrubBar";
 
 const btn = "menu-pop label border-2 border-phosphor bg-ink px-2 py-1 text-[11px] text-phosphor hover:bg-phosphor hover:text-ink disabled:opacity-40";
 
-/** Two versions of a tape side by side, `leftId` on the left; the route's `vs` is the right. */
-export function CompareView({ projectId, tapeId, leftId, rightId }: { projectId: number; tapeId: number; leftId: number; rightId: number }) {
-  const { iterations, tape, error } = useTape(tapeId);
+/** Two versions of an edit side by side, `leftId` on the left; the route's `vs` is the right. */
+export function CompareView({ projectId, editId, leftId, rightId }: { projectId: number; editId: number; leftId: number; rightId: number }) {
+  const { iterations, edit, error } = useEdit(editId);
   const playable = (id: number) => iterations.find((i) => i.id === id && i.status === "ready" && !!i.drive_file_id) ?? null;
   const left = playable(leftId);
   const right = playable(rightId);
   if (error) return <p className="text-rec">{error}</p>;
-  if (!tape) return <p className="osd text-xl text-dim">Loading…</p>;
+  if (!edit) return <p className="osd text-xl text-dim">Loading…</p>;
   if (!left || !right)
     return (
       <p className="text-amber">
         Both versions must be uploaded to compare them.{" "}
-        <a className="underline" href={routeHash({ view: "iteration", projectId, tapeId, iterationId: leftId })}>
+        <a className="underline" href={routeHash({ view: "iteration", projectId, editId, iterationId: leftId })}>
           Back to the version
         </a>
       </p>
     );
-  return <Pair key={`${left.id}-${right.id}`} projectId={projectId} tapeId={tapeId} left={left} right={right} />;
+  return <Pair key={`${left.id}-${right.id}`} projectId={projectId} editId={editId} left={left} right={right} />;
 }
 
 const media = (it: Iteration) => ({ id: it.id, drive_file_id: it.drive_file_id as string, size: it.size });
 
-function Pair({ projectId, tapeId, left, right }: { projectId: number; tapeId: number; left: Iteration; right: Iteration }) {
+function Pair({ projectId, editId, left, right }: { projectId: number; editId: number; left: Iteration; right: Iteration }) {
   const lm = useMediaFile(media(left), projectId, right.id);
   const rm = useMediaFile(media(right), projectId, left.id);
   const lf = left.drive_file_id as string;
@@ -148,7 +148,7 @@ function Pair({ projectId, tapeId, left, right }: { projectId: number; tapeId: n
     </figure>
   );
 
-  const swap = routeHash({ view: "iteration", projectId, tapeId, iterationId: right.id, vsId: left.id });
+  const swap = routeHash({ view: "iteration", projectId, editId, iterationId: right.id, vsId: left.id });
   return (
     <section ref={area} className="space-y-3" aria-label="Side by side">
       <header className="flex flex-wrap items-center gap-3">
@@ -158,7 +158,7 @@ function Pair({ projectId, tapeId, left, right }: { projectId: number; tapeId: n
         <a className={btn} href={swap}>
           Swap sides
         </a>
-        <a className={btn} href={routeHash({ view: "iteration", projectId, tapeId, iterationId: left.id })}>
+        <a className={btn} href={routeHash({ view: "iteration", projectId, editId, iterationId: left.id })}>
           Back to v{left.version}
         </a>
       </header>

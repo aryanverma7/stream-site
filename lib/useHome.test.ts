@@ -7,7 +7,7 @@ describe("useHome", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("loads the three lists, and reports the server's error", async () => {
-    const home = { vods_ready: [{ id: 1 }], deletes_to_confirm: [], open_tapes: [] };
+    const home = { vods_ready: [{ id: 1 }], deletes_to_confirm: [], open_edits: [] };
     editorBackend({ "/home": home });
     const { result } = renderHook(() => useHome());
     await waitFor(() => expect(result.current.home).toEqual(home));

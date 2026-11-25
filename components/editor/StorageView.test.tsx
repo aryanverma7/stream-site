@@ -6,9 +6,9 @@ import { editorBackend } from "@/lib/testUtils";
 const STORAGE = (paused: number | null = null) => ({
   quota: { limit: 15e9, usage: 6e9, free: 9e9 },
   files: [
-    { kind: "vod", label: "Ranked — VOD", size: 4e9, project_id: 12, tape_id: null, status: "ready", project_name: "Ranked", vod_filename: "ranked.mp4", tape_name: null },
-    { kind: "iteration", label: "Jett dash v1", size: 5e8, project_id: 12, tape_id: 5, status: "ready", project_name: "Ranked", vod_filename: null, tape_name: "Jett dash" },
-    { kind: "iteration", label: "Jett dash v2", size: 6e8, project_id: 12, tape_id: 5, status: "ready", project_name: "Ranked", vod_filename: null, tape_name: "Jett dash" },
+    { kind: "vod", label: "Ranked — VOD", size: 4e9, project_id: 12, edit_id: null, status: "ready", project_name: "Ranked", vod_filename: "ranked.mp4", edit_name: null },
+    { kind: "iteration", label: "Jett dash v1", size: 5e8, project_id: 12, edit_id: 5, status: "ready", project_name: "Ranked", vod_filename: null, edit_name: "Jett dash" },
+    { kind: "iteration", label: "Jett dash v2", size: 6e8, project_id: 12, edit_id: 5, status: "ready", project_name: "Ranked", vod_filename: null, edit_name: "Jett dash" },
   ],
   pending_deletes: [],
   scheduler: { sane: paused === null, last_seen: 100, paused_since: paused },
@@ -60,7 +60,7 @@ describe("StorageView", () => {
     expect(resets()).toBe(1);
   });
 
-  it("opens DeleteDialog for project, VOD and tape files with the names the server confirms against", async () => {
+  it("opens DeleteDialog for project, VOD and edit files with the names the server confirms against", async () => {
     const fetchMock = base({ "POST /deletions": { request_id: 1 } });
     const { findByRole, getByRole, getByLabelText } = render(<StorageView username="aryan" />);
     const tryDelete = async (button: string, name: string) => {
@@ -77,12 +77,12 @@ describe("StorageView", () => {
     expect(bodies).toEqual([
       { kind: "project", target_id: 12, confirm: "Ranked" },
       { kind: "vod", target_id: 12, confirm: "ranked.mp4" },
-      { kind: "tape_files", target_id: 5, confirm: "Jett dash" },
+      { kind: "edit_files", target_id: 5, confirm: "Jett dash" },
     ]);
   });
 
   it("lists pending deletes with their countdown and Undo in place of the Delete button", async () => {
-    base({ "/deletions": { pending: [{ id: 3, kind: "tape_files", target_id: 5, label: "Jett dash", requested_by: "aryan", delete_at: 1, remaining_seconds: 600, status: "pending" }] } });
+    base({ "/deletions": { pending: [{ id: 3, kind: "edit_files", target_id: 5, label: "Jett dash", requested_by: "aryan", delete_at: 1, remaining_seconds: 600, status: "pending" }] } });
     const { findAllByText, getAllByRole, queryByRole } = render(<StorageView username="aryan" />);
     expect(await findAllByText("Deleting in 10 min")).toHaveLength(2);
     expect(getAllByRole("button", { name: "Undo" })).toHaveLength(2);

@@ -7,7 +7,7 @@ import { useCrumbNames } from "@/lib/useCrumbNames";
 import { Breadcrumb } from "./Breadcrumb";
 import { ProjectsView } from "./ProjectsView";
 import { ProjectView } from "./ProjectView";
-import { TapeView } from "./TapeView";
+import { EditView } from "./EditView";
 import { CompareView } from "./CompareView";
 import { ReviewPlayer } from "./ReviewPlayer";
 import { isTyping } from "@/lib/isTyping";
@@ -23,7 +23,7 @@ import { Ransom } from "../Hero";
 
 const DELETED = "That was deleted or never existed";
 
-const depth = (r: Route) => ({ project: 1, tape: 2, iteration: 3 })[r.view as string] ?? 0;
+const depth = (r: Route) => ({ project: 1, edit: 2, iteration: 3 })[r.view as string] ?? 0;
 
 /** What each route shows. */
 function RouteView({ route, me }: { route: Route; me: EditorMe }) {
@@ -32,11 +32,11 @@ function RouteView({ route, me }: { route: Route; me: EditorMe }) {
       return <ProjectsView role={me.role} username={me.username} />;
     case "project":
       return <ProjectView projectId={route.projectId} role={me.role} username={me.username} />;
-    case "tape":
-      return <TapeView projectId={route.projectId} tapeId={route.tapeId} role={me.role} username={me.username} />;
+    case "edit":
+      return <EditView projectId={route.projectId} editId={route.editId} role={me.role} username={me.username} />;
     case "iteration":
-      if (route.vsId) return <CompareView projectId={route.projectId} tapeId={route.tapeId} leftId={route.iterationId} rightId={route.vsId} />;
-      return <ReviewPlayer projectId={route.projectId} tapeId={route.tapeId} iterationId={route.iterationId} seekS={route.seekS} role={me.role} username={me.username} />;
+      if (route.vsId) return <CompareView projectId={route.projectId} editId={route.editId} leftId={route.iterationId} rightId={route.vsId} />;
+      return <ReviewPlayer projectId={route.projectId} editId={route.editId} iterationId={route.iterationId} seekS={route.seekS} role={me.role} username={me.username} />;
     case "home":
       return <HomeView role={me.role} username={me.username} />;
     case "fixes":
@@ -119,7 +119,7 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
   }, [me, go]);
 
   // Esc zooms out. A dialog handles its own Esc and stops propagation, so
-  // closing it never also leaves the tape behind it.
+  // closing it never also leaves the edit behind it.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !e.defaultPrevented && !isTyping(e)) up();
@@ -136,7 +136,7 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
     { label: "Quota", to: { view: "quota" } },
     ...(me?.role === "admin" ? [{ label: "Storage", to: { view: "storage" } as Route }] : []),
   ];
-  const inProjects = ["projects", "project", "tape", "iteration"].includes(route.view);
+  const inProjects = ["projects", "project", "edit", "iteration"].includes(route.view);
   return (
     <div className="flex min-h-screen flex-col bg-ink text-phosphor">
       <header className="wallpaper relative z-30 flex flex-wrap items-center justify-between gap-4 border-b-4 border-ink px-4 py-3 sm:px-6">

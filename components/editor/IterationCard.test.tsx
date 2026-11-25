@@ -1,8 +1,8 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import { CheckBadges, IterationCard, IterationDetails } from "./IterationCard";
-import type { Checks, Iteration } from "@/lib/useTape";
-import type { Tape } from "@/lib/useProject";
+import type { Checks, Iteration } from "@/lib/useEdit";
+import type { Edit } from "@/lib/useProject";
 import { editorBackend } from "@/lib/testUtils";
 
 vi.mock("@/lib/mediaChecks", async (orig) => ({
@@ -12,10 +12,10 @@ vi.mock("@/lib/mediaChecks", async (orig) => ({
 }));
 
 const it2 = (over: Partial<Iteration> = {}): Iteration => ({
-  id: 2, tape_id: 5, version: 2, filename: "cut2.mp4", size: 1, status: "ready", drive_file_id: "FILE_2",
+  id: 2, edit_id: 5, version: 2, filename: "cut2.mp4", size: 1, status: "ready", drive_file_id: "FILE_2",
   uploaded_at: 100, created_at: 100, checks: { duration_s: 3725.4 } as Checks, has_thumbnail: false, ...over,
 });
-const tape = { id: 5, project_id: 12, name: "Jett dash", kind: "tape", status: "in_review" } as unknown as Tape;
+const edit = { id: 5, project_id: 12, name: "Jett dash", kind: "edit", status: "in_review" } as unknown as Edit;
 
 describe("CheckBadges", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -38,7 +38,7 @@ describe("IterationCard", () => {
 
   it("shows the duration and downloads from a new-tab link to Google", () => {
     editorBackend({ "/iterations/2": { comments: [] } });
-    const { getByText, getByRole } = render(<IterationCard iteration={it2()} tape={tape} role="editor" onStatus={() => {}} locked={false} />);
+    const { getByText, getByRole } = render(<IterationCard iteration={it2()} edit={edit} role="editor" onStatus={() => {}} locked={false} />);
     expect(getByText("1:02:05")).toBeTruthy();
     const link = getByRole("link", { name: "Download" });
     expect(link.getAttribute("href")).toBe("https://drive.usercontent.google.com/download?id=FILE_2&export=download");
@@ -47,7 +47,7 @@ describe("IterationCard", () => {
 
   it("shows m:ss under an hour, and a disabled Download while a delete is live", () => {
     editorBackend({ "/iterations/2": { comments: [] } });
-    const { getByText, getByRole } = render(<IterationCard iteration={it2({ checks: { duration_s: 222 } as Checks })} tape={tape} role="editor" onStatus={() => {}} locked />);
+    const { getByText, getByRole } = render(<IterationCard iteration={it2({ checks: { duration_s: 222 } as Checks })} edit={edit} role="editor" onStatus={() => {}} locked />);
     expect(getByText("3:42")).toBeTruthy();
     expect((getByRole("button", { name: "Download" }) as HTMLButtonElement).disabled).toBe(true);
   });
@@ -59,10 +59,10 @@ describe("IterationCard Cancel this upload", () => {
     localStorage.clear();
   });
 
-  it("an orphaned upload can be cancelled by either role after a confirm, then the tape refreshes", async () => {
+  it("an orphaned upload can be cancelled by either role after a confirm, then the edit refreshes", async () => {
     const fetchMock = editorBackend({ "POST /iterations/2/abandon": { id: 2, status: "abandoned" } });
     const onChanged = vi.fn();
-    const { getByRole, findByRole, queryByRole } = render(<IterationCard iteration={it2({ status: "uploading" })} tape={tape} role="editor" onStatus={() => {}} locked={false} onChanged={onChanged} />);
+    const { getByRole, findByRole, queryByRole } = render(<IterationCard iteration={it2({ status: "uploading" })} edit={edit} role="editor" onStatus={() => {}} locked={false} onChanged={onChanged} />);
     const abandons = () => fetchMock.mock.calls.filter(([u, i]) => u === "/api/editor/iterations/2/abandon" && i?.method === "POST");
     fireEvent.click(getByRole("button", { name: "Cancel this upload" }));
     fireEvent.click(await findByRole("button", { name: "Keep it" }));
@@ -77,13 +77,13 @@ describe("IterationCard Cancel this upload", () => {
 
   it("is not offered on a ready version, nor for an upload this tab is sending", async () => {
     editorBackend({ "/iterations/2": { comments: [] } });
-    const ready = render(<IterationCard iteration={it2()} tape={tape} role="admin" onStatus={() => {}} locked={false} />);
+    const ready = render(<IterationCard iteration={it2()} edit={edit} role="admin" onStatus={() => {}} locked={false} />);
     expect(ready.queryByRole("button", { name: "Cancel this upload" })).toBeNull();
     ready.unmount();
-    localStorage.setItem("editor.uploads", JSON.stringify([{ tapeId: 5, projectId: 12, name: "x.mp4", size: 1, lastModified: 1, iterationId: 2, version: 2, uploadUrl: "u", sent: 0 }]));
+    localStorage.setItem("editor.uploads", JSON.stringify([{ editId: 5, projectId: 12, name: "x.mp4", size: 1, lastModified: 1, iterationId: 2, version: 2, uploadUrl: "u", sent: 0 }]));
     vi.resetModules(); // the transfers store reads storage once
     const { IterationCard: Card } = await import("./IterationCard");
-    const mine = render(<Card iteration={it2({ status: "uploading" })} tape={tape} role="admin" onStatus={() => {}} locked={false} />);
+    const mine = render(<Card iteration={it2({ status: "uploading" })} edit={edit} role="admin" onStatus={() => {}} locked={false} />);
     expect(mine.queryByRole("button", { name: "Cancel this upload" })).toBeNull();
   });
 });
@@ -92,7 +92,7 @@ describe("IterationCard Add comment", () => {
   it("sets the one-shot flag and goes to the version", () => {
     editorBackend({ "/iterations/2": { comments: [] } });
     sessionStorage.clear();
-    const { getByRole } = render(<IterationCard iteration={it2()} tape={tape} role="editor" onStatus={() => {}} locked={false} />);
+    const { getByRole } = render(<IterationCard iteration={it2()} edit={edit} role="editor" onStatus={() => {}} locked={false} />);
     fireEvent.click(getByRole("button", { name: "Add comment" }));
     expect(sessionStorage.getItem("editor.openComposer")).toBe("2");
     expect(window.location.hash).toBe("#/p/12/t/5/v/2");
@@ -103,7 +103,7 @@ describe("IterationCard Edit checklist and summary", () => {
   it("Edit checklist sets its own one-shot flag and goes to the version", () => {
     editorBackend({ "/iterations/2": { comments: [] } });
     sessionStorage.clear();
-    const { getByRole } = render(<IterationCard iteration={it2()} tape={tape} role="editor" onStatus={() => {}} locked={false} />);
+    const { getByRole } = render(<IterationCard iteration={it2()} edit={edit} role="editor" onStatus={() => {}} locked={false} />);
     fireEvent.click(getByRole("button", { name: "Edit checklist" }));
     expect(sessionStorage.getItem("editor.openChecklist")).toBe("2");
     expect(window.location.hash).toBe("#/p/12/t/5/v/2");
@@ -120,7 +120,7 @@ describe("IterationCard Edit checklist and summary", () => {
         ],
       },
     });
-    const { findByLabelText } = render(<IterationCard iteration={it2()} tape={tape} role="editor" onStatus={() => {}} locked={false} />);
+    const { findByLabelText } = render(<IterationCard iteration={it2()} edit={edit} role="editor" onStatus={() => {}} locked={false} />);
     const card = await findByLabelText("Comment summary");
     expect(card).toHaveTextContent("1 of 4 resolved");
     expect(card).toHaveTextContent("1 Fix open");
@@ -151,11 +151,11 @@ describe("IterationCard Run checks", () => {
     localStorage.clear();
   });
 
-  it("a ready version with no checks offers Run checks: the same file is measured and PUT, then the tape refreshes", async () => {
+  it("a ready version with no checks offers Run checks: the same file is measured and PUT, then the edit refreshes", async () => {
     const fetchMock = editorBackend({ "/iterations/2": { comments: [] }, "PUT /iterations/2/media": { id: 2 } });
     const onChanged = vi.fn();
     const { getByRole, getByLabelText, findByRole } = render(
-      <IterationCard iteration={it2({ checks: null, size: 5 })} tape={tape} role="editor" onStatus={() => {}} locked={false} onChanged={onChanged} />,
+      <IterationCard iteration={it2({ checks: null, size: 5 })} edit={edit} role="editor" onStatus={() => {}} locked={false} onChanged={onChanged} />,
     );
     const input = getByLabelText("File for v2's checks") as HTMLInputElement;
     const click = vi.spyOn(input, "click");
@@ -173,10 +173,10 @@ describe("IterationCard Run checks", () => {
 
   it("is not offered when checks exist, nor on a version still uploading", () => {
     editorBackend({ "/iterations/2": { comments: [] } });
-    const has = render(<IterationCard iteration={it2()} tape={tape} role="admin" onStatus={() => {}} locked={false} />);
+    const has = render(<IterationCard iteration={it2()} edit={edit} role="admin" onStatus={() => {}} locked={false} />);
     expect(has.queryByRole("button", { name: "Run checks" })).toBeNull();
     has.unmount();
-    const uploading = render(<IterationCard iteration={it2({ checks: null, status: "uploading" })} tape={tape} role="admin" onStatus={() => {}} locked={false} />);
+    const uploading = render(<IterationCard iteration={it2({ checks: null, status: "uploading" })} edit={edit} role="admin" onStatus={() => {}} locked={false} />);
     expect(uploading.queryByRole("button", { name: "Run checks" })).toBeNull();
   });
 });

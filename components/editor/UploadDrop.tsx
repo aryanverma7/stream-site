@@ -4,24 +4,22 @@ import { useState } from "react";
 import { startUpload } from "@/lib/useTransfers";
 
 /**
- * A tape's drop zone for a new version (drag-drop or the picker, one file
- * at a time). Dropping a file that is stored as unfinished on this tape
+ * An edit's drop zone for a new version (drag-drop or the picker, one file
+ * at a time). Dropping a file that is stored as unfinished on this edit
  * resumes it instead of making another version. The upload itself runs in
- * the transfers store, so it carries on if this tape is left.
+ * the transfers store, so it carries on if this edit is left.
  *
- * `disabled` is true while a delete covering the tape is in its undo hour,
+ * `disabled` is true while a delete covering the edit is in its undo hour,
  * when the server would refuse the upload anyway.
  */
 export function UploadDrop({
-  tapeId,
+  editId,
   projectId,
-  kind,
   disabled,
   onUploaded,
 }: {
-  tapeId: number;
+  editId: number;
   projectId: number;
-  kind: "tape" | "reel";
   disabled: boolean;
   onUploaded: () => void;
 }) {
@@ -32,7 +30,7 @@ export function UploadDrop({
     if (disabled || !files?.length) return;
     if (files.length > 1) return setError("One file at a time.");
     setError(null);
-    void startUpload({ tapeId, projectId, kind }, files[0], onUploaded);
+    void startUpload({ editId, projectId }, files[0], onUploaded);
   };
 
   return (

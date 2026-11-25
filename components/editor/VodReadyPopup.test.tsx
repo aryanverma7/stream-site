@@ -6,7 +6,7 @@ import { VodReadyPopup } from "./VodReadyPopup";
 import { editorBackend } from "@/lib/testUtils";
 
 const ev = (id: number, kind: string, project_id: number | null = id) => ({
-  id, at: 1, actor: "agent", kind, summary: `Stream ${id} VOD is ready`, project_id, tape_id: null, iteration_id: null,
+  id, at: 1, actor: "agent", kind, summary: `Stream ${id} VOD is ready`, project_id, edit_id: null, iteration_id: null,
 });
 // Newest first; the two newest are unseen, so the vod_ready at id 5 is old news.
 const FEED = { items: [ev(9, "vod_ready"), ev(8, "comment_added"), ev(5, "vod_ready")], unseen: 2 };

@@ -14,7 +14,7 @@ const api = (comments: Comment[], over: Partial<CommentsApi> = {}): CommentsApi 
     add: vi.fn(), reply: vi.fn(), edit: vi.fn(), setResolved: vi.fn(), reload: vi.fn(), ...over,
   }) as unknown as CommentsApi;
 const panel = (cm: CommentsApi, t = 0, onSeek = vi.fn()) =>
-  render(<CommentPanel cm={cm} username="me" projectId={1} tapeId={2} currentTime={t} onSeek={onSeek} />);
+  render(<CommentPanel cm={cm} username="me" projectId={1} editId={2} currentTime={t} onSeek={onSeek} />);
 const ids = () => [...document.querySelectorAll("[data-comment]")].map((e) => e.getAttribute("data-comment"));
 
 describe("CommentPanel", () => {
@@ -37,7 +37,7 @@ describe("CommentPanel", () => {
   });
 
   it("Checklist shows the carried checkboxes only, and can be the first tab", () => {
-    render(<CommentPanel cm={api(set)} initialTab="Checklist" username="me" projectId={1} tapeId={2} currentTime={0} onSeek={vi.fn()} />);
+    render(<CommentPanel cm={api(set)} initialTab="Checklist" username="me" projectId={1} editId={2} currentTime={0} onSeek={vi.fn()} />);
     expect(screen.getByRole("tab", { name: "Checklist" })).toHaveAttribute("aria-selected", "true");
     expect(ids()).toEqual(["1"]);
   });
@@ -46,7 +46,7 @@ describe("CommentPanel", () => {
     const onSeek = vi.fn();
     const { rerender } = panel(api(set), 51, onSeek);
     expect(document.querySelector('[data-comment="3"]')).toHaveAttribute("aria-current", "true");
-    rerender(<CommentPanel cm={api(set)} username="me" projectId={1} tapeId={2} currentTime={60} onSeek={onSeek} />);
+    rerender(<CommentPanel cm={api(set)} username="me" projectId={1} editId={2} currentTime={60} onSeek={onSeek} />);
     expect(document.querySelector("[aria-current]")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Go to 0:50" }));
     expect(onSeek).toHaveBeenCalledWith(50);

@@ -124,8 +124,8 @@ export function StorageView({ username }: { username: string }) {
           {[...groups].map(([pid, files]) => {
             const name = files[0].project_name;
             const vod = files.find((f) => f.kind === "vod");
-            const tapes = new Map<number, StorageFile[]>();
-            for (const f of files) if (f.tape_id !== null) tapes.set(f.tape_id, [...(tapes.get(f.tape_id) ?? []), f]);
+            const edits = new Map<number, StorageFile[]>();
+            for (const f of files) if (f.edit_id !== null) edits.set(f.edit_id, [...(edits.get(f.edit_id) ?? []), f]);
             return (
               <div key={pid} className={panel}>
                 <div className="flex flex-wrap items-center gap-3">
@@ -144,17 +144,17 @@ export function StorageView({ username }: { username: string }) {
                     )}
                   </div>
                 )}
-                {[...tapes].map(([tid, tfiles]) => {
-                  const tape = tfiles[0].tape_name ?? "";
+                {[...edits].map(([tid, tfiles]) => {
+                  const edit = tfiles[0].edit_name ?? "";
                   return (
                     <div key={tid} className="flex flex-wrap items-center gap-3 text-sm">
-                      <a href={routeHash({ view: "tape", projectId: pid, tapeId: tid })} className="hover:underline">
-                        {tape}
+                      <a href={routeHash({ view: "edit", projectId: pid, editId: tid })} className="hover:underline">
+                        {edit}
                       </a>
                       <span className="text-xs text-dim">
-                        {tfiles.map((f) => `${f.label.slice(tape.length + 1)} ${size(f.size)}`).join(" · ")}
+                        {tfiles.map((f) => `${f.label.slice(edit.length + 1)} ${size(f.size)}`).join(" · ")}
                       </span>
-                      <span className="ml-auto">{deleteEntry("tape_files", tid, tape, `Delete ${tape}'s files`, "Delete files")}</span>
+                      <span className="ml-auto">{deleteEntry("edit_files", tid, edit, `Delete ${edit}'s files`, "Delete files")}</span>
                     </div>
                   );
                 })}

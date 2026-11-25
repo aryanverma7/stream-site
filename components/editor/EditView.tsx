@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { editorApi } from "@/lib/editorApi";
-import { useTape } from "@/lib/useTape";
+import { useEdit } from "@/lib/useEdit";
 import { useDeletions } from "@/lib/useDeletions";
-import type { TapeStatus } from "@/lib/useProject";
+import { KIND_LABEL, type EditStatus } from "@/lib/useProject";
 import { StatusSelect } from "./StatusLabel";
 import { IterationCard } from "./IterationCard";
 import { PendingDelete } from "./PendingDelete";
@@ -25,7 +25,7 @@ const timeout: Delay = (fn, ms) => {
 
 /**
  * Saves a field's draft a second after typing stops, and on unmount (leaving
- * the tape mid-edit), each draft at most once. The returned flush is for blur.
+ * the edit mid-edit), each draft at most once. The returned flush is for blur.
  */
 function useAutosave(draft: string | null, save: (v: string) => void, delay: Delay) {
   const latest = useRef({ draft, save });
@@ -47,21 +47,21 @@ function useAutosave(draft: string | null, save: (v: string) => void, delay: Del
   return flush;
 }
 
-/** A tape: its name, notes and status, its versions newest first, and the Final download. */
-export function TapeView({
+/** An edit: its name, notes and status, its versions newest first, and the Final download. */
+export function EditView({
   projectId,
-  tapeId,
+  editId,
   role,
   username,
   delay = timeout,
 }: {
   projectId: number;
-  tapeId: number;
+  editId: number;
   role: "admin" | "editor";
   username: string;
   delay?: Delay;
 }) {
-  const { tape, iterations, error, refresh, update } = useTape(tapeId);
+  const { edit, iterations, error, refresh, update } = useEdit(editId);
   // An Undo (or any delete appearing or finishing) changes the target too: refetch it.
   const deletions = useDeletions(() => refresh());
   const me = { username, role };
@@ -75,8 +75,8 @@ export function TapeView({
   const isAdmin = role === "admin";
   const newestFirst = [...iterations].reverse();
   const latest = newestFirst.find((i) => i.status === "ready");
-  const isFinal = tape?.status === "final";
-  const filesDelete = deletions.find("tape_files", tapeId);
+  const isFinal = edit?.status === "final";
+  const filesDelete = deletions.find("edit_files", editId);
   const projectDelete = deletions.find("project", projectId);
   const locked = !!(filesDelete || projectDelete);
 
@@ -88,19 +88,19 @@ export function TapeView({
       setActionError((e as Error).message);
     }
   }
-  const setStatus = (status: TapeStatus) => run(() => update({ status }));
+  const setStatus = (status: EditStatus) => run(() => update({ status }));
   const saveName = useAutosave(
     name,
     (v) => {
       const next = v.trim();
-      if (tape && next && next !== tape.name) void run(() => update({ name: next }));
+      if (edit && next && next !== edit.name) void run(() => update({ name: next }));
     },
     delay,
   );
   const saveNotes = useAutosave(
     notes,
     (v) => {
-      if (tape && v !== tape.notes) void run(() => update({ notes: v }));
+      if (edit && v !== edit.notes) void run(() => update({ notes: v }));
     },
     delay,
   );
@@ -108,10 +108,10 @@ export function TapeView({
   // One h2 in the same place loading or loaded, so the focus the shell gives it survives the load.
   const heading = (
     <h2 tabIndex={-1} className="stencil tilt slam text-4xl">
-      {tape?.name ?? "Tape"}
+      {edit?.name ?? "…"}
     </h2>
   );
-  if (!tape) {
+  if (!edit) {
     return (
       <section className="space-y-5">
         {heading}
@@ -124,6 +124,7 @@ export function TapeView({
     <section className="space-y-5">
       {heading}
       <div className="flex flex-wrap items-center gap-3">
+        {edit.kind && <span className="label text-xs text-dim">{KIND_LABEL[edit.kind]}</span>}
         {filesDelete && <PendingDelete request={filesDelete} onUndo={deletions.undo} me={me} />}
         {projectDelete && <PendingDelete request={projectDelete} onUndo={deletions.undo} me={me} />}
       </div>
@@ -137,7 +138,7 @@ export function TapeView({
         <label className="space-y-1 text-xs text-dim">
           <span className="label">Name</span>
           <input
-            value={name ?? tape.name}
+            value={name ?? edit.name}
             onChange={(e) => setName(e.target.value)}
             onBlur={() => {
               saveName();
@@ -148,13 +149,13 @@ export function TapeView({
         </label>
         <div className="space-y-1 text-xs text-dim">
           <span className="label block">Status</span>
-          <StatusSelect name={tape.name} status={tape.status} role={role} onChange={setStatus} />
+          <StatusSelect name={edit.name} status={edit.status} role={role} onChange={setStatus} />
         </div>
         {isAdmin && (
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
             <input
               type="checkbox"
-              checked={!tape.quota_exempt}
+              checked={!edit.quota_exempt}
               onChange={(e) => run(() => update({ quota_exempt: !e.target.checked }))}
             />
             Counts toward the weekly quota
@@ -164,7 +165,7 @@ export function TapeView({
           <span className="label">Notes</span>
           <textarea
             rows={3}
-            value={notes ?? tape.notes}
+            value={notes ?? edit.notes}
             onChange={(e) => setNotes(e.target.value)}
             onBlur={() => {
               saveNotes();
@@ -175,7 +176,7 @@ export function TapeView({
         </label>
       </div>
 
-      {isFinal && latest?.drive_file_id && !tape.files_deleted_at && (
+      {isFinal && latest?.drive_file_id && !edit.files_deleted_at && (
         <div className="slab slab-ok relative flex flex-wrap items-center gap-3 p-4">
           <span className="label text-sm text-signal">Final: v{latest.version}</span>
           <DownloadLink fileId={latest.drive_file_id} disabled={locked} className={btn}>
@@ -209,24 +210,24 @@ export function TapeView({
         </button>
       )}
 
-      <UploadDrop tapeId={tapeId} projectId={projectId} kind={tape.kind} disabled={locked} onUploaded={refresh} />
+      <UploadDrop editId={editId} projectId={projectId} disabled={locked} onUploaded={refresh} />
 
       {newestFirst.length === 0 ? (
         <p className="text-sm text-dim">No versions yet.</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {newestFirst.map((it) => (
-            <IterationCard key={it.id} iteration={it} tape={tape} role={role} onStatus={setStatus} locked={locked} onChanged={refresh} />
+            <IterationCard key={it.id} iteration={it} edit={edit} role={role} onStatus={setStatus} locked={locked} onChanged={refresh} />
           ))}
         </div>
       )}
 
       {deleting && (
         <DeleteDialog
-          kind="tape_files"
-          targetId={tapeId}
-          label={tape.name}
-          title={`Delete ${tape.name}'s files`}
+          kind="edit_files"
+          targetId={editId}
+          label={edit.name}
+          title={`Delete ${edit.name}'s files`}
           onClose={() => setDeleting(false)}
           onDone={() => {
             setDeleting(false);

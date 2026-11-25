@@ -3,13 +3,13 @@
 import { useSyncExternalStore } from "react";
 import { editorApi, EditorApiError } from "./editorApi";
 import { resumableUpload, SessionExpired, sleep } from "./resumableUpload";
-import { grade, measureMedia, thumbnail } from "./mediaChecks";
+import { grade, measureMedia, thumbnail, type Measure } from "./mediaChecks";
 
 /**
  * Every version upload this tab knows about. Uploads live here, not in the
- * tape view, so leaving the tape does not stop one; and each unfinished
+ * edit view, so leaving the edit does not stop one; and each unfinished
  * one is remembered in localStorage, so a closed browser can pick it up
- * again from Google's offset when the same file is dropped on that tape.
+ * again from Google's offset when the same file is dropped on that edit.
  *
  * The stored session URL can only put bytes into that one Drive file; it
  * is kept for exactly that and deleted on completion (a cancelled entry is
@@ -52,7 +52,7 @@ function claimUpload(iterationId: number): Promise<(() => void) | null> {
 let elsewhere = new Set<number>();
 
 interface Stored {
-  tapeId: number;
+  editId: number;
   projectId: number;
   name: string;
   size: number;
@@ -68,7 +68,7 @@ interface Stored {
 export type TransferState = "uploading" | "offline" | "retrying" | "waiting" | "checking" | "paused" | "elsewhere" | "done" | "failed";
 export interface Transfer {
   key: string;
-  tapeId: number;
+  editId: number;
   projectId: number;
   name: string;
   size: number;
@@ -89,7 +89,7 @@ export interface SpaceNotice {
   warn: boolean;
 }
 
-const keyOf = (tapeId: number, f: { name: string; size: number; lastModified: number }) => `${tapeId}:${f.name}:${f.size}:${f.lastModified}`;
+const keyOf = (editId: number, f: { name: string; size: number; lastModified: number }) => `${editId}:${f.name}:${f.size}:${f.lastModified}`;
 
 function load(): Stored[] {
   try {
@@ -111,7 +111,7 @@ function save(list: Stored[]) {
 
 /** Changes (or with null, forgets) the stored entry for `key`. */
 function patchStored(key: string, patch: Partial<Stored> | null) {
-  save(load().flatMap((s) => (keyOf(s.tapeId, s) !== key ? [s] : patch ? [{ ...s, ...patch }] : [])));
+  save(load().flatMap((s) => (keyOf(s.editId, s) !== key ? [s] : patch ? [{ ...s, ...patch }] : [])));
 }
 
 const notices: SpaceNotice[] = [];
@@ -161,10 +161,10 @@ function getSnapshot(): Transfer[] {
   snapshot ??= [
     ...live.values(),
     ...load()
-      .filter((s) => !s.abandoned && !live.has(keyOf(s.tapeId, s)))
+      .filter((s) => !s.abandoned && !live.has(keyOf(s.editId, s)))
       .map((s): Transfer => ({
-        key: keyOf(s.tapeId, s),
-        tapeId: s.tapeId,
+        key: keyOf(s.editId, s),
+        editId: s.editId,
         projectId: s.projectId,
         name: s.name,
         size: s.size,
@@ -224,28 +224,28 @@ async function whenReachable<T>(key: string, signal: AbortSignal, call: () => Pr
 }
 
 /**
- * Uploads `file` as a new version of the tape - or, when this exact file
+ * Uploads `file` as a new version of the edit - or, when this exact file
  * (name, size, last modified) is already stored as unfinished there,
  * continues that version instead of creating another. Never throws: every
  * failure becomes the transfer's state and message.
  */
 export async function startUpload(
-  target: { tapeId: number; projectId: number; kind: "tape" | "reel" },
+  target: { editId: number; projectId: number },
   file: File,
   onDone?: () => void,
 ): Promise<void> {
-  const { tapeId, projectId } = target;
-  const key = keyOf(tapeId, file);
+  const { editId, projectId } = target;
+  const key = keyOf(editId, file);
   if (controllers.has(key)) return;
   const ctl = new AbortController();
   controllers.set(key, ctl);
   const signal = ctl.signal;
   const mime = file.type || "application/octet-stream";
-  let entry = load().find((s) => keyOf(s.tapeId, s) === key);
+  let entry = load().find((s) => keyOf(s.editId, s) === key);
   const newSession = (iterationId: number) =>
     whenReachable(key, signal, () => editorApi<{ upload_url: string }>(`/iterations/${iterationId}/session`, { method: "POST", body: { mime } }), "retrying");
   live.set(key, {
-    key, tapeId, projectId, name: file.name, size: file.size,
+    key, editId, projectId, name: file.name, size: file.size,
     version: entry?.version ?? null, sent: entry?.sent ?? 0, speed: null, state: "uploading", message: null,
   });
   emit();
@@ -263,6 +263,7 @@ export async function startUpload(
   };
 
   let last: { t: number; sent: number } | null = null;
+  let measured: Measure | null | undefined;
   const send = (url: string) =>
     resumableUpload(file, url, {
       signal,
@@ -299,6 +300,13 @@ export async function startUpload(
       }
     }
     if (!entry) {
+      // The file's shape decides (or must keep) video, clip or reel: the backend checks it before Drive is asked.
+      measured = await measureMedia(file).catch(() => null);
+      if (signal.aborted) return;
+      if (!measured?.width || !measured.height || !measured.duration_s) {
+        update(key, { state: "failed", message: "This browser can't read the file's size and length, so it can't tell a video from a clip or reel. Try Chrome, or export as MP4." });
+        return;
+      }
       const space = await driveSpace();
       if (signal.aborted) return;
       if (space) {
@@ -315,15 +323,15 @@ export async function startUpload(
           update(key, { spaceNote: note });
         }
       }
-      const r = await editorApi<{ iteration_id: number; version: number; upload_url: string }>(`/tapes/${tapeId}/iterations`, {
+      const r = await editorApi<{ iteration_id: number; version: number; upload_url: string }>(`/edits/${editId}/iterations`, {
         method: "POST",
-        body: { filename: file.name, size: file.size, mime },
+        body: { filename: file.name, size: file.size, mime, width: measured.width, height: measured.height, duration_s: measured.duration_s },
       });
       // Cancelled while the version was being created: never write its session URL back.
       if (signal.aborted) return abandon(r.iteration_id);
       await claim(r.iteration_id); // brand new: no other tab can hold it
       entry = {
-        tapeId, projectId, name: file.name, size: file.size, lastModified: file.lastModified,
+        editId, projectId, name: file.name, size: file.size, lastModified: file.lastModified,
         iterationId: r.iteration_id, version: r.version, uploadUrl: r.upload_url, sent: 0,
       };
       save([...load(), entry]);
@@ -356,9 +364,9 @@ export async function startUpload(
     update(key, { state: "checking", speed: null, message: null });
 
     // Best effort: an unreadable file still gets its version, with "unknown" checks and no thumbnail.
-    const measured = await measureMedia(file).catch(() => null);
+    measured ??= await measureMedia(file).catch(() => null);
     const thumb = await thumbnail(file).catch(() => null);
-    const checks = grade(measured ?? { width: null, height: null, duration_s: null, fps: null, bitrate_mbps: null }, target.kind);
+    const checks = grade(measured ?? { width: null, height: null, duration_s: null, fps: null, bitrate_mbps: null });
     await editorApi(`/iterations/${id}/media`, { method: "PUT", body: { checks, thumbnail_b64: thumb } }).catch(() => {});
     update(key, { state: "done" });
     onDone?.();
@@ -372,7 +380,7 @@ export async function startUpload(
 
 /**
  * Best effort, never awaited: a cancelled version left `uploading` blocks its
- * tape's and project's deletes until reconcile abandons it after 8 days. A
+ * edit's and project's deletes until reconcile abandons it after 8 days. A
  * raw fetch, not editorApi, so an expired session cannot navigate to login
  * mid-cancel; on any failure that 8-day backstop still applies.
  */
@@ -389,7 +397,7 @@ function abandon(iterationId: number) {
  */
 export function cancelTransfer(key: string) {
   if (live.get(key)?.state === "waiting") return;
-  const entry = load().find((s) => keyOf(s.tapeId, s) === key);
+  const entry = load().find((s) => keyOf(s.editId, s) === key);
   if (!live.has(key) && entry && elsewhere.has(entry.iterationId)) return; // another tab's to cancel
   if (entry) abandon(entry.iterationId);
   controllers.get(key)?.abort();
@@ -421,13 +429,13 @@ export async function refreshLocks() {
       /* treat as nothing held */
     }
   }
-  elsewhere = new Set(load().filter((s) => !live.has(keyOf(s.tapeId, s)) && held.has(uploadLock(s.iterationId))).map((s) => s.iterationId));
+  elsewhere = new Set(load().filter((s) => !live.has(keyOf(s.editId, s)) && held.has(uploadLock(s.iterationId))).map((s) => s.iterationId));
   emit();
 }
 
 export async function refreshStored() {
   for (const s of load()) {
-    const key = keyOf(s.tapeId, s);
+    const key = keyOf(s.editId, s);
     if (live.has(key)) continue;
     try {
       const { iteration } = await editorApi<{ iteration: { status: string } }>(`/iterations/${s.iterationId}`);

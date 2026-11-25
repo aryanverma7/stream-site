@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { editorApi } from "./editorApi";
+import type { EditKind } from "./useProject";
 
 export type QuotaCounts = { videos: number; reels: number };
 
-export interface QuotaTape {
+export interface QuotaEdit {
   id: number;
   name: string;
-  kind: "tape" | "reel";
+  kind: EditKind;
   project_id: number;
   project_name: string;
   final_upload_at: number;
@@ -23,7 +24,7 @@ export interface QuotaWeek {
   status: "met" | "missed" | "excused" | "in_progress";
   excused: boolean;
   note: string;
-  tapes: QuotaTape[];
+  edits: QuotaEdit[];
 }
 
 /** GET /quota, as editor_quota.summary returns it: weeks newest first, from the start week. */

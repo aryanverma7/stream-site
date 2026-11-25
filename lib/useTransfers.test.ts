@@ -11,7 +11,7 @@ vi.mock("./mediaChecks", async (orig) => ({
 const MiB = 1024 * 1024;
 const SIZE = 20 * MiB;
 const file = () => new File([new Uint8Array(SIZE)], "jett.mp4", { type: "video/mp4", lastModified: 1000 });
-const target = { tapeId: 5, projectId: 12, kind: "tape" as const };
+const target = { editId: 5, projectId: 12 };
 const stored = () => JSON.parse(localStorage.getItem("editor.uploads") ?? "[]");
 
 /**
@@ -60,7 +60,7 @@ describe("useTransfers", () => {
     const { startUpload, useTransfers } = await fresh();
     let seenWhileSending: unknown[] = [];
     const { api } = backend({
-      "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" },
+      "POST /edits/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" },
       "POST /iterations/7/complete": () => {
         seenWhileSending = stored();
         return { id: 7, status: "ready" };
@@ -71,9 +71,9 @@ describe("useTransfers", () => {
     const { result } = renderHook(() => useTransfers());
     await act(() => startUpload(target, file(), onDone));
 
-    expect(calls(api, "POST", "/tapes/5/iterations")).toEqual([{ filename: "jett.mp4", size: SIZE, mime: "video/mp4" }]);
+    expect(calls(api, "POST", "/edits/5/iterations")).toEqual([{ filename: "jett.mp4", size: SIZE, mime: "video/mp4", width: 1920, height: 1080, duration_s: 10 }]);
     expect(seenWhileSending).toEqual([
-      { tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/s1", sent: SIZE },
+      { editId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/s1", sent: SIZE },
     ]);
     expect(calls(api, "POST", "/iterations/7/complete")).toEqual([{ file_id: "FILE_ID_1" }]);
     const [media] = calls(api, "PUT", "/iterations/7/media");
@@ -87,7 +87,7 @@ describe("useTransfers", () => {
   it("survives a reload as an unfinished entry, and the same file resumes it from Google's offset", async () => {
     let mod = await fresh();
     const table = {
-      "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" },
+      "POST /edits/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" },
       "/iterations/7": { iteration: { id: 7, status: "uploading" } },
       "POST /iterations/7/complete": { id: 7, status: "ready" },
       "PUT /iterations/7/media": { id: 7 },
@@ -101,14 +101,14 @@ describe("useTransfers", () => {
     mod = await fresh();
     const { result } = renderHook(() => mod.useTransfers());
     expect(result.current).toEqual([
-      expect.objectContaining({ name: "jett.mp4", version: 3, sent: 8 * MiB, size: SIZE, state: "paused", tapeId: 5, projectId: 12 }),
+      expect.objectContaining({ name: "jett.mp4", version: 3, sent: 8 * MiB, size: SIZE, state: "paused", editId: 5, projectId: 12 }),
     ]);
     await act(() => mod.refreshStored());
     expect(result.current).toHaveLength(1);
 
     const { api, googleCalls } = backend(table, { have });
     await act(() => mod.startUpload(target, file()));
-    expect(calls(api, "POST", "/tapes/5/iterations")).toEqual([]);
+    expect(calls(api, "POST", "/edits/5/iterations")).toEqual([]);
     expect(googleCalls[0]).toBe(`https://upload.example/s1 bytes */${SIZE}`);
     expect(googleCalls[1]).toBe(`https://upload.example/s1 bytes ${8 * MiB}-${16 * MiB - 1}/${SIZE}`);
     expect(calls(api, "POST", "/iterations/7/complete")).toHaveLength(1);
@@ -119,7 +119,7 @@ describe("useTransfers", () => {
     const mod = await fresh();
     localStorage.setItem(
       "editor.uploads",
-      JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 12 * MiB }]),
+      JSON.stringify([{ editId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 12 * MiB }]),
     );
     const { api, googleCalls } = backend(
       {
@@ -131,14 +131,14 @@ describe("useTransfers", () => {
     );
     await act(() => mod.startUpload(target, file()));
     expect(calls(api, "POST", "/iterations/7/session")).toEqual([{ mime: "video/mp4" }]);
-    expect(calls(api, "POST", "/tapes/5/iterations")).toEqual([]);
+    expect(calls(api, "POST", "/edits/5/iterations")).toEqual([]);
     expect(googleCalls).toContain(`https://upload.example/new bytes 0-${8 * MiB - 1}/${SIZE}`);
     expect(calls(api, "POST", "/iterations/7/complete")).toHaveLength(1);
   });
 
   it("cancel stops sending and hides the entry, keeping it only as abandoned", async () => {
     const mod = await fresh();
-    backend({ "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" } }, { hold: 8 * MiB });
+    backend({ "POST /edits/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" } }, { hold: 8 * MiB });
     const { result } = renderHook(() => mod.useTransfers());
     const done = mod.startUpload(target, file());
     await waitFor(() => expect(stored()[0]?.sent).toBe(8 * MiB));
@@ -152,7 +152,7 @@ describe("useTransfers", () => {
     const mod = await fresh();
     localStorage.setItem(
       "editor.uploads",
-      JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 8 * MiB, abandoned: true }]),
+      JSON.stringify([{ editId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 8 * MiB, abandoned: true }]),
     );
     const { api, googleCalls } = backend({
       "POST /iterations/7/session": { upload_url: "https://upload.example/new" },
@@ -162,7 +162,7 @@ describe("useTransfers", () => {
     const { result } = renderHook(() => mod.useTransfers());
     expect(result.current).toEqual([]); // hidden while abandoned
     await act(() => mod.startUpload(target, file()));
-    expect(calls(api, "POST", "/tapes/5/iterations")).toEqual([]);
+    expect(calls(api, "POST", "/edits/5/iterations")).toEqual([]);
     expect(calls(api, "POST", "/iterations/7/session")).toHaveLength(1);
     expect(googleCalls.every((c) => c.startsWith("https://upload.example/new"))).toBe(true);
     expect(result.current[0]).toMatchObject({ version: 3, state: "done" });
@@ -173,17 +173,17 @@ describe("useTransfers", () => {
     const mod = await fresh();
     localStorage.setItem(
       "editor.uploads",
-      JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0, abandoned: true }]),
+      JSON.stringify([{ editId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0, abandoned: true }]),
     );
     const { api } = backend({
       "POST /iterations/7/session": { status: 404, body: { error: "Not found" } },
-      "POST /tapes/5/iterations": { iteration_id: 8, version: 4, upload_url: "https://upload.example/s1" },
+      "POST /edits/5/iterations": { iteration_id: 8, version: 4, upload_url: "https://upload.example/s1" },
       "POST /iterations/8/complete": { id: 8, status: "ready" },
       "PUT /iterations/8/media": { id: 8 },
     });
     const { result } = renderHook(() => mod.useTransfers());
     await act(() => mod.startUpload(target, file()));
-    expect(calls(api, "POST", "/tapes/5/iterations")).toHaveLength(1);
+    expect(calls(api, "POST", "/edits/5/iterations")).toHaveLength(1);
     expect(result.current[0]).toMatchObject({ version: 4, state: "done" });
   });
 
@@ -191,7 +191,7 @@ describe("useTransfers", () => {
     const mod = await fresh();
     localStorage.setItem(
       "editor.uploads",
-      JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0, abandoned: true }]),
+      JSON.stringify([{ editId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0, abandoned: true }]),
     );
     let answer!: (v: unknown) => void;
     const { api } = backend({ "POST /iterations/7/abandon": { id: 7, status: "abandoned" } });
@@ -213,17 +213,17 @@ describe("useTransfers", () => {
     const mod = await fresh();
     localStorage.setItem(
       "editor.uploads",
-      JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0, abandoned: true }]),
+      JSON.stringify([{ editId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0, abandoned: true }]),
     );
     const { api } = backend({
       "POST /iterations/7/session": { status: 409, body: { error: "This version is not uploading" } },
-      "POST /tapes/5/iterations": { iteration_id: 8, version: 4, upload_url: "https://upload.example/s1" },
+      "POST /edits/5/iterations": { iteration_id: 8, version: 4, upload_url: "https://upload.example/s1" },
       "POST /iterations/8/complete": { id: 8, status: "ready" },
       "PUT /iterations/8/media": { id: 8 },
     });
     const { result } = renderHook(() => mod.useTransfers());
     await act(() => mod.startUpload(target, file()));
-    expect(calls(api, "POST", "/tapes/5/iterations")).toHaveLength(1);
+    expect(calls(api, "POST", "/edits/5/iterations")).toHaveLength(1);
     expect(result.current[0]).toMatchObject({ version: 4, state: "done" });
   });
 
@@ -233,7 +233,7 @@ describe("useTransfers", () => {
       const mod = await fresh();
       localStorage.setItem(
         "editor.uploads",
-        JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0 }]),
+        JSON.stringify([{ editId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0 }]),
       );
       let down = true;
       const { api } = backend(
@@ -261,7 +261,7 @@ describe("useTransfers", () => {
   it("cancel tells the server the version is abandoned, so it stops blocking deletes", async () => {
     const mod = await fresh();
     const { api } = backend(
-      { "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" }, "POST /iterations/7/abandon": { id: 7, status: "abandoned" } },
+      { "POST /edits/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" }, "POST /iterations/7/abandon": { id: 7, status: "abandoned" } },
       { hold: 8 * MiB },
     );
     const { result } = renderHook(() => mod.useTransfers());
@@ -278,7 +278,7 @@ describe("useTransfers", () => {
       const mod = await fresh();
       let down = true;
       const { api } = backend({
-        "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" },
+        "POST /edits/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" },
         "POST /iterations/7/complete": () => (down ? { status: 502, body: { error: "Bad gateway" } } : { id: 7, status: "ready" }),
         "POST /iterations/7/abandon": { id: 7, status: "abandoned" },
         "PUT /iterations/7/media": { id: 7 },
@@ -300,7 +300,7 @@ describe("useTransfers", () => {
 
   it("a failed abandon never undoes the cancel", async () => {
     const mod = await fresh();
-    backend({ "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" }, "POST /iterations/7/abandon": { status: 409, body: { error: "This version is not uploading" } } }, { hold: 8 * MiB });
+    backend({ "POST /edits/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" }, "POST /iterations/7/abandon": { status: 409, body: { error: "This version is not uploading" } } }, { hold: 8 * MiB });
     const { result } = renderHook(() => mod.useTransfers());
     const done = mod.startUpload(target, file());
     await waitFor(() => expect(stored()[0]?.sent).toBe(8 * MiB));
@@ -313,7 +313,7 @@ describe("useTransfers", () => {
 
   it("explains a Drive that is too full in GB", async () => {
     const mod = await fresh();
-    backend({ "POST /tapes/5/iterations": { status: 507, body: { error: "Drive is too full for this file", needed: 20_970_000_000, free: 4_000_000_000 } } });
+    backend({ "POST /edits/5/iterations": { status: 507, body: { error: "Drive is too full for this file", needed: 20_970_000_000, free: 4_000_000_000 } } });
     const { result } = renderHook(() => mod.useTransfers());
     await act(() => mod.startUpload(target, file()));
     expect(result.current[0]).toMatchObject({ state: "failed", message: "Drive is too full: needs 21.0 GB, 4.0 GB free" });
@@ -321,7 +321,7 @@ describe("useTransfers", () => {
   });
 
   describe("drive space check", () => {
-    const create = { "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" }, "POST /iterations/7/complete": { id: 7, status: "ready" }, "PUT /iterations/7/media": { id: 7 } };
+    const create = { "POST /edits/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" }, "POST /iterations/7/complete": { id: 7, status: "ready" }, "PUT /iterations/7/media": { id: 7 } };
     const run = async (space: unknown) => {
       const mod = await fresh();
       const { api } = backend({ ...create, "/drive/space": space });
@@ -346,7 +346,7 @@ describe("useTransfers", () => {
     it("refuses a file bigger than the free space, without creating a version", async () => {
       const { api, result } = await run({ limit: 100e9, usage: 100e9 - 10_000_000, free: 10_000_000 });
       expect(result.current.transfers[0]).toMatchObject({ state: "failed", message: "Not enough space on Drive: this file needs 0.0 GB, only 0.0 GB free." });
-      expect(calls(api, "POST", "/tapes/5/iterations")).toEqual([]);
+      expect(calls(api, "POST", "/edits/5/iterations")).toEqual([]);
     });
 
     it("says so when the Drive is unlimited", async () => {
@@ -362,7 +362,7 @@ describe("useTransfers", () => {
     });
 
     it("does not ask again when resuming a stored upload", async () => {
-      localStorage.setItem("editor.uploads", JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/s1", sent: 0 }]));
+      localStorage.setItem("editor.uploads", JSON.stringify([{ editId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/s1", sent: 0 }]));
       const mod = await fresh();
       const { api } = backend({ ...create, "/drive/space": { limit: 1, usage: 0, free: 1 } });
       await act(() => mod.startUpload(target, file()));
@@ -370,27 +370,32 @@ describe("useTransfers", () => {
     });
   });
 
-  it("still finishes the upload when the checks cannot be measured", async () => {
+  it("refuses a file whose size and length the browser cannot read, before asking the backend", async () => {
     const mod = await fresh();
     const checks = await import("./mediaChecks");
     vi.mocked(checks.measureMedia).mockRejectedValueOnce(new Error("no video track"));
-    vi.mocked(checks.thumbnail).mockRejectedValueOnce(new Error("no video track"));
-    const { api } = backend({
-      "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" },
-      "POST /iterations/7/complete": { id: 7, status: "ready" },
-      "PUT /iterations/7/media": { id: 7 },
-    });
+    const { api } = backend({});
     const { result } = renderHook(() => mod.useTransfers());
     await act(() => mod.startUpload(target, file()));
-    const [media] = calls(api, "PUT", "/iterations/7/media");
-    expect([media.checks.resolution.state, media.checks.fps.state, media.checks.bitrate.state]).toEqual(["unknown", "unknown", "unknown"]);
-    expect(media.thumbnail_b64).toBeNull();
-    expect(result.current[0].state).toBe("done");
+    expect(api).not.toHaveBeenCalled();
+    expect(result.current[0]).toMatchObject({ state: "failed", message: expect.stringMatching(/tell a video from a clip or reel/) });
+    expect(stored()).toEqual([]);
+  });
+
+  it("shows the backend's refusal of the file's shape as it is, and stores nothing", async () => {
+    const mod = await fresh();
+    const refusal = "A reel must be vertical (taller than wide) and under 3 minutes - this file is not";
+    const { api } = backend({ "POST /edits/5/iterations": { status: 400, body: { error: refusal } } });
+    const { result } = renderHook(() => mod.useTransfers());
+    await act(() => mod.startUpload(target, file()));
+    expect(calls(api, "POST", "/edits/5/iterations")).toHaveLength(1);
+    expect(result.current[0]).toMatchObject({ state: "failed", message: refusal });
+    expect(stored()).toEqual([]);
   });
 
   it("refresh drops entries the server has finished (reconcile) or deleted", async () => {
     const mod = await fresh();
-    const entry = (iterationId: number) => ({ tapeId: 5, projectId: 12, name: `f${iterationId}.mp4`, size: 10, lastModified: 1, iterationId, version: 1, uploadUrl: "https://upload.example/x", sent: 0 });
+    const entry = (iterationId: number) => ({ editId: 5, projectId: 12, name: `f${iterationId}.mp4`, size: 10, lastModified: 1, iterationId, version: 1, uploadUrl: "https://upload.example/x", sent: 0 });
     localStorage.setItem("editor.uploads", JSON.stringify([entry(1), entry(2), entry(3), entry(4)]));
     editorBackend({
       "/iterations/1": { iteration: { status: "ready" } },
@@ -408,7 +413,7 @@ describe("useTransfers", () => {
     let answer!: (v: unknown) => void;
     const { api } = backend({});
     global.fetch = vi.fn((url: string, init?: RequestInit) =>
-      url === "/api/editor/tapes/5/iterations"
+      url === "/api/editor/edits/5/iterations"
         ? new Promise((r) => (answer = r))
         : api(url, init),
     ) as unknown as typeof fetch;
@@ -428,7 +433,7 @@ describe("useTransfers", () => {
     const mod = await fresh();
     localStorage.setItem(
       "editor.uploads",
-      JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0 }]),
+      JSON.stringify([{ editId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/old", sent: 0 }]),
     );
     backend({ "POST /iterations/7/session": { status: 409, body: { error: "This version is not uploading" } } }, { expired: ["https://upload.example/old"] });
     const { result } = renderHook(() => mod.useTransfers());
@@ -466,14 +471,14 @@ describe("useTransfers", () => {
       return locks;
     }
     afterEach(() => void delete (navigator as unknown as { locks?: unknown }).locks);
-    const old = { tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/s1", sent: 8 * MiB };
+    const old = { editId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/s1", sent: 8 * MiB };
 
     it("a running upload holds upload-<iterationId> and lets go when it ends", async () => {
       const locks = fakeLocks();
       const mod = await fresh();
       let heldWhileSending = false;
       backend({
-        "POST /tapes/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" },
+        "POST /edits/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" },
         "POST /iterations/7/complete": () => {
           heldWhileSending = locks.held.has("upload-7");
           return { id: 7, status: "ready" };

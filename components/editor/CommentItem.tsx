@@ -21,7 +21,7 @@ export function CommentItem({
   username,
   active,
   projectId,
-  tapeId,
+  editId,
   pendingReplies,
   onSeek,
 }: {
@@ -30,13 +30,13 @@ export function CommentItem({
   username: string;
   active: boolean;
   projectId: number;
-  tapeId: number;
+  editId: number;
   pendingReplies: Entry[];
   onSeek?(s: number): void;
 }) {
   const [reply, setReply] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
-  // a reply's images go to this comment's tape: its origin version is on it
+  // a reply's images go to this comment's edit: its origin version is on it
   const uploads = useAttachmentUploads(c.origin_iteration_id);
   const timed = c.start_s !== null && !c.carried;
   const canResolve = cm.role === "admin";
@@ -74,7 +74,7 @@ export function CommentItem({
       {c.carried && (
         <a
           className="text-[11px] text-field underline"
-          href={routeHash({ view: "iteration", projectId, tapeId, iterationId: c.origin_iteration_id, ...(c.start_s !== null && { seekS: Number(c.start_s.toFixed(1)) }) })}
+          href={routeHash({ view: "iteration", projectId, editId, iterationId: c.origin_iteration_id, ...(c.start_s !== null && { seekS: Number(c.start_s.toFixed(1)) }) })}
         >
           {c.start_s === null ? `from v${c.origin_version}, general` : `from v${c.origin_version} at ${formatTime(c.start_s)}`}
         </a>

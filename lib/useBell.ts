@@ -11,7 +11,7 @@ export interface BellItem {
   kind: string;
   summary: string;
   project_id: number | null;
-  tape_id: number | null;
+  edit_id: number | null;
   iteration_id: number | null;
 }
 

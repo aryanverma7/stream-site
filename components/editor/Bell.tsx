@@ -8,9 +8,9 @@ import { VodReadyPopup } from "./VodReadyPopup";
 /** The deepest place an event points at, or null for one about nothing on screen. */
 export function itemHref(i: BellItem): string | null {
   if (i.project_id === null) return null;
-  if (i.tape_id === null) return routeHash({ view: "project", projectId: i.project_id });
-  if (i.iteration_id === null) return routeHash({ view: "tape", projectId: i.project_id, tapeId: i.tape_id });
-  return routeHash({ view: "iteration", projectId: i.project_id, tapeId: i.tape_id, iterationId: i.iteration_id });
+  if (i.edit_id === null) return routeHash({ view: "project", projectId: i.project_id });
+  if (i.iteration_id === null) return routeHash({ view: "edit", projectId: i.project_id, editId: i.edit_id });
+  return routeHash({ view: "iteration", projectId: i.project_id, editId: i.edit_id, iterationId: i.iteration_id });
 }
 
 /**

@@ -6,8 +6,8 @@ describe("Breadcrumb", () => {
   it("renders every level's name as a link to that level", () => {
     const { getByRole } = render(
       <Breadcrumb
-        route={{ view: "iteration", projectId: 12, tapeId: 5, iterationId: 3 }}
-        names={{ project: "Ranked grind", tape: "Main", version: 2 }}
+        route={{ view: "iteration", projectId: 12, editId: 5, iterationId: 3 }}
+        names={{ project: "Ranked grind", edit: "Main", version: 2 }}
       />,
     );
     expect(getByRole("link", { name: "All projects" }).getAttribute("href")).toBe("#/");
@@ -20,14 +20,14 @@ describe("Breadcrumb", () => {
 
   it("shows a placeholder while a name is still loading", () => {
     const { getByRole } = render(
-      <Breadcrumb route={{ view: "project", projectId: 12 }} names={{ project: null, tape: null, version: null }} />,
+      <Breadcrumb route={{ view: "project", projectId: 12 }} names={{ project: null, edit: null, version: null }} />,
     );
     expect(getByRole("link", { name: "…" }).getAttribute("href")).toBe("#/p/12");
   });
 
   it("stops at the level being shown", () => {
     const { queryAllByRole } = render(
-      <Breadcrumb route={{ view: "projects" }} names={{ project: null, tape: null, version: null }} />,
+      <Breadcrumb route={{ view: "projects" }} names={{ project: null, edit: null, version: null }} />,
     );
     expect(queryAllByRole("link")).toHaveLength(1);
   });

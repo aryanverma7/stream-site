@@ -42,7 +42,7 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 async function open(props: Partial<React.ComponentProps<typeof ReviewPlayer>> = {}, now?: () => number) {
-  const r = render(<ReviewPlayer projectId={1} tapeId={2} iterationId={7} role="editor" username="cutter" now={now} {...props} />);
+  const r = render(<ReviewPlayer projectId={1} editId={2} iterationId={7} role="editor" username="cutter" now={now} {...props} />);
   await screen.findByText("Version 3");
   return r;
 }
@@ -113,7 +113,7 @@ describe("ReviewPlayer", () => {
   it("disables the button until the worker is ready, hinting a reload if it stays late", async () => {
     worker.ready = false;
     vi.useFakeTimers();
-    render(<ReviewPlayer projectId={1} tapeId={2} iterationId={7} role="editor" username="u" />);
+    render(<ReviewPlayer projectId={1} editId={2} iterationId={7} role="editor" username="u" />);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10);
     });
@@ -171,7 +171,7 @@ describe("ReviewPlayer", () => {
     expect(puts()).toHaveLength(0);
   });
 
-  it("Cancel goes back to the tape", async () => {
+  it("Cancel goes back to the edit", async () => {
     await open();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(window.location.hash).toBe("#/p/1/t/2");
@@ -379,7 +379,7 @@ describe("ReviewPlayer", () => {
   describe("compare and the card's Add comment", () => {
     const withTape = (t: Record<string, unknown>) =>
       editorBackend({ "/iterations/7": { iteration: IT, comments: [], position_s: 100 }, "PUT /iterations/7/position": { ok: true }, ...t });
-    const tapeOf = (...v: [number, number, string][]) => ({ "/tapes/2": { tape: { id: 2 }, iterations: v.map(([id, version, status]) => ({ id, version, status })) } });
+    const tapeOf = (...v: [number, number, string][]) => ({ "/edits/2": { edit: { id: 2 }, iterations: v.map(([id, version, status]) => ({ id, version, status })) } });
     beforeEach(() => {
       window.location.hash = "";
       sessionStorage.clear();
@@ -396,7 +396,7 @@ describe("ReviewPlayer", () => {
       expect(window.location.hash).toBe("#/p/1/t/2/v/5@12.5");
     });
 
-    it("never starts the download without the partner, and V while the tape loads does nothing", async () => {
+    it("never starts the download without the partner, and V while the edit loads does nothing", async () => {
       withTape(tapeOf([5, 2, "ready"], [7, 3, "ready"]));
       mediaSpy.mockClear();
       await open();
@@ -404,9 +404,9 @@ describe("ReviewPlayer", () => {
       for (const c of mediaSpy.mock.calls) if (c[0] !== null) expect(c[2]).toBe(5);
       cleanup();
       const fake = editorBackend({ "/iterations/7": { iteration: IT, comments: [], position_s: 100 } });
-      global.fetch = ((u: string, i?: RequestInit) => (u.includes("/tapes/") ? new Promise(() => {}) : fake(u, i))) as unknown as typeof fetch;
+      global.fetch = ((u: string, i?: RequestInit) => (u.includes("/edits/") ? new Promise(() => {}) : fake(u, i))) as unknown as typeof fetch;
       mediaSpy.mockClear();
-      render(<ReviewPlayer projectId={1} tapeId={2} iterationId={7} role="editor" username="u" />);
+      render(<ReviewPlayer projectId={1} editId={2} iterationId={7} role="editor" username="u" />);
       await screen.findByText("Version 3");
       fireEvent.keyDown(document.body, { key: "v" });
       expect(screen.queryByText("No earlier version to compare")).toBeNull();
@@ -426,7 +426,7 @@ describe("ReviewPlayer", () => {
       play.mockClear();
       worker.provide.mockClear();
       editorBackend({ "/iterations/5": { iteration: { ...IT, id: 5, version: 2 }, comments: [], position_s: 100 }, ...tapeOf([5, 2, "ready"], [7, 3, "ready"]) });
-      render(<ReviewPlayer projectId={1} tapeId={2} iterationId={5} seekS={12.5} role="editor" username="cutter" />);
+      render(<ReviewPlayer projectId={1} editId={2} iterationId={5} seekS={12.5} role="editor" username="cutter" />);
       await screen.findByText("Version 2");
       await waitFor(() => expect(sessionStorage.getItem("editor.resumePlaying")).toBeNull());
       await waitFor(() => expect(worker.provide).toHaveBeenCalled());
@@ -446,7 +446,7 @@ describe("ReviewPlayer", () => {
       play.mockClear();
       worker.provide.mockClear();
       editorBackend({ "/iterations/5": { iteration: { ...IT, id: 5, version: 2 }, comments: [], position_s: 100 }, ...tapeOf([5, 2, "ready"], [7, 3, "ready"]) });
-      render(<ReviewPlayer projectId={1} tapeId={2} iterationId={5} seekS={12.5} role="editor" username="cutter" />);
+      render(<ReviewPlayer projectId={1} editId={2} iterationId={5} seekS={12.5} role="editor" username="cutter" />);
       await screen.findByText("Version 2");
       await waitFor(() => expect(sessionStorage.getItem("editor.resumePlaying")).toBeNull());
       await new Promise((r) => setTimeout(r, 20));
@@ -516,7 +516,7 @@ describe("ReviewPlayer", () => {
       const good = editorBackend({ "/iterations/7": { iteration: IT, comments: [], position_s: 100 } });
       global.fetch = ((u: string, i?: RequestInit) =>
         fail && u.endsWith("/iterations/7") ? Promise.resolve({ ok: false, status: 502, json: async () => ({ error: "Bad gateway" }) }) : good(u, i)) as unknown as typeof fetch;
-      render(<ReviewPlayer projectId={1} tapeId={2} iterationId={7} role="editor" username="cutter" />);
+      render(<ReviewPlayer projectId={1} editId={2} iterationId={7} role="editor" username="cutter" />);
       expect(await screen.findByRole("heading", { name: "This version could not be opened" })).toBeInTheDocument();
       expect(screen.getByText("Bad gateway")).toBeInTheDocument();
       expect(sessionStorage.getItem("editor.openComposer")).toBeNull();
@@ -528,7 +528,7 @@ describe("ReviewPlayer", () => {
     it("leaving while the version loads drops its flag", async () => {
       sessionStorage.setItem("editor.openComposer", "7");
       global.fetch = (() => new Promise(() => {})) as unknown as typeof fetch;
-      const r = render(<ReviewPlayer projectId={1} tapeId={2} iterationId={7} role="editor" username="cutter" />);
+      const r = render(<ReviewPlayer projectId={1} editId={2} iterationId={7} role="editor" username="cutter" />);
       r.unmount();
       await new Promise((res) => setTimeout(res, 0));
       expect(sessionStorage.getItem("editor.openComposer")).toBeNull();
