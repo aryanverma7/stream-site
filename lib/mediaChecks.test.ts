@@ -1,5 +1,8 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { fpsFrom, grade, jpegUnder, measureMedia, THUMBNAIL_MAX_BYTES, type Measure } from "./mediaChecks";
+import { mp4Info } from "./mp4Codec";
+
+vi.mock("./mp4Codec", () => ({ mp4Info: vi.fn(async () => null) }));
 
 const m = (over: Partial<Measure> = {}): Measure => ({ width: 1920, height: 1080, duration_s: 90, fps: 60, bitrate_mbps: 55, ...over });
 
@@ -144,6 +147,19 @@ describe("measureMedia", () => {
     const g = grade(got);
     expect(g.playable).toBe(false);
     expect(g.codec).toBeNull();
+  });
+
+  it("takes size and duration from the MP4/MOV header when the browser cannot decode the file (ProRes)", async () => {
+    vi.mocked(mp4Info).mockResolvedValueOnce({ codec: "apcn", width: 1080, height: 1920, duration_s: 42.5 });
+    fakeVideo({ duration: NaN, videoWidth: 0, videoHeight: 0 });
+    const got = await measureMedia(new File([new Uint8Array(10)], "a.mov"));
+    expect(got).toEqual({ width: 1080, height: 1920, duration_s: 42.5, fps: null, bitrate_mbps: null, codec: "apcn", playable: false });
+  });
+
+  it("keeps the browser's size over the header's when it can decode the file", async () => {
+    vi.mocked(mp4Info).mockResolvedValueOnce({ codec: "avc1", width: 1, height: 1, duration_s: 1 });
+    fakeVideo({ duration: Infinity, videoWidth: 1920, videoHeight: 1080 });
+    expect(await measureMedia(new File([new Uint8Array(10)], "a.mp4"))).toMatchObject({ width: 1920, height: 1080, duration_s: 1, playable: true });
   });
 
   it("marks a file with a picture playable", async () => {

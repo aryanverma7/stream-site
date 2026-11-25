@@ -94,7 +94,8 @@ const keyOf = (editId: number, f: { name: string; size: number; lastModified: nu
 function load(): Stored[] {
   try {
     const list = JSON.parse(localStorage.getItem(KEY) ?? "[]");
-    return Array.isArray(list) ? list : [];
+    // Entries saved before tapes became edits carry tapeId.
+    return Array.isArray(list) ? list.map((s: Stored & { tapeId?: number }) => ({ ...s, editId: s.editId ?? s.tapeId })) : [];
   } catch {
     return [];
   }

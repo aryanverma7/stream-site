@@ -6,7 +6,7 @@
  * in pure functions so it can be tested without a video decoder.
  */
 
-import { mp4VideoCodec } from "./mp4Codec";
+import { mp4Info } from "./mp4Codec";
 
 export interface Measure {
   width: number | null;
@@ -152,16 +152,24 @@ function capped<T>(p: Promise<T | null>, ms: number): Promise<T | null> {
   return Promise.race([p, new Promise<null>((r) => (t = setTimeout(() => r(null), ms)))]).finally(() => clearTimeout(t));
 }
 
-/** The browser's measure of `file`; a file it cannot decode is `playable: false`, never an error, so it still uploads. */
+/**
+ * The browser's measure of `file`; a file it cannot decode is `playable: false`, never an error, so it still uploads.
+ * Size and duration the browser cannot give come from the MP4/MOV header (ProRes, some HEVC .mov).
+ */
 export async function measureMedia(file: File): Promise<Measure> {
-  const codec = await mp4VideoCodec(file);
+  const head = await mp4Info(file);
+  const codec = head?.codec ?? null;
+  let m: Measure;
   try {
-    const m = await measureWith(file);
-    return { ...m, codec, playable: m.width !== null };
-  } catch (e) {
-    if (!(e instanceof Unreadable)) throw e;
-    return { width: null, height: null, duration_s: null, fps: null, bitrate_mbps: null, codec, playable: false };
+    m = await measureWith(file);
+  } catch {
+    // Unreadable, or metadata that never loads: the header may still know.
+    m = { width: null, height: null, duration_s: null, fps: null, bitrate_mbps: null };
   }
+  const playable = m.width !== null;
+  if (!playable && head?.width && head.height) [m.width, m.height] = [head.width, head.height];
+  m.duration_s ??= head?.duration_s ?? null;
+  return { ...m, codec, playable };
 }
 
 function measureWith(file: File): Promise<Measure> {

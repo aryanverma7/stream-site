@@ -1,8 +1,9 @@
 /**
- * The video codec of an MP4, read from the first video track's sample
- * description (moov > trak > mdia > minf > stbl > stsd), e.g. "hvc1" or
- * "avc1". Only box headers and the moov box are read, so a 4 GB file costs a
- * few MB; moov may sit after mdat (Resolve and Premiere often put it there).
+ * The codec, shown size and duration of an MP4/MOV's first video track, read
+ * from the header: moov > mvhd, and trak > tkhd / mdia > mdhd / minf > stbl > stsd.
+ * Only box headers and the moov box are read, so a 4 GB file costs a few MB;
+ * moov may sit after mdat (Resolve and Premiere often put it there). This is
+ * what measures a file the browser cannot decode (ProRes, some HEVC .mov).
  * Null when it is not an MP4 or no video track is found.
  */
 
@@ -39,7 +40,8 @@ function child(v: DataView, start: number, end: number, type: string): [number, 
   }
 }
 
-function videoEntry(v: DataView, start: number, end: number): string | null {
+/** The first video trak in [start, end): its payload [start, end] and its mdia. */
+function videoTrak(v: DataView, start: number, end: number): [number, number, [number, number]] | null {
   for (let at = start; ; ) {
     const h = header(v, at, end);
     if (!h) return null;
@@ -47,21 +49,67 @@ function videoEntry(v: DataView, start: number, end: number): string | null {
     if (h[0] === "trak") {
       const mdia = child(v, at + h[1], boxEnd, "mdia");
       const hdlr = mdia && child(v, mdia[0], mdia[1], "hdlr");
-      if (hdlr && hdlr[0] + 12 <= hdlr[1] && fourcc(v, hdlr[0] + 8) === "vide") {
-        let box: [number, number] | null = mdia;
-        for (const t of ["minf", "stbl", "stsd"]) box = box && child(v, box[0], box[1], t);
-        // stsd: version/flags (4), entry count (4), then the first entry's size (4) and type (4)
-        if (box && box[0] + 16 <= box[1]) return fourcc(v, box[0] + 12);
-      }
+      if (mdia && hdlr && hdlr[0] + 12 <= hdlr[1] && fourcc(v, hdlr[0] + 8) === "vide") return [at + h[1], boxEnd, mdia];
     } else if (CONTAINERS.has(h[0])) {
-      const found = videoEntry(v, at + h[1], boxEnd);
+      const found = videoTrak(v, at + h[1], boxEnd);
       if (found) return found;
     }
     at += h[2];
   }
 }
 
-export async function mp4VideoCodec(file: Blob): Promise<string | null> {
+/** Seconds from an mvhd or mdhd payload (version 1 has 64-bit times); null when it does not fit or is unset. */
+function seconds(v: DataView, box: [number, number] | null): number | null {
+  if (!box) return null;
+  const [at, end] = box;
+  const v1 = v.getUint8(at) === 1;
+  const ts = at + (v1 ? 20 : 12);
+  if (ts + (v1 ? 12 : 8) > end) return null;
+  const scale = v.getUint32(ts);
+  const dur = v1 ? Number(v.getBigUint64(ts + 4)) : v.getUint32(ts + 4);
+  return scale && dur && dur !== 0xffffffff ? Math.round((dur / scale) * 10) / 10 : null;
+}
+
+export interface Mp4Info {
+  /** The video sample entry ("hvc1", "avc1", "apcn"...). */
+  codec: string | null;
+  /** As shown: a 90 or 270 degree rotation in the tkhd matrix swaps them. */
+  width: number | null;
+  height: number | null;
+  duration_s: number | null;
+}
+
+function info(v: DataView, start: number, end: number): Mp4Info | null {
+  const trak = videoTrak(v, start, end);
+  if (!trak) return null;
+  const [tStart, tEnd, mdia] = trak;
+  let box: [number, number] | null = mdia;
+  for (const t of ["minf", "stbl", "stsd"]) box = box && child(v, box[0], box[1], t);
+  // stsd: version/flags (4), entry count (4), then the first entry: size (4), type (4), 24 bytes, width (2), height (2)
+  const codec = box && box[0] + 16 <= box[1] ? fourcc(v, box[0] + 12) : null;
+  let [w, h] = box && box[0] + 44 <= box[1] ? [v.getUint16(box[0] + 40), v.getUint16(box[0] + 42)] : [0, 0];
+  let turned = false;
+  const tkhd = child(v, tStart, tEnd, "tkhd");
+  if (tkhd) {
+    // After version/flags and the times: reserved, layer, group, volume, reserved (16), the matrix (36), width, height (16.16).
+    const m = tkhd[0] + (v.getUint8(tkhd[0]) === 1 ? 36 : 24) + 16;
+    if (m + 44 <= tkhd[1]) {
+      turned = v.getInt32(m) === 0 && v.getInt32(m + 16) === 0 && v.getInt32(m + 4) !== 0; // a = d = 0: 90 or 270 degrees
+      const tw = Math.round(v.getUint32(m + 36) / 65536);
+      const th = Math.round(v.getUint32(m + 40) / 65536);
+      if (tw && th) [w, h] = [tw, th];
+    }
+  }
+  if (turned) [w, h] = [h, w];
+  return {
+    codec,
+    width: w || null,
+    height: h || null,
+    duration_s: seconds(v, child(v, mdia[0], mdia[1], "mdhd")) ?? seconds(v, child(v, start, end, "mvhd")),
+  };
+}
+
+export async function mp4Info(file: Blob): Promise<Mp4Info | null> {
   try {
     for (let at = 0; at + 8 <= file.size; ) {
       const v = await bytes(file, at, Math.min(at + 16, file.size));
@@ -74,7 +122,7 @@ export async function mp4VideoCodec(file: Blob): Promise<string | null> {
       if (type === "moov") {
         if (boxSize > MOOV_MAX_BYTES) return null;
         const moov = await bytes(file, at, Math.min(at + boxSize, file.size));
-        return videoEntry(moov, head, moov.byteLength);
+        return info(moov, head, moov.byteLength);
       }
       at += boxSize;
     }
@@ -82,6 +130,10 @@ export async function mp4VideoCodec(file: Blob): Promise<string | null> {
     /* not an MP4 we can read */
   }
   return null;
+}
+
+export async function mp4VideoCodec(file: Blob): Promise<string | null> {
+  return (await mp4Info(file))?.codec ?? null;
 }
 
 const LABELS: Record<string, string> = { hvc1: "H.265", hev1: "H.265", avc1: "H.264", avc3: "H.264", av01: "AV1", vp09: "VP9" };

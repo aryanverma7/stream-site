@@ -115,6 +115,13 @@ describe("useTransfers", () => {
     expect(stored()).toEqual([]);
   });
 
+  it("reads an upload stored before the rename (tapeId) as its editId", async () => {
+    localStorage.setItem("editor.uploads", JSON.stringify([{ tapeId: 5, projectId: 12, name: "jett.mp4", size: SIZE, lastModified: 1000, iterationId: 7, version: 3, uploadUrl: "https://upload.example/s1", sent: 8 * MiB }]));
+    const mod = await fresh();
+    const { result } = renderHook(() => mod.useTransfers());
+    expect(result.current).toEqual([expect.objectContaining({ key: `5:jett.mp4:${SIZE}:1000`, editId: 5, projectId: 12, state: "paused" })]);
+  });
+
   it("gets the same version a new session when Google has forgotten the old one, and sends it from the start", async () => {
     const mod = await fresh();
     localStorage.setItem(
@@ -373,13 +380,23 @@ describe("useTransfers", () => {
   it("refuses a file whose size and length the browser cannot read, before asking the backend", async () => {
     const mod = await fresh();
     const checks = await import("./mediaChecks");
-    vi.mocked(checks.measureMedia).mockRejectedValueOnce(new Error("no video track"));
+    // Neither the browser nor the MP4/MOV header gave a size or length.
+    vi.mocked(checks.measureMedia).mockResolvedValueOnce({ width: null, height: null, duration_s: null, fps: null, bitrate_mbps: null, codec: null, playable: false });
     const { api } = backend({});
     const { result } = renderHook(() => mod.useTransfers());
     await act(() => mod.startUpload(target, file()));
     expect(api).not.toHaveBeenCalled();
     expect(result.current[0]).toMatchObject({ state: "failed", message: expect.stringMatching(/tell a video from a clip or reel/) });
     expect(stored()).toEqual([]);
+  });
+
+  it("uploads a file the browser cannot decode when its header gives the size and length (ProRes .mov)", async () => {
+    const mod = await fresh();
+    const checks = await import("./mediaChecks");
+    vi.mocked(checks.measureMedia).mockResolvedValueOnce({ width: 1080, height: 1920, duration_s: 42, fps: null, bitrate_mbps: null, codec: "apcn", playable: false });
+    const { api } = backend({ "POST /edits/5/iterations": { iteration_id: 7, version: 3, upload_url: "https://upload.example/s1" }, "POST /iterations/7/complete": { id: 7, status: "ready" }, "PUT /iterations/7/media": { id: 7 } });
+    await act(() => mod.startUpload(target, file()));
+    expect(calls(api, "POST", "/edits/5/iterations")).toEqual([{ filename: "jett.mp4", size: SIZE, mime: "video/mp4", width: 1080, height: 1920, duration_s: 42 }]);
   });
 
   it("shows the backend's refusal of the file's shape as it is, and stores nothing", async () => {
