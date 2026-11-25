@@ -162,6 +162,11 @@ describe("measureMedia", () => {
     expect(await measureMedia(new File([new Uint8Array(10)], "a.mp4"))).toMatchObject({ width: 1920, height: 1080, duration_s: 1, playable: true });
   });
 
+  it("sends the duration unrounded, so 180.04 s stays a clip on the backend", async () => {
+    fakeVideo({ duration: 180.04, videoWidth: 1080, videoHeight: 1920 });
+    expect((await measureMedia(new File([new Uint8Array(10)], "a.mp4"))).duration_s).toBe(180.04);
+  });
+
   it("marks a file with a picture playable", async () => {
     fakeVideo({ duration: Infinity, videoWidth: 1920, videoHeight: 1080 });
     expect((await measureMedia(new File([new Uint8Array(10)], "a.mp4"))).playable).toBe(true);

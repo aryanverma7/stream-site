@@ -110,7 +110,7 @@ export function ProjectsView({ role, username }: { role: "admin" | "editor"; use
                 </a>
                 {p.has_new && <span className="tag bg-field text-[11px] text-ink">New</span>}
                 <span className="label text-[11px] text-dim">VOD {p.vod_status}</span>
-                <span className="text-xs text-dim">{p.edit_count === 1 ? "1 video or tape" : `${p.edit_count} videos & tapes`}</span>
+                <span className="text-xs text-dim">{p.edit_count === 1 ? "1 video or clip" : `${p.edit_count} videos & clips`}</span>
                 {pending && <PendingDelete request={pending} onUndo={deletions.undo} me={me} />}
                 <span className="ml-auto flex flex-wrap items-center gap-2">
                   {role === "admin" && (

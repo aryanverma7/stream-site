@@ -21,4 +21,11 @@ describe("useProject", () => {
     const { result } = renderHook(() => useProject(12));
     await waitFor(() => expect(result.current.error).toBe("Not found"));
   });
+
+  it("shows no edits from an older backend that sends tapes", async () => {
+    editorBackend({ "/projects/12": { project: { id: 12, name: "Ranked" }, tapes: [{ id: 5 }] } });
+    const { result } = renderHook(() => useProject(12));
+    await waitFor(() => expect(result.current.project?.id).toBe(12));
+    expect(result.current.edits).toEqual([]);
+  });
 });

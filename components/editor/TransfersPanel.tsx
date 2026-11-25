@@ -16,6 +16,8 @@ function stateText(t: Transfer, pct: number): string {
       return `${pct}% - connection trouble, retrying`;
     case "waiting":
       return "Sent - waiting for the Mac Mini";
+    case "measuring":
+      return "Checking the file…";
     case "checking":
       return "Checking the file";
     case "paused":
@@ -74,7 +76,7 @@ export function TransfersPanel() {
     return () => clearInterval(h);
   }, [stored]);
 
-  const sending = transfers.some((t) => ["uploading", "offline", "retrying", "checking"].includes(t.state));
+  const sending = transfers.some((t) => ["uploading", "offline", "retrying", "measuring", "checking"].includes(t.state));
   useEffect(() => {
     if (!sending) return;
     const ask = (e: BeforeUnloadEvent) => {

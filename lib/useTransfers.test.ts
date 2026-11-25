@@ -390,6 +390,20 @@ describe("useTransfers", () => {
     expect(stored()).toEqual([]);
   });
 
+  it("shows Checking the file while it is measured", async () => {
+    const mod = await fresh();
+    const checks = await import("./mediaChecks");
+    let done!: () => void;
+    vi.mocked(checks.measureMedia).mockImplementationOnce(() => new Promise((ok) => (done = () => ok({ width: null, height: null, duration_s: null, fps: null, bitrate_mbps: null, codec: null, playable: false }))));
+    backend({});
+    const { result } = renderHook(() => mod.useTransfers());
+    let p!: Promise<unknown>;
+    act(() => void (p = mod.startUpload(target, file())));
+    await waitFor(() => expect(result.current[0]?.state).toBe("measuring"));
+    done();
+    await act(() => p);
+  });
+
   it("uploads a file the browser cannot decode when its header gives the size and length (ProRes .mov)", async () => {
     const mod = await fresh();
     const checks = await import("./mediaChecks");

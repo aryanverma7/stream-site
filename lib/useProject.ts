@@ -42,7 +42,8 @@ export function useProject(id: number): {
 
   const refresh = useCallback(async () => {
     try {
-      setData(await editorApi<{ project: Project; edits: Edit[] }>(`/projects/${id}`));
+      const d = await editorApi<{ project: Project; edits?: Edit[] }>(`/projects/${id}`);
+      setData({ project: d.project, edits: d.edits ?? [] }); // an older backend sends "tapes"
       setError(null);
     } catch (e) {
       setError((e as Error).message);

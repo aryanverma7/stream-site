@@ -16,4 +16,10 @@ describe("useHome", () => {
     const failed = renderHook(() => useHome());
     await waitFor(() => expect(failed.result.current.error).toBe("database is locked"));
   });
+
+  it("shows an empty open list from an older backend that sends open_tapes", async () => {
+    editorBackend({ "/home": { vods_ready: [], deletes_to_confirm: [], open_tapes: [] } });
+    const { result } = renderHook(() => useHome());
+    await waitFor(() => expect(result.current.home?.open_edits).toEqual([]));
+  });
 });

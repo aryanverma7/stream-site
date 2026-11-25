@@ -36,14 +36,14 @@ export interface Iteration {
  * so the caller can show the refusal.
  */
 /** quota_exempt is the streamer's "doesn't count toward the quota" switch. */
-export type TapePatch = Partial<Pick<Edit, "name" | "notes" | "status">> & { quota_exempt?: boolean };
+export type EditPatch = Partial<Pick<Edit, "name" | "notes" | "status">> & { quota_exempt?: boolean };
 
 export function useEdit(id: number): {
   edit: Edit | null;
   iterations: Iteration[];
   error: string | null;
   refresh: () => Promise<void>;
-  update: (patch: TapePatch) => Promise<void>;
+  update: (patch: EditPatch) => Promise<void>;
 } {
   const [data, setData] = useState<{ edit: Edit | null; iterations: Iteration[] }>({ edit: null, iterations: [] });
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +58,7 @@ export function useEdit(id: number): {
   }, [id]);
 
   const update = useCallback(
-    async (patch: TapePatch) => {
+    async (patch: EditPatch) => {
       const edit = await editorApi<Edit>(`/edits/${id}`, { method: "PATCH", body: patch });
       setData((d) => ({ ...d, edit }));
     },

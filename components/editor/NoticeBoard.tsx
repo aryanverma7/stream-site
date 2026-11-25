@@ -97,7 +97,7 @@ export function NoticeBoard({ notices, role, onChanged }: { notices: Notice[]; r
                       </>
                     ) : (
                       <>
-                        <button type="button" disabled={busy} className={btn} onClick={() => setEditing({ id: n.id, text: n.text })}>
+                        <button type="button" disabled={busy || editing !== null} className={btn} onClick={() => setEditing({ id: n.id, text: n.text })}>
                           Change
                         </button>
                         <button

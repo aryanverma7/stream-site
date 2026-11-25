@@ -65,7 +65,7 @@ interface Stored {
   abandoned?: boolean;
 }
 
-export type TransferState = "uploading" | "offline" | "retrying" | "waiting" | "checking" | "paused" | "elsewhere" | "done" | "failed";
+export type TransferState = "uploading" | "offline" | "retrying" | "waiting" | "measuring" | "checking" | "paused" | "elsewhere" | "done" | "failed";
 export interface Transfer {
   key: string;
   editId: number;
@@ -302,6 +302,7 @@ export async function startUpload(
     }
     if (!entry) {
       // The file's shape decides (or must keep) video, clip or reel: the backend checks it before Drive is asked.
+      update(key, { state: "measuring" });
       measured = await measureMedia(file).catch(() => null);
       if (signal.aborted) return;
       if (!measured?.width || !measured.height || !measured.duration_s) {

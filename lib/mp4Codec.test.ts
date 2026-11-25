@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { codecLabel, codecProbe, mp4Info, mp4VideoCodec } from "./mp4Codec";
+import { codecLabel, codecProbe, mp4Info } from "./mp4Codec";
+
+const mp4VideoCodec = async (f: Blob) => (await mp4Info(f))?.codec ?? null;
 
 const u32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
 const ascii = (s: string) => [...s].map((c) => c.charCodeAt(0));
@@ -14,7 +16,7 @@ const ftyp = box("ftyp", ascii("isom"), u32(0));
 
 const file = (...parts: (number[] | Blob)[]) => new Blob(parts.map((p) => (p instanceof Blob ? p : new Uint8Array(p))));
 
-describe("mp4VideoCodec", () => {
+describe("mp4Info(...).codec", () => {
   it("reads the video track's entry when moov sits after a large mdat", async () => {
     const mdat = [...u32(8 + 100_000), ...ascii("mdat")];
     const f = file(ftyp, mdat, new Blob([new Uint8Array(100_000)]), box("moov", trak("soun", "mp4a"), trak("vide", "hvc1")));
@@ -66,6 +68,14 @@ describe("mp4Info", () => {
   it("falls back to the stsd size and the mvhd duration", async () => {
     const f = file(ftyp, box("moov", mvhd(1000, 45_500), fullTrak({ entry: visual("hev1", 1080, 1920) })));
     expect(await mp4Info(f)).toEqual({ codec: "hev1", width: 1080, height: 1920, duration_s: 45.5 });
+  });
+
+  it("keeps the duration unrounded, and reads a v1 all-ones duration as unknown", async () => {
+    const f = file(ftyp, box("moov", fullTrak({ mdhd: mdhd(600, 108_031), entry: visual("avc1", 1920, 1080) })));
+    expect((await mp4Info(f))?.duration_s).toBeCloseTo(180.0517, 4);
+    const mdhd1 = box("mdhd", [1, 0, 0, 0], zeros(16), u32(600), u32(0xffffffff), u32(0xffffffff), zeros(4));
+    const g = file(ftyp, box("moov", fullTrak({ mdhd: mdhd1, entry: visual("avc1", 1920, 1080) })));
+    expect((await mp4Info(g))?.duration_s).toBeNull();
   });
 
   it("gives nulls when the header has no size or duration", async () => {

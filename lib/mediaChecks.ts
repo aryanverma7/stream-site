@@ -178,7 +178,7 @@ function measureWith(file: File): Promise<Measure> {
     return {
       width: v.videoWidth || null,
       height: v.videoHeight || null,
-      duration_s: d === null ? null : round1(d),
+      duration_s: d, // unrounded: the backend decides clip vs project on it
       // play() can wait forever on a file the browser half-understands; the upload must not.
       fps:
         d === null || !v.videoWidth

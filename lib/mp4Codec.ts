@@ -66,8 +66,10 @@ function seconds(v: DataView, box: [number, number] | null): number | null {
   const ts = at + (v1 ? 20 : 12);
   if (ts + (v1 ? 12 : 8) > end) return null;
   const scale = v.getUint32(ts);
-  const dur = v1 ? Number(v.getBigUint64(ts + 4)) : v.getUint32(ts + 4);
-  return scale && dur && dur !== 0xffffffff ? Math.round((dur / scale) * 10) / 10 : null;
+  // All ones means "unknown" in either version.
+  const raw = v1 ? v.getBigUint64(ts + 4) : BigInt(v.getUint32(ts + 4));
+  const dur = raw === BigInt.asUintN(v1 ? 64 : 32, BigInt(-1)) ? 0 : Number(raw);
+  return scale && dur ? dur / scale : null;
 }
 
 export interface Mp4Info {
@@ -130,10 +132,6 @@ export async function mp4Info(file: Blob): Promise<Mp4Info | null> {
     /* not an MP4 we can read */
   }
   return null;
-}
-
-export async function mp4VideoCodec(file: Blob): Promise<string | null> {
-  return (await mp4Info(file))?.codec ?? null;
 }
 
 const LABELS: Record<string, string> = { hvc1: "H.265", hev1: "H.265", avc1: "H.264", avc3: "H.264", av01: "AV1", vp09: "VP9" };

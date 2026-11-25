@@ -33,7 +33,8 @@ export function useHome(): { home: HomeData | null; error: string | null; refres
 
   const refresh = useCallback(async () => {
     try {
-      setHome(await editorApi<HomeData>("/home"));
+      const h = await editorApi<HomeData>("/home");
+      setHome({ ...h, open_edits: h.open_edits ?? [] }); // an older backend sends "open_tapes"
       setError(null);
     } catch (e) {
       setError((e as Error).message);

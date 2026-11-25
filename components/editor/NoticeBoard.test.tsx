@@ -59,4 +59,22 @@ describe("NoticeBoard", () => {
     fireEvent.click(within(await findByRole("alertdialog")).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(sent(m, "DELETE", "/notices/2")).toHaveLength(1));
   });
+
+  it("drops Seen once a seen notice is changed, and locks other Change buttons while one is open", async () => {
+    let notices = NOTICES;
+    editorBackend({
+      "/home": () => ({ ...HOME, notices }),
+      "PATCH /notices/1": (b: { text: string }) => {
+        notices = [NOTICES[0], { ...NOTICES[1], text: b.text, seen_at: null }]; // the backend clears seen_at on a text change
+        return { id: 1 };
+      },
+    });
+    const { findAllByRole, getAllByRole, getByRole, getAllByText, queryByText } = render(<HomeView role="admin" username="aryan" />);
+    fireEvent.click((await findAllByRole("button", { name: "Change" }))[1]);
+    expect((getAllByRole("button", { name: "Change" })[0] as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(getByRole("textbox", { name: "Notice text" }), { target: { value: "Older, fixed" } });
+    fireEvent.click(getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(getAllByText("Not seen yet")).toHaveLength(2));
+    expect(queryByText(/^Seen /)).toBeNull();
+  });
 });
