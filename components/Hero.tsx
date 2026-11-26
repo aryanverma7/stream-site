@@ -4,7 +4,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import { useLiveStatus } from "@/lib/useLiveStatus";
 
-// The hero is HeroScene2 ("Calling card", pure CSS; the card is the admin door). The red room
+// The hero is HeroScene2 ("Calling card": CSS animation, per-frame JS only while a flick moves; the card is the admin door). The red room
 // shows until the chunk loads. `?hero=lite` loads SpheresLite (hand-written WebGL2 spheres) so the
 // owner can compare; the three + gsap Spheres.tsx is gone.
 const Spheres = dynamic(

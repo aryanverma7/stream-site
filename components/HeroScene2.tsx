@@ -346,7 +346,7 @@ export function HeroScene2() {
             tabIndex={-1}
             onPointerDown={onDown}
             onPointerUp={onUp}
-            className="cc-card block w-[min(62vw,22rem)] cursor-default touch-none select-none"
+            className="cc-card block w-[min(62vw,22rem)] cursor-default touch-pan-y select-none"
           >
             <div ref={flipRef} className="cc-flip">
               <svg viewBox="0 0 200 280" className="cc-face block w-full drop-shadow-[10px_12px_0_#0b0b0b]">
