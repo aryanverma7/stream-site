@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { INTRO_END, SpheresLite, introPosition, nearest, pick } from "./SpheresLite";
 import { HeroScene2 } from "./HeroScene2";
@@ -62,6 +62,9 @@ describe("SpheresLite", () => {
 });
 
 describe("HeroScene2", () => {
+  // Every pointer-up asks matchMedia, and the tests below unstub globals as they finish.
+  beforeEach(() => vi.stubGlobal("matchMedia", () => ({ matches: false })));
+
   it("clears the door's flash when Back restores the page from the bfcache", () => {
     const { container } = render(<HeroScene2 />);
     const flash = container.querySelector<HTMLDivElement>(".z-40")!;
@@ -109,7 +112,6 @@ describe("HeroScene2", () => {
 
   it("a flick draws an arcana with its fortune, cleared after 7 s", () => {
     vi.useFakeTimers();
-    vi.stubGlobal("matchMedia", () => ({ matches: false }));
     const { container } = render(<HeroScene2 />);
     const card = screen.getByRole("button", { name: "Calling card" });
     const caption = container.querySelector("[aria-live]")!;

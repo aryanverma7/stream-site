@@ -377,9 +377,14 @@ export function HeroScene2() {
             ))}
           </div>
         </div>
+      </div>
+      {/* The fortune sits above every hero overlay (Hero's slashes, sticker and tags are z-10/z-20),
+          under the card by a card-sized spacer, 16px from the viewport edges. */}
+      <div className="pointer-events-none absolute inset-x-4 inset-y-0 z-30 flex flex-col items-center pt-[14vh] md:pt-[10vh]">
+        <div aria-hidden className="aspect-[5/7] w-[min(62vw,22rem)] shrink-0" />
         <p
           aria-live="polite"
-          className={`pointer-events-none mt-6 max-w-[min(92vw,30rem)] -rotate-2 border-2 border-paper bg-ink px-3 py-2 text-center text-sm uppercase text-paper shadow-[5px_5px_0_#7a0710] md:text-base ${
+          className={`stencil no-shadow mt-6 max-w-[min(100%,30rem)] -rotate-2 border-2 border-paper bg-ink px-3.5 py-2 text-center text-[clamp(15px,2.4vw,20px)] !leading-tight tracking-[0.03em] text-paper shadow-[5px_5px_0_#7a0710] ${
             fortune ? "" : "invisible"
           }`}
         >
