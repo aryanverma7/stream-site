@@ -15,6 +15,7 @@ import { isTyping } from "@/lib/isTyping";
 import { keepOnlyProject } from "@/lib/opfsMedia";
 import { Bell } from "./Bell";
 import { SearchBox } from "./SearchBox";
+import { TranscriberSwitch } from "./TranscriberSwitch";
 import { HomeView } from "./HomeView";
 import { FixListView } from "./FixListView";
 import { TodoView } from "./TodoView";
@@ -147,8 +148,9 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
           </h1>
           <span className="tag hidden bg-ink text-sm text-phosphor sm:inline-block">Editor</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           {me && <SearchBox />}
+          {me && <TranscriberSwitch />}
           {me && <Bell role={me.role} />}
           <form method="post" action="/auth/logout">
             <button
