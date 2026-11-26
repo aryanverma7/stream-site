@@ -93,8 +93,8 @@ function Slashes() {
 }
 
 /**
- * The sphere cluster in a red room, framed like a comic page. Everything laid over it is
- * pointer-events: none except the one link, because the big centre sphere is also the admin
+ * The calling card in a red room, framed like a comic page. Everything laid over it is
+ * pointer-events: none except the one link, because the card is also the admin
  * door - five taps inside three seconds navigate to /admin - and an overlay that ate clicks
  * would quietly lock the streamer out.
  */

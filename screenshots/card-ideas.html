@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Calling card: five ideas</title>
+<!--
+  Five variants of the hero's calling card (components/HeroScene2.tsx), one per tab.
+  Shared scaffolding (top of the script): the red room, its shards and halftone, the pointer
+  lean, the card art (front()), and the five-taps-in-three-seconds door (press()). In the demo the
+  door flashes and shows a toast instead of navigating to /admin.
+  Each idea is one mount function (tarot, slash, live, flick, ransom) plus its own CSS block, so
+  the one that is chosen can be ported into HeroScene2 on its own.
+  Self-contained: no network requests, opens from disk.
+-->
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:#0b0b0b;color:#f4efe6;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100dvh}
+nav{display:flex;gap:6px;overflow-x:auto;padding:8px 10px;background:#0b0b0b;z-index:50;scrollbar-width:none}
+nav button{font:900 15px/1 Impact,"Arial Black",sans-serif;letter-spacing:.05em;text-transform:uppercase;padding:9px 14px;border:2px solid #f4efe6;background:#0b0b0b;color:#f4efe6;transform:skewX(-10deg);white-space:nowrap;cursor:pointer}
+nav button[aria-selected=true]{background:#d80f1d;box-shadow:4px 4px 0 #f4efe6}
+#room{position:relative;flex:1;overflow:hidden;background:radial-gradient(circle at 50% 40%,#e3141f 0%,#d80f1d 45%,#8c0711 100%)}
+.shards{position:absolute;inset:0;pointer-events:none}
+.cc-shard{position:absolute;left:0;animation:cc-fly linear infinite;will-change:transform}
+@keyframes cc-fly{from{transform:translate3d(-20vw,-12vh,0) rotate(0)}to{transform:translate3d(120vw,14vh,0) rotate(540deg)}}
+.halftone{position:absolute;inset:0;pointer-events:none;opacity:.25;mix-blend-mode:multiply;background-image:radial-gradient(#000 1.2px,transparent 1.6px);background-size:9px 9px}
+#stage{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;padding-top:8vh}
+.persp{position:relative;perspective:900px}
+.lean{transform:rotateY(calc(var(--lx,0)*24deg)) rotateX(calc(var(--ly,0)*-18deg));transition:transform .4s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d}
+.lean.off{transform:none}
+.turn{animation:cc-turn 7s ease-in-out infinite;transform-style:preserve-3d}
+@keyframes cc-turn{0%,100%{transform:rotateY(-18deg) rotateZ(-7deg) translateY(0)}50%{transform:rotateY(18deg) rotateZ(-3deg) translateY(-2%)}}
+.card{position:relative;display:block;width:min(62vw,22rem,calc((100dvh - 320px)*.714));aspect-ratio:200/280;border:0;padding:0;background:none;color:inherit;cursor:default;user-select:none;-webkit-user-select:none;touch-action:pan-y;transform-style:preserve-3d;-webkit-tap-highlight-color:transparent}
+.cardsvg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(10px 12px 0 #0b0b0b)}
+.flip{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.3,1.35,.5,1)}
+.flip.over{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.face.back{transform:rotateY(180deg)}
+.cap{margin-top:30px;max-width:min(92vw,30rem);padding:8px 14px;background:#0b0b0b;border:2px solid #f4efe6;font:900 clamp(15px,2.4vw,20px)/1.2 Impact,"Arial Black",sans-serif;letter-spacing:.03em;text-transform:uppercase;text-align:center;transform:rotate(-2deg);box-shadow:5px 5px 0 #7a0710;z-index:3}
+.note{position:absolute;left:10px;right:10px;bottom:10px;z-index:3;font-size:12px;line-height:1.35;color:#f4efe6;opacity:.85;text-shadow:0 1px 0 #000;pointer-events:none}
+#flash{position:absolute;inset:0;z-index:40;background:#0b0b0b;opacity:0;pointer-events:none}
+#toast{position:absolute;left:50%;top:45%;z-index:41;transform:translate(-50%,-50%) rotate(-3deg);padding:10px 16px;background:#f4efe6;color:#0b0b0b;font:900 18px Impact,"Arial Black",sans-serif;letter-spacing:.04em;opacity:0;pointer-events:none;white-space:nowrap}
+
+/* 2: slash */
+.layer{position:absolute;inset:0;transition:transform .35s cubic-bezier(.2,1.3,.5,1)}
+.layer.under{transform:scale(.9)}
+.piece{transition:transform .85s cubic-bezier(.5,0,.9,.6),opacity .85s ease-in}
+.cuts{position:absolute;inset:-4%;width:108%;height:108%;overflow:visible;pointer-events:none;z-index:5}
+.cuts path{fill:none;stroke-linecap:round;stroke-dasharray:420;stroke-dashoffset:420;animation:cut .15s ease-out forwards}
+.cuts .ink{stroke:#0b0b0b;stroke-width:12}.cuts .edge{stroke:#f4efe6;stroke-width:5}
+.cuts .two{animation-delay:.12s}
+@keyframes cut{to{stroke-dashoffset:0}}
+.bit{position:absolute;left:50%;top:50%;width:22px;height:18px;transition:transform .8s cubic-bezier(.1,.7,.3,1),opacity .8s ease-in;z-index:6;pointer-events:none}
+
+/* 3: live */
+.ctl{display:flex;gap:8px;align-items:center;margin-top:18px;z-index:3;font:700 13px system-ui,sans-serif}
+.ctl button,.ctl a{font:900 15px/1 Impact,"Arial Black",sans-serif;letter-spacing:.05em;text-transform:uppercase;padding:9px 14px;border:2px solid #f4efe6;background:#0b0b0b;color:#f4efe6;cursor:pointer;text-decoration:none}
+.ctl button[aria-pressed=true]{background:#f4efe6;color:#d80f1d}
+.ctl a{background:#f4efe6;color:#0b0b0b}
+.pulse{animation:pulse 1s steps(2) infinite}
+@keyframes pulse{50%{opacity:0}}
+
+/* 4: flick */
+.orbit{position:absolute;left:50%;top:50%;width:0;height:0;z-index:2;pointer-events:none}
+.loose{position:absolute;left:-14px;top:-11px;width:28px;height:22px;will-change:transform}
+
+/* 5: ransom */
+.rl{animation:rl-in .5s cubic-bezier(.2,1.4,.4,1) backwards}
+@keyframes rl-in{from{transform:translate(var(--fx),var(--fy)) rotate(var(--fr));opacity:0}}
+
+@media (prefers-reduced-motion:reduce){
+  .cc-shard,.turn,.rl,.pulse,.cuts path{animation:none!important}
+  .cuts path{stroke-dashoffset:0}
+  .flip,.lean,.layer,.piece,.bit{transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <nav role="tablist" aria-label="Calling card ideas"></nav>
+  <div id="room">
+    <div class="shards" aria-hidden="true"></div>
+    <div class="halftone" aria-hidden="true"></div>
+    <div id="stage"></div>
+    <p class="note"></p>
+    <div id="flash"></div>
+    <div id="toast">DOOR OPENED &rarr; /admin (demo stays here)</div>
+  </div>
+</div>
+<script>
+"use strict";
+const I = "#0b0b0b", P = "#f4efe6", R = "#d80f1d", DEEP = "#7a0710";
+const FONT = "Impact,'Arial Black',sans-serif";
+const $ = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; };
+const RM = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = (xs) => xs[Math.floor(Math.random() * xs.length)];
+function shuffle(xs) { xs = xs.slice(); for (let i = xs.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [xs[i], xs[j]] = [xs[j], xs[i]]; } return xs; }
+/** Endless draws from a shuffled list, never the same item twice in a row (also across reshuffles). */
+function dealer(items) { let deck = [], last = null; return () => { if (!deck.length) { deck = shuffle(items); if (deck[0] === last) deck.push(deck.shift()); } return (last = deck.shift()); }; }
+
+/* ---------- shared: the red room (same shards as HeroScene2) ---------- */
+const room = document.getElementById("room"), stage = document.getElementById("stage");
+(function buildShards() {
+  const fills = [I, P, I, DEEP], durations = [9, 6, 3.6];
+  const shapes = ["polygon(0 0,100% 30%,20% 100%)", "polygon(10% 0,100% 0,0 100%)", "polygon(0 40%,100% 0,70% 100%)"];
+  const box = document.querySelector(".shards");
+  for (let i = 0; i < 42; i++) {
+    const r = (k) => ((Math.sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1;
+    const layer = i % 3, size = (0.6 + r(2)) * (1 + layer * 1.4), d = durations[layer];
+    const s = document.createElement("span");
+    s.className = "cc-shard";
+    Object.assign(s.style, { top: `${r(1) * 110 - 5}%`, width: `${size}rem`, height: `${size * 0.8}rem`, background: fills[i % 4],
+      clipPath: shapes[i % 3], opacity: layer === 0 ? 0.55 : 1, animationDuration: `${d}s`, animationDelay: `${-r(3) * d}s`, zIndex: layer === 2 ? 2 : 0 });
+    box.append(s);
+  }
+})();
+room.addEventListener("pointermove", (e) => {
+  const b = room.getBoundingClientRect();
+  room.style.setProperty("--lx", ((e.clientX - b.left) / b.width - 0.5).toFixed(3));
+  room.style.setProperty("--ly", ((e.clientY - b.top) / b.height - 0.5).toFixed(3));
+});
+
+/* ---------- shared: the card art ---------- */
+function starPts(cx, cy, n, ro, ri, rot = -Math.PI / 2) {
+  return Array.from({ length: n * 2 }, (_, k) => { const r = k % 2 ? ri : ro, a = rot + (k / (n * 2)) * Math.PI * 2; return `${(cx + Math.cos(a) * r).toFixed(1)},${(cy + Math.sin(a) * r).toFixed(1)}`; }).join(" ");
+}
+const BURST = Array.from({ length: 24 }, (_, k) => { const r = k % 2 ? 38 : 78 + (k % 4) * 4, a = (k / 24) * Math.PI * 2; return `${(100 + Math.cos(a) * r).toFixed(1)},${(128 + Math.sin(a) * r).toFixed(1)}`; }).join(" ");
+const OUTLINE = "8,14 192,2 196,268 2,278";
+const shell = (fill, inner, edge = I) => `<svg viewBox="0 0 200 280" class="cardsvg" aria-hidden="true"><polygon points="${OUTLINE}" fill="${fill}" stroke="${edge}" stroke-width="6"/>${inner}</svg>`;
+const plate = (text, bg = I, fg = P, y = 232, size = 20) => `<g transform="rotate(-3 100 ${y + 15})"><rect x="22" y="${y}" width="156" height="30" fill="${bg}"/><text x="100" y="${y + 22}" text-anchor="middle" font-size="${size}" font-weight="900" fill="${fg}" font-family="${FONT}"${text.length > 9 ? ' textLength="140" lengthAdjust="spacingAndGlyphs"' : ""}>${text}</text></g>`;
+const CLASSIC = { card: P, star: I, blade: R, eye: P, plate: I, text: P, edge: I };
+const INKED = { card: I, star: P, blade: R, eye: I, plate: R, text: P, edge: P };
+const REDCARD = { card: "#b80c18", star: I, blade: P, eye: "#b80c18", plate: P, text: I, edge: I };
+/** The hero's card face, in a palette. */
+const front = (p = CLASSIC) => shell(p.card, `<polygon fill="${p.star}" points="${BURST}"/>
+  <path d="M58 70 L150 186 L136 196 L46 82 Z M146 64 L160 76 L62 194 L48 182 Z" fill="${p.blade}"/>
+  <circle cx="100" cy="128" r="14" fill="${p.eye}" stroke="${I}" stroke-width="5"/>${plate("DUALBLADEX", p.plate, p.text)}`, p.edge);
+
+/* ---------- shared: the door (five taps in three seconds, as lib/tapCounter.ts) ---------- */
+const isTap = (dx, dy, ms) => Math.hypot(dx, dy) <= 8 && ms <= 500;
+function tapCounter(taps = 5, windowMs = 3000) { let t = []; return (now) => { t = t.filter((x) => now - x < windowMs); t.push(now); if (t.length < taps) return false; t = []; return true; }; }
+const doorTap = tapCounter();
+const flash = document.getElementById("flash"), toast = document.getElementById("toast");
+function openDoor() {
+  flash.style.transition = RM() ? "none" : "opacity .6s ease-in";
+  flash.style.opacity = "1"; toast.style.opacity = "1";
+  setTimeout(() => { flash.style.transition = RM() ? "none" : "opacity .4s"; flash.style.opacity = "0"; toast.style.opacity = "0"; }, 1500);
+}
+/** Calls onTap for a tap (not a drag) on el; every tap also counts toward the door, whatever the variant does with it. */
+function press(el, onTap) {
+  let d = null;
+  el.addEventListener("pointerdown", (e) => { d = e.button === 0 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null; });
+  el.addEventListener("pointerup", (e) => {
+    const s = d; d = null;
+    if (!s || e.button !== 0) return;
+    const now = performance.now();
+    if (!isTap(e.clientX - s.x, e.clientY - s.y, now - s.t)) return;
+    if (onTap) onTap();
+    if (doorTap(now)) openDoor();
+  });
+}
+/** persp > lean > turn > button.card, the hero's nesting. */
+function slot() {
+  const p = $(`<div class="persp"><div class="lean"><div class="turn"><button type="button" class="card" aria-label="Calling card" tabindex="-1"></button></div></div></div>`);
+  stage.append(p);
+  return p.querySelector(".card");
+}
+function caption(text) { const c = $(`<p class="cap" aria-live="polite"></p>`); c.textContent = text; stage.append(c); return c; }
+/** A two-faced card; flip() turns it over and returns the face now showing. */
+function flipper(card, frontHTML, backHTML = "") {
+  card.innerHTML = `<div class="flip"><div class="face">${frontHTML}</div><div class="face back">${backHTML}</div></div>`;
+  const flip = card.firstChild, faces = card.querySelectorAll(".face");
+  let over = false;
+  return { flip, faces, get over() { return over; }, turn(to = !over) { over = to; flip.classList.toggle("over", over); return faces[over ? 1 : 0]; }, hidden() { return faces[over ? 0 : 1]; } };
+}
+
+/* ========== 1. Tarot draw ========== */
+const ARCANA = [
+  { n: "0", name: "THE FOOL", fortune: "Push the off-angle. Fortune favours the bold.",
+    art: `<circle cx="140" cy="76" r="18" fill="${R}"/><path d="M26 212 L118 212 L130 152 L26 166Z" fill="${I}"/><circle cx="106" cy="104" r="9" fill="${I}"/><path d="M106 113 L104 142 M104 124 L86 116 M104 124 L126 112 M104 142 L92 160 M104 142 L122 150" stroke="${I}" stroke-width="6" stroke-linecap="round" fill="none"/>` },
+  { n: "I", name: "THE MAGICIAN", fortune: "A clutch awaits you.",
+    art: `<path d="M56 86 C56 62 96 62 100 86 C104 110 144 110 144 86 C144 62 104 62 100 86 C96 110 56 110 56 86Z" fill="none" stroke="${I}" stroke-width="10"/><path d="M92 128 L108 128 L104 212 L96 212Z" fill="${I}"/><polygon points="100,108 109,128 91,128" fill="${R}"/>` },
+  { n: "VI", name: "THE LOVERS", fortune: "Your duo queue is blessed tonight.",
+    art: `<path transform="translate(84 118) scale(2.3)" d="M0 22 L-22 0 A11 11 0 0 1 0 -14 A11 11 0 0 1 22 0 Z" fill="${R}"/><path transform="translate(118 140) scale(2.3)" d="M0 22 L-22 0 A11 11 0 0 1 0 -14 A11 11 0 0 1 22 0 Z" fill="none" stroke="${I}" stroke-width="3"/>` },
+  { n: "VII", name: "THE CHARIOT", fortune: "Rush B. Do not stop.",
+    art: `<polygon points="36,74 100,44 164,74 100,60" fill="${R}"/><circle cx="100" cy="136" r="50" fill="none" stroke="${I}" stroke-width="10"/>${Array.from({ length: 8 }, (_, k) => { const a = k * Math.PI / 4; return `<line x1="100" y1="136" x2="${(100 + Math.cos(a) * 48).toFixed(1)}" y2="${(136 + Math.sin(a) * 48).toFixed(1)}" stroke="${I}" stroke-width="6"/>`; }).join("")}<circle cx="100" cy="136" r="12" fill="${R}" stroke="${I}" stroke-width="4"/>` },
+  { n: "XIII", name: "DEATH", fortune: "An ending, then a better round.",
+    art: `<path d="M68 212 L134 58" stroke="${I}" stroke-width="9" stroke-linecap="round"/><path d="M134 58 C92 38 50 60 36 98 C66 78 100 72 130 76Z" fill="${I}"/><circle cx="150" cy="190" r="13" fill="${R}"/><path d="M150 203 L150 220" stroke="${I}" stroke-width="4"/>` },
+  { n: "XVI", name: "THE TOWER", fortune: "After the chaos comes a full rebuy.",
+    art: `<path d="M74 212 L80 92 L120 92 L126 212Z" fill="${I}"/><path d="M70 92 L130 92 L126 72 L74 72Z" fill="${R}"/><rect x="93" y="120" width="14" height="24" fill="${P}"/><polygon points="156,28 122,88 142,90 114,150 166,76 146,74" fill="${R}" stroke="${I}" stroke-width="3"/>` },
+  { n: "XVII", name: "THE STAR", fortune: "Your aim is written in the stars.",
+    art: `<polygon points="${starPts(100, 128, 8, 64, 22)}" fill="${I}"/><polygon points="${starPts(48, 62, 4, 16, 5)}" fill="${R}"/><polygon points="${starPts(156, 72, 4, 12, 4)}" fill="${R}"/><polygon points="${starPts(150, 198, 4, 14, 5)}" fill="${R}"/>` },
+  { n: "XVIII", name: "THE MOON", fortune: "Trust the footsteps, not the sight.",
+    art: `<circle cx="100" cy="122" r="56" fill="${I}"/><circle cx="126" cy="104" r="50" fill="${P}"/><path d="M60 196 q8 -16 16 0 a8 8 0 0 1 -16 0Z M96 210 q8 -16 16 0 a8 8 0 0 1 -16 0Z M132 194 q8 -16 16 0 a8 8 0 0 1 -16 0Z" fill="${R}"/>` },
+  { n: "XIX", name: "THE SUN", fortune: "Win the eco, own the match.",
+    art: `<polygon points="${starPts(100, 128, 12, 82, 50)}" fill="${I}"/><circle cx="100" cy="128" r="44" fill="${R}"/><circle cx="100" cy="128" r="16" fill="${P}" stroke="${I}" stroke-width="4"/>` },
+  { n: "IX", name: "THE HERMIT", fortune: "Lurk. Patience wins the round.",
+    art: `<path d="M100 44 L100 76" stroke="${I}" stroke-width="6"/><polygon points="${starPts(100, 126, 6, 50, 50, 0)}" fill="${I}"/><polygon points="${starPts(100, 126, 6, 28, 11)}" fill="${R}"/><rect x="84" y="172" width="32" height="12" fill="${I}"/>` },
+];
+const arcanaFace = (a) => shell(P, `<polygon points="8,14 52,12 8,58" fill="${R}"/><polygon points="196,268 152,270 196,222" fill="${R}"/>
+  <g transform="rotate(-4 100 31)"><rect x="66" y="18" width="68" height="26" fill="${I}"/><text x="100" y="39" text-anchor="middle" font-size="22" font-weight="900" fill="${P}" font-family="${FONT}">${a.n}</text></g>
+  ${a.art}${plate(a.name, I, P, 232, a.name.length > 11 ? 17 : 20)}`);
+
+function tarot() {
+  const card = slot(), c = flipper(card, front()), next = dealer(ARCANA);
+  const cap = caption("Tap the card to draw your arcana.");
+  press(card, () => { const a = next(); c.hidden().innerHTML = arcanaFace(a); c.turn(); cap.textContent = `${a.name}: ${a.fortune}`; });
+}
+
+/* ========== 2. Dual-blade slash ========== */
+const PIECES = [ // clip, translate x %, y %, rotate deg (corner-to-corner X cut, centre at 50% 50%)
+  ["polygon(-5% -5%,110% -5%,110% 3.6%,50% 50%,-5% 3.6%)", -6, 70, -22],
+  ["polygon(110% 3.6%,110% 110%,110% 96.4%,50% 50%)", 45, 60, 32],
+  ["polygon(-5% 96.4%,50% 50%,110% 96.4%,110% 110%,-5% 110%)", 6, 90, 14],
+  ["polygon(-5% 3.6%,50% 50%,-5% 96.4%)", -45, 55, -34],
+];
+function slash() {
+  const card = slot(), pals = [CLASSIC, INKED, REDCARD], timers = [];
+  let i = 0, busy = false;
+  const layer = () => { const d = $(`<div class="layer"></div>`); d.innerHTML = front(pals[i % 3]); return d; };
+  let cur = layer(); card.append(cur);
+  const cap = caption("Tap to cut the card.");
+  const later = (ms, f) => timers.push(setTimeout(f, ms));
+  press(card, () => {
+    if (busy) return;
+    busy = true; i++;
+    const under = layer(); under.classList.add("under"); card.prepend(under);
+    cap.textContent = ["Cut. Another card beneath.", "Cut again.", "Two blades, one card."][i % 3];
+    const cuts = $(`<svg class="cuts" viewBox="0 0 200 280" preserveAspectRatio="none"><path class="ink" d="M0 10 L200 270"/><path class="edge" d="M0 10 L200 270"/><path class="ink two" d="M200 10 L0 270"/><path class="edge two" d="M200 10 L0 270"/></svg>`);
+    card.append(cuts);
+    const reduced = RM();
+    later(reduced ? 250 : 300, () => {
+      cuts.remove();
+      if (!reduced) {
+        const html = cur.innerHTML;
+        for (const [clip, tx, ty, rot] of PIECES) {
+          const p = $(`<div class="layer piece"></div>`);
+          p.innerHTML = html; p.style.clipPath = clip; card.append(p);
+          requestAnimationFrame(() => requestAnimationFrame(() => { p.style.transform = `translate(${tx}%,${ty}%) rotate(${rot}deg)`; p.style.opacity = "0"; }));
+          later(900, () => p.remove());
+        }
+        for (let k = 0; k < 16; k++) {
+          const b = $(`<span class="bit"></span>`);
+          Object.assign(b.style, { background: pick([I, P, R, DEEP]), clipPath: pick(["polygon(0 0,100% 30%,20% 100%)", "polygon(10% 0,100% 0,0 100%)", "polygon(0 40%,100% 0,70% 100%)"]) });
+          card.append(b);
+          const a = rand(0, Math.PI * 2), r = rand(90, 220);
+          requestAnimationFrame(() => requestAnimationFrame(() => { b.style.transform = `translate(${Math.cos(a) * r}px,${Math.sin(a) * r}px) rotate(${rand(-540, 540)}deg) scale(${rand(.6, 1.6)})`; b.style.opacity = "0"; }));
+          later(850, () => b.remove());
+        }
+      }
+      cur.remove(); under.classList.remove("under"); cur = under;
+      later(reduced ? 0 : 450, () => { busy = false; });
+    });
+  });
+  return () => timers.forEach(clearTimeout);
+}
+
+/* ========== 3. Live status ========== */
+// Real version: `live` from GET /api/public/live-status (lib/useLiveStatus.ts already polls it).
+// The next-stream time has no backend source yet; SCHEDULE stands in for one.
+const SCHEDULE = [{ day: 1, hour: 20 }, { day: 3, hour: 20 }, { day: 5, hour: 20 }]; // Mon, Wed, Fri 20:00 local
+function nextStream(now = new Date()) {
+  for (let k = 0; k < 8; k++) {
+    const d = new Date(now); d.setDate(d.getDate() + k);
+    for (const s of SCHEDULE) {
+      if (d.getDay() !== s.day) continue;
+      d.setHours(s.hour, 0, 0, 0);
+      if (d > now) return d;
+    }
+  }
+  return null;
+}
+const liveFace = () => shell(REDCARD.card, `<polygon fill="${I}" points="${BURST}" opacity=".35"/>
+  <g transform="rotate(-5 100 92)"><rect x="12" y="62" width="176" height="62" fill="${I}"/><circle class="pulse" cx="38" cy="93" r="10" fill="${R}"/><text x="112" y="112" text-anchor="middle" font-size="52" font-weight="900" fill="${P}" font-family="${FONT}" textLength="128" lengthAdjust="spacingAndGlyphs">ON AIR</text></g>
+  <text x="100" y="168" text-anchor="middle" font-size="18" font-weight="900" fill="${P}" font-family="${FONT}" transform="rotate(-3 100 168)">THE HEIST IS ON</text>
+  ${plate("WATCH NOW &#9656;", P, I)}`);
+function offFace(d) {
+  const day = d ? d.toLocaleDateString(undefined, { weekday: "long" }).toUpperCase() : "SOON";
+  const time = d ? d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) : "";
+  const date = d ? d.toLocaleDateString(undefined, { day: "numeric", month: "short" }).toUpperCase() : "";
+  return shell(P, `<polygon points="8,14 52,12 8,58" fill="${R}"/>
+    <text x="100" y="62" text-anchor="middle" font-size="22" font-weight="900" fill="${I}" font-family="${FONT}" transform="rotate(-3 100 62)">NEXT STREAM</text>
+    <g transform="rotate(-4 100 112)"><rect x="16" y="82" width="168" height="56" fill="${I}"/><text x="100" y="126" text-anchor="middle" font-size="${day.length > 7 ? 34 : 42}" font-weight="900" fill="${P}" font-family="${FONT}"${day.length > 6 ? ' textLength="150" lengthAdjust="spacingAndGlyphs"' : ""}>${day}</text></g>
+    <text x="100" y="190" text-anchor="middle" font-size="44" font-weight="900" fill="${R}" font-family="${FONT}" textLength="120" lengthAdjust="spacingAndGlyphs" transform="rotate(2 100 190)">${time}</text>
+    ${plate(date || "STAY TUNED", I, P)}`);
+}
+function live() {
+  const card = slot(), c = flipper(card, front()), cap = caption("");
+  const ctl = $(`<div class="ctl"><span>Demo:</span><button type="button" aria-pressed="false"></button><a href="#" hidden>Watch now</a></div>`);
+  stage.append(ctl);
+  const btn = ctl.querySelector("button"), watch = ctl.querySelector("a");
+  watch.addEventListener("click", (e) => e.preventDefault());
+  let isLive = false;
+  const render = () => {
+    c.faces[1].innerHTML = isLive ? liveFace() : offFace(nextStream());
+    btn.textContent = isLive ? "Live" : "Offline";
+    btn.setAttribute("aria-pressed", String(isLive));
+    watch.hidden = !isLive;
+    cap.textContent = isLive ? "On air. Tap the card to turn it." : "Offline. The back says when we are on next.";
+  };
+  btn.addEventListener("click", () => { isLive = !isLive; render(); c.turn(true); });
+  render();
+  press(card, () => c.turn());
+}
+
+/* ========== 4. Flick it ========== */
+// The only variant with per-frame JS, and the loop runs only while something is still moving.
+function flick() {
+  const card = slot();
+  card.closest(".lean").classList.add("off");
+  card.style.touchAction = "none";
+  const turn = card.closest(".turn"), c = flipper(card, front(), front(INKED));
+  c.flip.style.transition = "none";
+  const cap = caption("Grab the card and flick it.");
+  const orbit = $(`<div class="orbit" aria-hidden="true"></div>`);
+  card.closest(".persp").append(orbit);
+  const s = { x: 0, y: 0, a: 0, z: 0, vx: 0, vy: 0, va: 0, vz: 0 };
+  const w = card.getBoundingClientRect().width;
+  const bits = Array.from({ length: 12 }, (_, k) => {
+    const ang = (k / 12) * Math.PI * 2 + 0.3, rad = w * (0.82 + (k % 3) * 0.12);
+    const el = $(`<span class="loose"></span>`);
+    Object.assign(el.style, { background: [I, P, I, DEEP][k % 4], clipPath: ["polygon(0 0,100% 30%,20% 100%)", "polygon(10% 0,100% 0,0 100%)", "polygon(0 40%,100% 0,70% 100%)"][k % 3] });
+    orbit.append(el);
+    return { el, rx: Math.cos(ang) * rad, ry: Math.sin(ang) * rad * 0.8, ox: 0, oy: 0, r: k * 37, vx: 0, vy: 0, vr: 0 };
+  });
+  const draw = () => {
+    c.flip.style.transform = `translate(${s.x}px,${s.y}px) rotateY(${s.a}deg) rotateZ(${s.z}deg)`;
+    for (const b of bits) b.el.style.transform = `translate(${b.rx + b.ox}px,${b.ry + b.oy}px) rotate(${b.r}deg)`;
+  };
+  draw();
+  let drag = null, raf = 0, last = 0;
+  const loop = (t) => {
+    const dt = Math.min(0.032, (t - last) / 1000); last = t;
+    let moving = !!drag;
+    if (!drag) {
+      s.vx += (-170 * s.x - 14 * s.vx) * dt; s.x += s.vx * dt;
+      s.vy += (-170 * s.y - 14 * s.vy) * dt; s.y += s.vy * dt;
+      s.vz += (-120 * s.z - 12 * s.vz) * dt; s.z += s.vz * dt;
+      if (Math.abs(s.va) > 260) s.va *= Math.exp(-1.4 * dt);
+      else { const goal = Math.round(s.a / 360) * 360; s.va += (-90 * (s.a - goal) - 12 * s.va) * dt; }
+      s.a += s.va * dt;
+      const goal = Math.round(s.a / 360) * 360;
+      moving = Math.abs(s.x) + Math.abs(s.y) + Math.abs(s.z) + Math.abs(s.a - goal) > 0.3 || Math.abs(s.vx) + Math.abs(s.vy) + Math.abs(s.va) > 3;
+      if (!moving) Object.assign(s, { x: 0, y: 0, z: 0, a: 0, vx: 0, vy: 0, va: 0, vz: 0 });
+    }
+    for (const b of bits) {
+      b.vx += (-26 * b.ox - 4 * b.vx) * dt; b.ox += b.vx * dt;
+      b.vy += (-26 * b.oy - 4 * b.vy) * dt; b.oy += b.vy * dt;
+      b.vr *= Math.exp(-2 * dt); b.r += b.vr * dt;
+      if (Math.abs(b.ox) + Math.abs(b.oy) > 0.5 || Math.abs(b.vx) + Math.abs(b.vy) + Math.abs(b.vr) > 4) moving = true;
+    }
+    draw();
+    if (moving) raf = requestAnimationFrame(loop);
+    else { raf = 0; turn.style.animationPlayState = ""; }
+  };
+  const start = () => { turn.style.animationPlayState = "paused"; if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); } };
+  const knock = (fvx, fvy) => {
+    const speed = Math.hypot(fvx, fvy);
+    for (const b of bits) {
+      const d = Math.hypot(b.rx, b.ry) || 1, f = speed * 0.55 * (w / (w + d * 0.5)) * rand(0.6, 1.2);
+      b.vx += (b.rx / d) * f + fvx * 0.25; b.vy += (b.ry / d) * f + fvy * 0.25; b.vr += rand(-1, 1) * speed;
+    }
+  };
+  card.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    card.setPointerCapture(e.pointerId);
+    drag = { a0: s.a - (s.x / 0.6) * 0.5, x0: e.clientX - s.x / 0.6, y0: e.clientY - s.y / 0.6, px: e.clientX, py: e.clientY, pt: performance.now(), vx: 0, vy: 0 };
+    s.vx = s.vy = s.va = s.vz = 0;
+    turn.style.animationPlayState = "paused";
+  });
+  card.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const now = performance.now(), dtm = Math.max(1, now - drag.pt);
+    drag.vx = drag.vx * 0.5 + ((e.clientX - drag.px) / dtm) * 1000 * 0.5;
+    drag.vy = drag.vy * 0.5 + ((e.clientY - drag.py) / dtm) * 1000 * 0.5;
+    Object.assign(drag, { px: e.clientX, py: e.clientY, pt: now });
+    const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+    s.x = dx * 0.6; s.y = dy * 0.6; s.a = drag.a0 + dx * 0.5; s.z = dx * 0.05;
+    draw();
+  });
+  const release = () => {
+    if (!drag) return;
+    const { vx, vy } = performance.now() - drag.pt > 80 ? { vx: 0, vy: 0 } : drag; // a pause before letting go is not a flick
+    drag = null;
+    if (RM()) { Object.assign(s, { x: 0, y: 0, z: 0, a: 0 }); draw(); turn.style.animationPlayState = ""; return; }
+    s.va = vx * 0.9; s.vx = vx * 0.2; s.vy = vy * 0.2; s.vz = vx * 0.05;
+    if (Math.hypot(vx, vy) > 300) { knock(vx, vy); cap.textContent = Math.abs(s.va) > 1400 ? "Now that is a flick." : "Flick harder."; }
+    start();
+  };
+  card.addEventListener("pointerup", release);
+  card.addEventListener("pointercancel", release);
+  press(card, () => { if (!RM()) { s.va += 720; start(); } }); // a tap is one twirl
+  return () => cancelAnimationFrame(raf);
+}
+
+/* ========== 5. Ransom note (my own idea) ========== */
+// The back of the card is a note cut from magazine letters, the same ransom look as the hero title.
+const NOTES = [["TAKE", "YOUR", "AIM"], ["SEE YOU", "ON AIR"], ["CLUTCH", "OR", "KICK"], ["GG", "GO NEXT"], ["FULL", "BUY", "TONIGHT"], ["ONE", "TAP", "ONLY"], ["HEARTS", "TAKEN"]];
+const LETTER_FONTS = [FONT, "Georgia,'Times New Roman',serif", "'Courier New',monospace", "Verdana,sans-serif"];
+function ransomFace(lines) {
+  let html = "", i = 0;
+  const top = 140 - (lines.length * 50) / 2 + 22;
+  lines.forEach((line, li) => {
+    const x0 = 100 - (line.length * 23) / 2 + 11.5;
+    [...line].forEach((ch, ci) => {
+      if (ch === " ") return;
+      const bg = pick([I, P, R, I]), fg = bg === P ? pick([I, R]) : P;
+      const cx = x0 + ci * 23 + rand(-1.5, 1.5), cy = top + li * 50 + rand(-3, 3), size = rand(22, 30);
+      html += `<g class="rl" style="--fx:${rand(-160, 160).toFixed(0)}px;--fy:${rand(-200, 200).toFixed(0)}px;--fr:${rand(-200, 200).toFixed(0)}deg;animation-delay:${250 + i++ * 45}ms">
+        <g transform="translate(${cx.toFixed(1)} ${cy.toFixed(1)}) rotate(${rand(-12, 12).toFixed(1)})"><rect x="-11.5" y="-19" width="${rand(21, 24).toFixed(1)}" height="${rand(34, 38).toFixed(1)}" fill="${bg}" stroke="${I}" stroke-width="${bg === P ? 1.5 : 0}"/>
+        <text y="8" text-anchor="middle" font-size="${size.toFixed(0)}" font-weight="900" fill="${fg}" font-family="${pick(LETTER_FONTS)}">${ch}</text></g></g>`;
+    });
+  });
+  return shell(P, `<polygon points="196,268 152,270 196,222" fill="${R}"/>${html}
+    <text x="172" y="258" text-anchor="end" font-size="13" font-weight="900" fill="${I}" font-family="${FONT}" transform="rotate(-3 172 258)">&#8212; DBX</text>`);
+}
+function ransom() {
+  const card = slot(), c = flipper(card, front()), next = dealer(NOTES);
+  const cap = caption("Tap the card: it has something to tell you.");
+  press(card, () => { c.hidden().innerHTML = ransomFace(next()); c.turn(); cap.textContent = "Tap again for another note."; });
+}
+
+/* ---------- tabs ---------- */
+const IDEAS = [
+  ["tarot", "1 Tarot", tarot, "Tarot draw: every flip lands on a new arcana (10, original art) with a fortune. Shuffled per visit, never the same twice in a row."],
+  ["slash", "2 Slash", slash, "Dual-blade slash: a tap cuts the card with two crossing blades; the quarters fall away in a burst of shards and the next card (3 colourways) is underneath."],
+  ["live", "3 Live", live, "Live status: the back says ON AIR when live, else the next stream's day and time. Real data: /api/public/live-status; the schedule here is a stand-in."],
+  ["flick", "4 Flick", flick, "Flick it: drag and throw the card; it spins with momentum, springs home and knocks the shards around it. Per-frame JS only while moving."],
+  ["ransom", "5 Ransom", ransom, "Ransom note (my idea): the back is a note cut from magazine letters, the hero title's look; each tap flips to a new one."],
+];
+const nav = document.querySelector("nav"), note = document.querySelector(".note");
+let cleanup = null;
+function show(id) {
+  const idea = IDEAS.find((x) => x[0] === id) || IDEAS[0];
+  if (cleanup) cleanup();
+  stage.replaceChildren();
+  cleanup = idea[2]() || null;
+  note.textContent = `${idea[3]} Five quick taps on the card still open the door (here: a flash, no navigation).`;
+  for (const b of nav.children) b.setAttribute("aria-selected", String(b.dataset.id === idea[0]));
+  history.replaceState(null, "", `#${idea[0]}`);
+}
+for (const [id, label] of IDEAS) {
+  const b = $(`<button type="button" role="tab"></button>`);
+  b.dataset.id = id; b.textContent = label;
+  b.addEventListener("click", () => show(id));
+  nav.append(b);
+}
+show(location.hash.slice(1));
+addEventListener("hashchange", () => show(location.hash.slice(1)));
+</script>
+</body>
+</html>
