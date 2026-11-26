@@ -58,12 +58,12 @@ export function TranscriberSwitch({ now = () => Date.now() / 1000 }: { now?: () 
         ▾
       </button>
       {t.error && !open && (
-        <span role="alert" className="absolute right-0 top-full z-40 mt-2 whitespace-nowrap border-2 border-rec bg-ink px-2 py-1 text-xs text-rec">
+        <span role="alert" className="absolute left-0 top-full z-40 sm:left-auto sm:right-0 mt-2 whitespace-nowrap border-2 border-rec bg-ink px-2 py-1 text-xs text-rec">
           {t.error}
         </span>
       )}
       {open && (
-        <div id="transcriber-panel" className="dialog-in slab-flat absolute right-0 top-full z-40 mt-3 w-72 max-w-[calc(100vw-2rem)] space-y-2 p-4 text-sm text-phosphor">
+        <div id="transcriber-panel" className="dialog-in slab-flat absolute left-0 top-full sm:left-auto sm:right-0 z-40 mt-3 w-72 max-w-[calc(100vw-2rem)] space-y-2 p-4 text-sm text-phosphor">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={t.auto} onChange={(e) => void t.setAuto(e.target.checked)} />
             Auto for new versions

@@ -22,6 +22,19 @@ describe("SearchBox", () => {
     expect(window.location.hash).toBe("#/p/2/t/4/v/9@222");
   });
 
+  it("a transcript hit is labelled and opens the version at the line's start", () => {
+    hits.push({ kind: "transcript", comment_id: null as unknown as number, iteration_id: 7, edit_id: 4, project_id: 2, version: 1, snippet: "bhai kya scene hai", start_s: 61.5 });
+    try {
+      render(<SearchBox />);
+      fireEvent.change(screen.getByLabelText("Search comments"), { target: { value: "scene" } });
+      expect(screen.getByText("Transcript")).toBeInTheDocument();
+      fireEvent.click(screen.getByText(/bhai kya scene/));
+      expect(window.location.hash).toBe("#/p/2/t/4/v/7@61.5");
+    } finally {
+      hits.pop();
+    }
+  });
+
   it("a null start_s builds no @; Enter picks the first hit; Esc closes", () => {
     render(<SearchBox />);
     const box = screen.getByLabelText("Search comments");

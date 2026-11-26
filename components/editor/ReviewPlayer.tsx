@@ -23,6 +23,7 @@ import { ScrubBar, type Marker } from "./ScrubBar";
 import { KeySheet } from "./KeySheet";
 import { CommentPanel } from "./CommentPanel";
 import { CommentComposer } from "./CommentComposer";
+import { TranscriptPanel } from "./TranscriptPanel";
 
 const SAVE_EVERY_MS = 10_000;
 const REPLY_WAIT_MS = 4_000;
@@ -183,6 +184,7 @@ function Watch({ projectId, editId, iterationId, seekS, role, username, now = Da
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(2);
   const [sheet, setSheet] = useState(false);
+  const [side, setSide] = useState<"Comments" | "Transcript">("Comments");
   // start null: a general comment; a new start/end updates an open form without clearing its text
   const [composer, setComposer] = useState<{ start: number | null; end: number | null } | null>(null);
   const cm = useComments(iterationId, { role, username }, { seen });
@@ -533,8 +535,26 @@ function Watch({ projectId, editId, iterationId, seekS, role, username, now = Da
             fps={typeof it.checks?.fps?.value === "number" ? it.checks.fps.value : null}
             title={`${editName} v${it.version}`}
           />
+          <div role="tablist" aria-label="Beside the player" className="flex gap-1">
+            {(["Comments", "Transcript"] as const).map((t) => (
+              <button
+                key={t}
+                role="tab"
+                type="button"
+                aria-selected={side === t}
+                onClick={() => setSide(t)}
+                className={`menu-pop label px-3 py-1 text-xs ${side === t ? "menu-on" : "border border-seam text-dim hover:text-phosphor"}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
           {/* no seeking until there is something to seek */}
-          <CommentPanel cm={cm} initialTab={checklistFirst ? "Checklist" : "Open"} username={username} projectId={projectId} editId={editId} currentTime={current} onSeek={started ? seekTo : undefined} now={now} />
+          {side === "Comments" ? (
+            <CommentPanel cm={cm} initialTab={checklistFirst ? "Checklist" : "Open"} username={username} projectId={projectId} editId={editId} currentTime={current} onSeek={started ? seekTo : undefined} now={now} />
+          ) : (
+            <TranscriptPanel iterationId={iterationId} currentTime={current} onSeek={started ? seekTo : undefined} />
+          )}
         </div>
       </div>
       {!started && sheet && <KeySheet onClose={() => setSheet(false)} />}

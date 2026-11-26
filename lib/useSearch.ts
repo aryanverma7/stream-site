@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { editorApi } from "./editorApi";
 
 export type Hit = {
-  kind: "comment" | "reply";
-  comment_id: number;
+  /** a transcript hit has no comment; its start_s is the line's start */
+  kind: "comment" | "reply" | "transcript";
+  comment_id: number | null;
   iteration_id: number;
   edit_id: number;
   project_id: number;
