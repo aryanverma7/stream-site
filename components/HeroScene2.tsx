@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createTapCounter, isTap } from "@/lib/tapCounter";
-import { ARCANA, createReading, dealer, type Arcana } from "@/lib/tarot";
+import { ARCANA, SLICE_CHANCE, createIdle, createReading, dealer, type Arcana } from "@/lib/tarot";
 
 // "Calling card": a gale of cut paper shards (ink, paper, deep red) tears diagonally across
 // the red room in three depths, under a halftone, while a hand-cut card turns slowly in the
 // middle and leans toward the pointer. The card is the admin door (five taps in three seconds).
 // Flick it and it spins with momentum, knocks the loose shards around it and lands on a tarot
-// card with a fortune; after HOLD_MS it springs back to the calling card. The idle turn is CSS;
+// card with a fortune; after HOLD_MS it springs back to the calling card. About one real flick in
+// five (and once after 40-70 s of no interaction) the card is sliced instead: two blades cross it,
+// the quarters fall away and a new card in the next colourway slams in. The idle turn is CSS;
 // per-frame JS runs only while the card or a loose shard is still moving.
 
 /** Deterministic shards: [layer, top %, size rem, delay fraction, fill, shape]. */
@@ -25,6 +27,21 @@ const SHARDS = shards();
 const FILLS = ["#0b0b0b", "#f4efe6", "#0b0b0b", "#7a0710"];
 const SHAPES = ["polygon(0 0,100% 30%,20% 100%)", "polygon(10% 0,100% 0,0 100%)", "polygon(0 40%,100% 0,70% 100%)"];
 const DURATIONS = [9, 6, 3.6];
+const COLOURWAYS = [
+  { name: "CLASSIC", card: "#f4efe6", star: "#0b0b0b", blade: "#d80f1d", eye: "#f4efe6", plate: "#0b0b0b", text: "#f4efe6", edge: "#0b0b0b" },
+  { name: "INKED", card: "#0b0b0b", star: "#f4efe6", blade: "#d80f1d", eye: "#0b0b0b", plate: "#d80f1d", text: "#f4efe6", edge: "#f4efe6" },
+  { name: "REDCARD", card: "#b80c18", star: "#0b0b0b", blade: "#f4efe6", eye: "#b80c18", plate: "#f4efe6", text: "#0b0b0b", edge: "#0b0b0b" },
+];
+/** The slice's quarters: clip, translate x %, y %, rotate deg (corner-to-corner X cut). */
+const PIECES: [string, number, number, number][] = [
+  ["polygon(-5% -5%,110% -5%,110% 3.6%,50% 50%,-5% 3.6%)", -6, 70, -22],
+  ["polygon(110% 3.6%,110% 110%,110% 96.4%,50% 50%)", 45, 60, 32],
+  ["polygon(-5% 96.4%,50% 50%,110% 96.4%,110% 110%,-5% 110%)", 6, 90, 14],
+  ["polygon(-5% 3.6%,50% 50%,-5% 96.4%)", -45, 55, -34],
+];
+const CUTS = `<svg class="cc-cuts" viewBox="0 0 200 280" preserveAspectRatio="none">${["M0 10 L200 270", "M200 10 L0 270"]
+  .map((d, k) => `<path class="i${k ? " two" : ""}" d="${d}"/><path class="e${k ? " two" : ""}" d="${d}"/>`)
+  .join("")}</svg>`;
 const LOOSE = 12; // loose shards around the card that a flick knocks about
 const FLICK_SPEED = 300; // px/s at release
 
@@ -36,6 +53,10 @@ const CSS = `
 .cc-flip{position:relative;transform-style:preserve-3d}
 .cc-face{backface-visibility:hidden;-webkit-backface-visibility:hidden}
 .cc-loose{position:absolute;left:-14px;top:-11px;width:28px;height:22px;will-change:transform}
+.cc-cuts{position:absolute;inset:-4%;width:108%;height:108%;overflow:visible;z-index:1}
+.cc-cuts path{fill:none;stroke-linecap:round;stroke-dasharray:420;stroke-dashoffset:420;animation:cc-cut .15s ease-out forwards}
+.cc-cuts .i{stroke:#0b0b0b;stroke-width:12}.cc-cuts .e{stroke:#f4efe6;stroke-width:5}.cc-cuts .two{animation-delay:.12s}
+@keyframes cc-cut{to{stroke-dashoffset:0}}
 @media (prefers-reduced-motion:reduce){.cc-shard,.cc-card{animation:none}}
 `;
 
@@ -46,9 +67,17 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
  * The flick: drag the card and throw it; it spins with momentum, springs home and knocks the
  * loose shards. A real flick (fast release, never a tap) draws an arcana and lands tarot-up;
  * the reading's hold ends with the card springing back. Under reduced motion nothing spins:
- * a flick just turns the card over. Returns the cleanup.
+ * a flick just turns the card over. A sliced flick (`random() < SLICE_CHANCE`) asks `onSlice` to
+ * cut the card instead, which refuses (false) while a slice is still running.
  */
-function mountFlick(card: HTMLElement, flip: HTMLElement, looseEls: HTMLElement[], onReading: (a: Arcana | null) => void) {
+function mountFlick(
+  card: HTMLElement,
+  flip: HTMLElement,
+  looseEls: HTMLElement[],
+  onReading: (a: Arcana | null) => void,
+  random: () => number,
+  onSlice: () => boolean,
+) {
   const reading = createReading(dealer(ARCANA));
   const s = { x: 0, y: 0, a: 0, z: 0, vx: 0, vy: 0, va: 0, vz: 0 };
   let w = card.getBoundingClientRect().width;
@@ -138,7 +167,19 @@ function mountFlick(card: HTMLElement, flip: HTMLElement, looseEls: HTMLElement[
     land(0);
   };
 
+  /** Cut the card: the reading ends and the new card rests calling-card up. */
+  const slice = () => {
+    if (!onSlice()) return false;
+    window.clearTimeout(hold);
+    onReading(null);
+    Object.assign(s, { x: 0, y: 0, a: 0, z: 0, vx: 0, vy: 0, va: 0, vz: 0 });
+    draw();
+    land(0);
+    return true;
+  };
+
   const flick = (vx: number, vy: number) => {
+    if (random() < SLICE_CHANCE && slice()) return;
     onReading(reading.draw(Date.now()));
     window.clearTimeout(hold);
     hold = window.setTimeout(settle, reading.until() - Date.now());
@@ -203,7 +244,7 @@ function mountFlick(card: HTMLElement, flip: HTMLElement, looseEls: HTMLElement[
   card.addEventListener("pointermove", onMove);
   card.addEventListener("pointerup", onUp);
   card.addEventListener("pointercancel", onCancel);
-  return () => {
+  const stop = () => {
     resized?.disconnect();
     card.removeEventListener("pointerdown", onDown);
     card.removeEventListener("pointermove", onMove);
@@ -212,6 +253,7 @@ function mountFlick(card: HTMLElement, flip: HTMLElement, looseEls: HTMLElement[
     cancelAnimationFrame(raf);
     window.clearTimeout(hold);
   };
+  return { stop, slice };
 }
 
 function TarotFace({ a }: { a: Arcana }) {
@@ -233,7 +275,7 @@ function TarotFace({ a }: { a: Arcana }) {
           x="100"
           y="254"
           textAnchor="middle"
-          fontSize="20"
+          fontSize={a.name.length > 11 ? 17 : 20}
           fontWeight="900"
           fill="#f4efe6"
           fontFamily="inherit"
@@ -246,12 +288,16 @@ function TarotFace({ a }: { a: Arcana }) {
   );
 }
 
-export function HeroScene2() {
+/** `random` decides slices and the idle wait, `now` is the idle slice's clock (both injectable for tests). */
+export function HeroScene2({ random = Math.random, now = Date.now }: { random?: () => number; now?: () => number } = {}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLButtonElement>(null);
   const flipRef = useRef<HTMLDivElement>(null);
   const looseRef = useRef<HTMLDivElement>(null);
+  const slamRef = useRef<HTMLDivElement>(null);
+  const fxRef = useRef<HTMLDivElement>(null);
+  const [colour, setColour] = useState(0);
   const tap = useRef(createTapCounter(5, 3000));
   const down = useRef<{ x: number; y: number; t: number } | null>(null);
   const leaving = useRef(false);
@@ -260,13 +306,92 @@ export function HeroScene2() {
   const [reading, setReading] = useState<{ a: Arcana; on: boolean } | null>(null);
   useEffect(() => () => window.clearTimeout(navTimer.current), []);
 
-  useEffect(
-    () =>
-      mountFlick(cardRef.current!, flipRef.current!, [...looseRef.current!.children] as HTMLElement[], (a) =>
-        setReading((r) => (a ? { a, on: true } : r && { ...r, on: false })),
-      ),
-    [],
-  );
+  useEffect(() => {
+    const timers: number[] = [];
+    const later = (ms: number, f: () => void) => timers.push(window.setTimeout(f, ms));
+    let slicing = false;
+    const nextColour = () => setColour((c) => (c + 1) % COLOURWAYS.length);
+    // Two blades cross the card, its quarters fall away with shards, the next colourway slams in.
+    const onSlice = () => {
+      if (slicing || leaving.current) return false;
+      if (reducedMotion()) {
+        nextColour();
+        return true;
+      }
+      slicing = true;
+      const fx = fxRef.current!;
+      const slam = slamRef.current!;
+      const face = flipRef.current!.querySelector("svg")!.outerHTML;
+      fx.style.transform = getComputedStyle(cardRef.current!).transform.replace("none", "");
+      fx.innerHTML = CUTS;
+      later(300, () => {
+        fx.innerHTML = "";
+        slam.style.opacity = "0";
+        const fall = (el: HTMLElement, to: string, ms: number) =>
+          el.animate?.([{ transform: "none", opacity: 1 }, { transform: to, opacity: 0 }], { duration: ms, easing: "cubic-bezier(.3,0,.8,.6)", fill: "forwards" });
+        for (const [clip, tx, ty, rot] of PIECES) {
+          const p = document.createElement("div");
+          p.className = "absolute inset-0";
+          p.style.clipPath = clip;
+          p.innerHTML = face;
+          fx.append(p);
+          fall(p, `translate(${tx}%,${ty}%) rotate(${rot}deg)`, 850);
+        }
+        for (let k = 0; k < 16; k++) {
+          const b = document.createElement("span");
+          b.className = "absolute left-1/2 top-1/2 h-[18px] w-[22px]";
+          Object.assign(b.style, { background: FILLS[k % 4], clipPath: SHAPES[k % 3] });
+          fx.append(b);
+          const a = rand(0, Math.PI * 2);
+          const r = rand(90, 220);
+          fall(b, `translate(${Math.cos(a) * r}px,${Math.sin(a) * r}px) rotate(${rand(-540, 540)}deg) scale(${rand(0.6, 1.6)})`, 800);
+        }
+        nextColour();
+      });
+      later(450, () => {
+        const side = Math.random() < 0.5 ? -1 : 1;
+        slam.style.opacity = "";
+        slam.animate?.(
+          [
+            { transform: `translate(${side * 110}vw,-45vh) rotate(${side * -600}deg) scale(1.3)` },
+            { transform: `translate(${side * -4}%,2%) rotate(${side * 7}deg) scale(.94)`, offset: 0.72 },
+            { transform: "none" },
+          ],
+          { duration: 750, easing: "cubic-bezier(.2,.7,.3,1)" },
+        );
+      });
+      later(1300, () => {
+        fx.innerHTML = "";
+        slicing = false;
+      });
+      return true;
+    };
+    const flick = mountFlick(
+      cardRef.current!,
+      flipRef.current!,
+      [...looseRef.current!.children] as HTMLElement[],
+      (a) => setReading((r) => (a ? { a, on: true } : r && { ...r, on: false })),
+      random,
+      onSlice,
+    );
+    // Once per quiet stretch, 40-70 s after the last pointer or key press, the card is sliced on its own.
+    const idle = createIdle(random);
+    let idleTimer = 0;
+    const arm = () => {
+      window.clearTimeout(idleTimer);
+      idleTimer = window.setTimeout(() => idle.take(now()) && flick.slice(), idle.poke(now()) - now());
+    };
+    arm();
+    window.addEventListener("pointerdown", arm);
+    window.addEventListener("keydown", arm);
+    return () => {
+      flick.stop();
+      timers.forEach(window.clearTimeout);
+      window.clearTimeout(idleTimer);
+      window.removeEventListener("pointerdown", arm);
+      window.removeEventListener("keydown", arm);
+    };
+  }, [random, now]);
 
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
@@ -308,6 +433,7 @@ export function HeroScene2() {
     navTimer.current = window.setTimeout(() => window.location.assign("/admin"), reduced ? 0 : 850);
   };
 
+  const cw = COLOURWAYS[colour];
   const fortune = reading?.on ? `${reading.a.name}: ${reading.a.fortune}` : "";
 
   return (
@@ -352,10 +478,12 @@ export function HeroScene2() {
             transition: "transform 0.4s cubic-bezier(.2,.8,.2,1)",
           } as CSSProperties}
         >
+          <div ref={slamRef}>
           <button
             ref={cardRef}
             type="button"
             aria-label="Calling card"
+            data-colourway={cw.name}
             tabIndex={-1}
             onPointerDown={onDown}
             onPointerUp={onUp}
@@ -363,19 +491,19 @@ export function HeroScene2() {
           >
             <div ref={flipRef} className="cc-flip">
               <svg viewBox="0 0 200 280" className="cc-face block w-full drop-shadow-[10px_12px_0_#0b0b0b]">
-                <polygon points="8,14 192,2 196,268 2,278" fill="#f4efe6" stroke="#0b0b0b" strokeWidth="6" />
+                <polygon points="8,14 192,2 196,268 2,278" fill={cw.card} stroke={cw.edge} strokeWidth="6" />
                 <polygon
-                  fill="#0b0b0b"
+                  fill={cw.star}
                   points={Array.from({ length: 24 }, (_, k) => {
                     const r = k % 2 ? 38 : 78 + (k % 4) * 4;
                     const a = (k / 24) * Math.PI * 2;
                     return `${(100 + Math.cos(a) * r).toFixed(1)},${(128 + Math.sin(a) * r).toFixed(1)}`;
                   }).join(" ")}
                 />
-                <path d="M58 70 L150 186 L136 196 L46 82 Z M146 64 L160 76 L62 194 L48 182 Z" fill="#d80f1d" />
-                <circle cx="100" cy="128" r="14" fill="#f4efe6" stroke="#0b0b0b" strokeWidth="5" />
-                <rect x="22" y="232" width="156" height="30" fill="#0b0b0b" transform="rotate(-3 100 247)" />
-                <text x="100" y="254" textAnchor="middle" fontSize="20" fontWeight="900" fill="#f4efe6" fontFamily="inherit" transform="rotate(-3 100 247)">
+                <path d="M58 70 L150 186 L136 196 L46 82 Z M146 64 L160 76 L62 194 L48 182 Z" fill={cw.blade} />
+                <circle cx="100" cy="128" r="14" fill={cw.eye} stroke="#0b0b0b" strokeWidth="5" />
+                <rect x="22" y="232" width="156" height="30" fill={cw.plate} transform="rotate(-3 100 247)" />
+                <text x="100" y="254" textAnchor="middle" fontSize="20" fontWeight="900" fill={cw.text} fontFamily="inherit" transform="rotate(-3 100 247)">
                   DUALBLADEX
                 </text>
               </svg>
@@ -384,6 +512,8 @@ export function HeroScene2() {
               </div>
             </div>
           </button>
+          </div>
+          <div ref={fxRef} aria-hidden className="pointer-events-none absolute inset-0 z-[3]" />
           <div ref={looseRef} aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-0 w-0">
             {Array.from({ length: LOOSE }, (_, k) => (
               <span key={k} className="cc-loose" style={{ background: FILLS[k % 4], clipPath: SHAPES[k % 3] }} />
