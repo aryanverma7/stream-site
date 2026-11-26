@@ -36,9 +36,11 @@ export function TranscriptPanel({ iterationId, currentTime, onSeek, fileName = "
 
   const save = async () => {
     if (!editing || editing.saving) return;
+    const { index, text } = editing;
     setEditing({ ...editing, saving: true, error: null });
-    const error = await tr.saveLine(editing.index, editing.text);
-    setEditing(error ? { ...editing, saving: false, error } : null);
+    const error = await tr.saveLine(index, text);
+    // only the save that is still showing may close or reopen its box
+    setEditing((cur) => (cur?.index === index && cur.saving ? (error ? { ...cur, saving: false, error } : null) : cur));
   };
   const list = useRef<HTMLOListElement>(null);
   const segments = tr.segments ?? [];
@@ -82,6 +84,7 @@ export function TranscriptPanel({ iterationId, currentTime, onSeek, fileName = "
                   <textarea
                     aria-label={`Fix the line at ${clock(s.start)}`}
                     autoFocus
+                    readOnly={editing.saving}
                     value={editing.text}
                     maxLength={2000}
                     onChange={(e) => setEditing({ ...editing, text: e.target.value })}
@@ -91,7 +94,7 @@ export function TranscriptPanel({ iterationId, currentTime, onSeek, fileName = "
                         void save();
                       } else if (e.key === "Escape") {
                         e.stopPropagation(); // Esc here cancels the fix, not the route
-                        setEditing(null);
+                        if (!editing.saving) setEditing(null);
                       }
                     }}
                     className="block w-full border-2 border-phosphor bg-ink p-1 text-sm text-paper"
@@ -101,7 +104,7 @@ export function TranscriptPanel({ iterationId, currentTime, onSeek, fileName = "
                     <button type="button" className={btn} disabled={editing.saving} onClick={() => void save()}>
                       {editing.saving ? "Saving…" : "Save"}
                     </button>
-                    <button type="button" className={btn} onClick={() => setEditing(null)}>
+                    <button type="button" className={btn} disabled={editing.saving} onClick={() => setEditing(null)}>
                       Cancel
                     </button>
                   </div>
@@ -123,6 +126,7 @@ export function TranscriptPanel({ iterationId, currentTime, onSeek, fileName = "
                     type="button"
                     aria-label={`Fix the line at ${clock(s.start)}`}
                     title="Fix this line"
+                    disabled={!!editing?.saving}
                     onClick={() => setEditing({ index: i, text: s.text, error: null, saving: false })}
                     className="shrink-0 px-1.5 py-1 text-dim opacity-60 hover:text-phosphor group-hover:opacity-100 focus:opacity-100"
                   >

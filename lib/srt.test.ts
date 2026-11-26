@@ -18,4 +18,8 @@ describe("srt", () => {
     expect(srtName('a/b:c*?"<>|d v1')).toBe("a b c d v1.srt");
     expect(srtName("  ")).toBe("transcript.srt");
   });
+
+  it("never lets a line break end a cue early", () => {
+    expect(toSrt([{ start: 0, end: 1, text: "one\n\n  two \r\n" }])).toBe("1\r\n00:00:00,000 --> 00:00:01,000\r\none\r\ntwo\r\n");
+  });
 });

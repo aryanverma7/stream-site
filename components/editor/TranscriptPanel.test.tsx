@@ -112,5 +112,23 @@ describe("TranscriptPanel", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("This transcript is not finished yet");
     expect(screen.getByRole("textbox")).toBeInTheDocument(); // still open to try again
   });
+
+  it("while a fix is saving, nothing else can open or cancel and the box is locked", async () => {
+    let answer: (v: unknown) => void = () => {};
+    editorBackend({ "/iterations/5/transcript": { status: "done", segments: SEGS, error: null } });
+    const plain = global.fetch;
+    global.fetch = vi.fn((url: string, init?: RequestInit) =>
+      init?.method === "PUT" ? new Promise((r) => (answer = r)) : plain(url, init),
+    ) as unknown as typeof fetch;
+    render(<TranscriptPanel iterationId={5} currentTime={0} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Fix the line at 01:05" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("button", { name: "Saving…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Fix the line at 00:00" })).toBeDisabled();
+    expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+    answer({ ok: true, status: 200, json: () => Promise.resolve({ status: "done", segments: SEGS, error: null }) });
+    await waitFor(() => expect(screen.queryByRole("textbox")).toBeNull());
+  });
 });
 
