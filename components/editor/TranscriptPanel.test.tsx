@@ -106,6 +106,11 @@ describe("TranscriptPanel", () => {
     });
     expect(fetchMock.mock.calls.some(([u, i]) => u === "/api/editor/iterations/5/transcript/lines/1" && i?.method === "PUT")).toBe(true);
 
+    fireEvent.click(screen.getByRole("button", { name: "Fix the line at 00:00" }));
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter", isComposing: true }); // an IME still composing
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Escape" });
+
     refuse = true;
     fireEvent.click(screen.getByRole("button", { name: "Fix the line at 01:05" }));
     fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });

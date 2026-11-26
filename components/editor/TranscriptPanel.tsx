@@ -89,7 +89,7 @@ export function TranscriptPanel({ iterationId, currentTime, onSeek, fileName = "
                     maxLength={2000}
                     onChange={(e) => setEditing({ ...editing, text: e.target.value })}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
+                      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                         e.preventDefault();
                         void save();
                       } else if (e.key === "Escape") {
