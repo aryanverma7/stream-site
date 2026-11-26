@@ -41,6 +41,7 @@ describe("EditorShell", () => {
     const kit = getByRole("link", { name: /Brand kit/ });
     expect(kit.getAttribute("href")).toBe(ADMIN.brand_kit_url);
     expect(kit.getAttribute("target")).toBe("_blank");
+    expect(getByRole("link", { name: "Admin" }).getAttribute("href")).toBe("/admin"); // the way back to the dashboard
   });
 
   it("hides Storage from the editor, and the brand kit when there is none", async () => {
@@ -51,6 +52,7 @@ describe("EditorShell", () => {
     await findByRole("link", { name: "Home" });
     expect(queryByRole("link", { name: "Storage" })).toBeNull();
     expect(queryByRole("link", { name: /Brand kit/ })).toBeNull();
+    expect(queryByRole("link", { name: "Admin" })).toBeNull();
   });
 
   it("does not show the editor the Storage page even by direct link", async () => {

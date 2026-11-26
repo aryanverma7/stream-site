@@ -28,4 +28,30 @@ describe("useTranscriber", () => {
     await act(() => vi.advanceTimersByTimeAsync(TRANSCRIBER_POLL_MS * 3));
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it("drops a poll that started before a flip, so the flip is not undone by stale data", async () => {
+    let answerPoll: (v: unknown) => void = () => {};
+    let gets = 0;
+    global.fetch = vi.fn((_url: string, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "PUT")
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ...S, enabled: true }) });
+      gets++;
+      if (gets === 1) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ...S, enabled: false }) });
+      return new Promise((res) => (answerPoll = res)); // the second poll hangs until we answer it
+    }) as unknown as typeof fetch;
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useTranscriber());
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(result.current.enabled).toBe(false);
+    await act(() => vi.advanceTimersByTimeAsync(TRANSCRIBER_POLL_MS)); // poll 2 starts and hangs
+    await act(async () => {
+      await result.current.setEnabled(true);
+    });
+    expect(result.current.enabled).toBe(true);
+    await act(async () => {
+      answerPoll({ ok: true, status: 200, json: () => Promise.resolve({ ...S, enabled: false }) });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.enabled).toBe(true); // the stale "Paused" answer was dropped
+  });
 });
