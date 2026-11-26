@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { INTRO_END, SpheresLite, introPosition, nearest, pick } from "./SpheresLite";
 import { HeroScene2 } from "./HeroScene2";
 
@@ -82,6 +82,46 @@ describe("HeroScene2", () => {
     }
     vi.advanceTimersByTime(1000);
     expect(assign).toHaveBeenCalledWith("/admin");
+    expect(screen.queryByText(/: /)).toBeNull(); // taps draw no arcana
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("never counts a drag as a tap", () => {
+    vi.useFakeTimers();
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    render(<HeroScene2 />);
+    const card = screen.getByRole("button", { name: "Calling card" });
+    for (let i = 0; i < 5; i++) {
+      fireEvent.pointerDown(card, { button: 0, clientX: 10, clientY: 10 });
+      vi.advanceTimersByTime(200); // slow, so not a flick either
+      fireEvent.pointerMove(card, { clientX: 60, clientY: 10 });
+      vi.advanceTimersByTime(200);
+      fireEvent.pointerUp(card, { button: 0, clientX: 60, clientY: 10 });
+    }
+    vi.advanceTimersByTime(1000);
+    expect(assign).not.toHaveBeenCalled();
+    expect(screen.queryByText(/: /)).toBeNull();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("a flick draws an arcana with its fortune, cleared after 7 s", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    const { container } = render(<HeroScene2 />);
+    const card = screen.getByRole("button", { name: "Calling card" });
+    const caption = container.querySelector("[aria-live]")!;
+    fireEvent.pointerDown(card, { button: 0, clientX: 10, clientY: 10 });
+    vi.advanceTimersByTime(10);
+    fireEvent.pointerMove(card, { clientX: 90, clientY: 10 });
+    fireEvent.pointerUp(card, { button: 0, clientX: 90, clientY: 10 });
+    expect(caption.textContent).toMatch(/^(THE \w+|DEATH): .+\.$/);
+    act(() => vi.advanceTimersByTime(6900));
+    expect(caption.textContent).not.toBe("");
+    act(() => vi.advanceTimersByTime(200));
+    expect(caption.textContent).toBe("");
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
