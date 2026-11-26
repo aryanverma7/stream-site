@@ -553,7 +553,7 @@ function Watch({ projectId, editId, iterationId, seekS, role, username, now = Da
           {side === "Comments" ? (
             <CommentPanel cm={cm} initialTab={checklistFirst ? "Checklist" : "Open"} username={username} projectId={projectId} editId={editId} currentTime={current} onSeek={started ? seekTo : undefined} now={now} />
           ) : (
-            <TranscriptPanel iterationId={iterationId} currentTime={current} onSeek={started ? seekTo : undefined} />
+            <TranscriptPanel iterationId={iterationId} currentTime={current} onSeek={started ? seekTo : undefined} fileName={`${editName} v${it.version}`} />
           )}
         </div>
       </div>

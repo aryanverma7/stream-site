@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { editorApi } from "./editorApi";
 
-export type Segment = { start: number; end: number; text: string };
+export type Segment = { start: number; end: number; text: string; edited?: boolean };
 export type TranscriptStatus = "none" | "queued" | "running" | "done" | "failed";
 type Transcript = { status: TranscriptStatus; segments: Segment[] | null; error: string | null };
 
@@ -51,5 +51,19 @@ export function useTranscript(iterationId: number) {
     }
   }, [iterationId, load]);
 
-  return { status: cur?.status ?? null, segments: cur?.segments ?? null, error: error ?? cur?.error ?? null, request };
+  /** Fix one line's text; resolves to an error message, or null once saved. */
+  const saveLine = useCallback(
+    async (index: number, text: string): Promise<string | null> => {
+      try {
+        const d = await editorApi<Transcript>(`/iterations/${iterationId}/transcript/lines/${index}`, { method: "PUT", body: { text } });
+        setT({ ...d, id: iterationId });
+        return null;
+      } catch (e) {
+        return e instanceof Error ? e.message : "Could not save the line";
+      }
+    },
+    [iterationId],
+  );
+
+  return { status: cur?.status ?? null, segments: cur?.segments ?? null, error: error ?? cur?.error ?? null, request, saveLine };
 }
