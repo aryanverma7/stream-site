@@ -18,7 +18,7 @@ const go = (h: Hit) => {
 };
 
 /**
- * Comment search for the top bar; "/" focuses it. Snippets are plain text, never HTML.
+ * Comment and transcript search for the top bar; "/" focuses it. Snippets are plain text, never HTML.
  * A combobox: ArrowUp/ArrowDown/Home/End move the active result (focus stays in the box,
  * aria-activedescendant names the result), Enter opens it, or the first one if none is active.
  */
@@ -107,7 +107,7 @@ export function SearchBox() {
           {error && <li className="px-3 py-2 text-sm text-rec">{error}</li>}
           {!loading && !error && hits.length === 0 && <li className="px-3 py-2 text-sm text-dim">No matches</li>}
           {shown.map((h, i) => (
-            <li key={`${h.kind}-${h.comment_id}-${h.snippet}`} id={optionId(i)} role="option" aria-selected={i === active}>
+            <li key={`${h.kind}-${h.comment_id ?? h.iteration_id}-${h.start_s}-${h.snippet}`} id={optionId(i)} role="option" aria-selected={i === active}>
               <button
                 type="button"
                 tabIndex={-1}
@@ -116,7 +116,7 @@ export function SearchBox() {
                 onClick={() => pick(h)}
                 className={`block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-bezel-2 ${i === active ? "bg-phosphor text-ink [&_.text-dim]:text-ink" : ""}`}
               >
-                <span className="label mr-2 text-[10px] text-dim">{h.kind === "reply" ? "Reply" : "Comment"}</span>
+                <span className="label mr-2 text-[10px] text-dim">{h.kind === "reply" ? "Reply" : h.kind === "transcript" ? "Transcript" : "Comment"}</span>
                 v{h.version}
                 {h.start_s !== null && ` · ${formatTime(h.start_s)}`} · {h.snippet}
               </button>
