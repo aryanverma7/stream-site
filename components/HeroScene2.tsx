@@ -51,12 +51,18 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
 function mountFlick(card: HTMLElement, flip: HTMLElement, looseEls: HTMLElement[], onReading: (a: Arcana | null) => void) {
   const reading = createReading(dealer(ARCANA));
   const s = { x: 0, y: 0, a: 0, z: 0, vx: 0, vy: 0, va: 0, vz: 0 };
-  const w = card.getBoundingClientRect().width;
-  const bits = looseEls.map((el, k) => {
-    const ang = (k / LOOSE) * Math.PI * 2 + 0.3;
-    const reach = w * (0.82 + (k % 3) * 0.12);
-    return { el, rx: Math.cos(ang) * reach, ry: Math.sin(ang) * reach * 0.8, ox: 0, oy: 0, r: k * 37, vx: 0, vy: 0, vr: 0 };
-  });
+  let w = card.getBoundingClientRect().width;
+  const bits = looseEls.map((el, k) => ({ el, k, rx: 0, ry: 0, ox: 0, oy: 0, r: k * 37, vx: 0, vy: 0, vr: 0 }));
+  // The ring is sized from the card, so it is re-placed whenever the card's width changes (rotation, resize).
+  const place = () => {
+    for (const b of bits) {
+      const ang = (b.k / LOOSE) * Math.PI * 2 + 0.3;
+      const reach = w * (0.82 + (b.k % 3) * 0.12);
+      b.rx = Math.cos(ang) * reach;
+      b.ry = Math.sin(ang) * reach * 0.8;
+    }
+  };
+  place();
   let face = 0; // 0 = calling card up, 180 = tarot up
   let drag: null | { sx: number; sy: number; t0: number; a0: number; x0: number; y0: number; px: number; py: number; pt: number; vx: number; vy: number } = null;
   let raf = 0;
@@ -187,11 +193,18 @@ function mountFlick(card: HTMLElement, flip: HTMLElement, looseEls: HTMLElement[
   };
 
   draw();
+  const resized = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
+    w = card.getBoundingClientRect().width;
+    place();
+    draw();
+  });
+  resized?.observe(card);
   card.addEventListener("pointerdown", onDown);
   card.addEventListener("pointermove", onMove);
   card.addEventListener("pointerup", onUp);
   card.addEventListener("pointercancel", onCancel);
   return () => {
+    resized?.disconnect();
     card.removeEventListener("pointerdown", onDown);
     card.removeEventListener("pointermove", onMove);
     card.removeEventListener("pointerup", onUp);
