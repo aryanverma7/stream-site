@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TranscriptPanel, activeLine } from "./TranscriptPanel";
 import { editorBackend } from "@/lib/testUtils";
 
@@ -61,4 +61,56 @@ describe("TranscriptPanel", () => {
     expect(activeLine(SEGS, 69.9)).toBe(1);
     expect(activeLine([], 3)).toBe(-1);
   });
+
+  it("downloads the transcript as .srt named after the version", async () => {
+    editorBackend({ "/iterations/5/transcript": { status: "done", segments: SEGS, error: null } });
+    const blobs: Blob[] = [];
+    vi.spyOn(URL, "createObjectURL").mockImplementation((b) => (blobs.push(b as Blob), "blob:x"));
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    let name = "";
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      name = this.download;
+    });
+    render(<TranscriptPanel iterationId={5} currentTime={0} fileName="Main cut v3" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Download .srt" }));
+    expect(name).toBe("Main cut v3.srt");
+    expect(await blobs[0].text()).toContain("2\r\n00:01:05,000 --> 00:01:10,000\r\nyeh clip mast hai");
+  });
+
+  it("fixes a line: Save PUTs and marks it edited; Esc cancels; a refusal shows the error", async () => {
+    let segs = SEGS.map((x) => ({ ...x }));
+    let refuse = false;
+    const fetchMock = editorBackend({
+      "/iterations/5/transcript": () => ({ status: "done", segments: segs, error: null }),
+      "PUT /iterations/5/transcript/lines/1": (body: { text: string }) => {
+        if (refuse) return { status: 409, body: { error: "This transcript is not finished yet" } };
+        segs = segs.map((x, i) => (i === 1 ? { ...x, text: body.text, edited: true } : x));
+        return { status: "done", segments: segs, error: null };
+      },
+    });
+    render(<TranscriptPanel iterationId={5} currentTime={0} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Fix the line at 01:05" }));
+    const box = screen.getByRole("textbox", { name: "Fix the line at 01:05" });
+    fireEvent.change(box, { target: { value: "yeh clip ekdum mast hai" } });
+    fireEvent.keyDown(box, { key: "Escape" });
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByText("yeh clip mast hai")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Fix the line at 01:05" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "yeh clip ekdum mast hai" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("textbox")).toBeNull();
+      expect(screen.getByText("yeh clip ekdum mast hai")).toBeInTheDocument();
+      expect(screen.getByText("edited")).toBeInTheDocument();
+    });
+    expect(fetchMock.mock.calls.some(([u, i]) => u === "/api/editor/iterations/5/transcript/lines/1" && i?.method === "PUT")).toBe(true);
+
+    refuse = true;
+    fireEvent.click(screen.getByRole("button", { name: "Fix the line at 01:05" }));
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
+    expect(await screen.findByRole("alert")).toHaveTextContent("This transcript is not finished yet");
+    expect(screen.getByRole("textbox")).toBeInTheDocument(); // still open to try again
+  });
 });
+
