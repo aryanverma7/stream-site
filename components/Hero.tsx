@@ -4,7 +4,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import { useLiveStatus } from "@/lib/useLiveStatus";
 
-// The hero is HeroScene2 ("Calling card", pure CSS; the card is the admin door). The red room
+// The hero is HeroScene2 ("Calling card": CSS animation, per-frame JS only while a flick moves; the card is the admin door). The red room
 // shows until the chunk loads. `?hero=lite` loads SpheresLite (hand-written WebGL2 spheres) so the
 // owner can compare; the three + gsap Spheres.tsx is gone.
 const Spheres = dynamic(
@@ -93,8 +93,8 @@ function Slashes() {
 }
 
 /**
- * The sphere cluster in a red room, framed like a comic page. Everything laid over it is
- * pointer-events: none except the one link, because the big centre sphere is also the admin
+ * The calling card in a red room, framed like a comic page. Everything laid over it is
+ * pointer-events: none except the one link, because the card is also the admin
  * door - five taps inside three seconds navigate to /admin - and an overlay that ate clicks
  * would quietly lock the streamer out.
  */
