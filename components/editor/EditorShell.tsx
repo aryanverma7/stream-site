@@ -152,6 +152,15 @@ export function EditorShell({ transfers }: { transfers?: ReactNode }) {
           {me && <SearchBox />}
           {me && <TranscriberSwitch />}
           {me && <Bell role={me.role} />}
+          {me?.role === "admin" && (
+            // A document navigation: the backend gates /admin, and the two pages share no state.
+            <a
+              href="/admin"
+              className="menu-pop label whitespace-nowrap border-2 border-ink px-3 py-1.5 text-xs text-ink hover:bg-ink hover:text-phosphor"
+            >
+              Admin
+            </a>
+          )}
           <form method="post" action="/auth/logout">
             <button
               type="submit"

@@ -15,7 +15,7 @@ beforeEach(() => {
 describe("SearchBox", () => {
   it("lists hits as plain text and a click goes to the comment's time", () => {
     render(<SearchBox />);
-    fireEvent.change(screen.getByLabelText("Search comments"), { target: { value: "jet" } });
+    fireEvent.change(screen.getByLabelText("Search comments and transcripts"), { target: { value: "jet" } });
     expect(screen.getByText(/fix <b>jet<\/b> dash/)).toBeInTheDocument();
     expect(document.querySelector("li b")).toBeNull();
     fireEvent.click(screen.getByText(/fix <b>/));
@@ -26,7 +26,7 @@ describe("SearchBox", () => {
     hits.push({ kind: "transcript", comment_id: null as unknown as number, iteration_id: 7, edit_id: 4, project_id: 2, version: 1, snippet: "bhai kya scene hai", start_s: 61.5 });
     try {
       render(<SearchBox />);
-      fireEvent.change(screen.getByLabelText("Search comments"), { target: { value: "scene" } });
+      fireEvent.change(screen.getByLabelText("Search comments and transcripts"), { target: { value: "scene" } });
       expect(screen.getByText("Transcript")).toBeInTheDocument();
       fireEvent.click(screen.getByText(/bhai kya scene/));
       expect(window.location.hash).toBe("#/p/2/t/4/v/7@61.5");
@@ -37,7 +37,7 @@ describe("SearchBox", () => {
 
   it("a null start_s builds no @; Enter picks the first hit; Esc closes", () => {
     render(<SearchBox />);
-    const box = screen.getByLabelText("Search comments");
+    const box = screen.getByLabelText("Search comments and transcripts");
     fireEvent.change(box, { target: { value: "gen" } });
     fireEvent.keyDown(box, { key: "Escape" });
     expect(screen.queryByRole("listbox")).toBeNull();
@@ -61,12 +61,12 @@ describe("SearchBox", () => {
     fireEvent.keyDown(reply, { key: "/" });
     expect(document.activeElement).toBe(reply);
     fireEvent.keyDown(document.body, { key: "/" });
-    expect(document.activeElement).toBe(screen.getByLabelText("Search comments"));
+    expect(document.activeElement).toBe(screen.getByLabelText("Search comments and transcripts"));
   });
 
   it("a pick leaves the box, so the player's keys work again", () => {
     render(<SearchBox />);
-    const box = screen.getByLabelText("Search comments");
+    const box = screen.getByLabelText("Search comments and transcripts");
     box.focus();
     fireEvent.change(box, { target: { value: "jet" } });
     fireEvent.mouseDown(screen.getByText(/fix <b>/));
@@ -82,7 +82,7 @@ describe("SearchBox", () => {
         <button>elsewhere</button>
       </>,
     );
-    const box = screen.getByLabelText("Search comments");
+    const box = screen.getByLabelText("Search comments and transcripts");
     box.focus();
     fireEvent.change(box, { target: { value: "jet" } });
     const hit = screen.getByText(/fix <b>/).closest("button")!;
@@ -94,7 +94,7 @@ describe("SearchBox", () => {
 
   it("arrow keys, Home and End move the active result, named by aria-activedescendant; Enter opens it", () => {
     render(<SearchBox />);
-    const box = screen.getByLabelText("Search comments");
+    const box = screen.getByLabelText("Search comments and transcripts");
     box.focus();
     fireEvent.change(box, { target: { value: "jet" } });
     expect(box.getAttribute("role")).toBe("combobox");
@@ -125,7 +125,7 @@ describe("SearchBox", () => {
 
   it("typing again clears the active result", () => {
     render(<SearchBox />);
-    const box = screen.getByLabelText("Search comments");
+    const box = screen.getByLabelText("Search comments and transcripts");
     fireEvent.change(box, { target: { value: "jet" } });
     fireEvent.keyDown(box, { key: "End" });
     fireEvent.change(box, { target: { value: "jets" } });

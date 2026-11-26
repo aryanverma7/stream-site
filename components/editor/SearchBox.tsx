@@ -65,8 +65,8 @@ export function SearchBox() {
       <input
         ref={input}
         type="search"
-        aria-label="Search comments"
-        placeholder="Search comments ( / )"
+        aria-label="Search comments and transcripts"
+        placeholder="Search everything ( / )"
         value={q}
         role="combobox"
         aria-autocomplete="list"
