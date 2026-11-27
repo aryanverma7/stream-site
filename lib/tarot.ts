@@ -61,8 +61,22 @@ export const ARCANA: Arcana[] = [
     art: `<path d="M38 152 L128 104 L140 126 L50 170Z" fill="${I}"/><polygon points="128,104 166,72 176,160 140,126" fill="${R}"/><path d="M150 58 L160 40 M182 96 L192 88 M180 176 L192 186" stroke="${I}" stroke-width="6" stroke-linecap="round"/><rect x="34" y="192" width="44" height="20" fill="${I}"/><rect x="108" y="198" width="54" height="14" fill="${I}"/>` },
 ];
 
-/** How often a real flick slices the card instead of drawing an arcana. */
-export const SLICE_CHANCE = 0.2;
+/**
+ * Which real flick slices the card: every `min`-`max` flicks (a random whole number, inclusive),
+ * counted from the start and from the last slice. `flick()` stays true until `reset()` (call it
+ * whenever a slice actually happens, the idle one too), so a refused slice moves to the next flick.
+ */
+export function createSlicer(random: () => number = Math.random, min = 4, max = 7) {
+  let left = 0;
+  const reset = () => {
+    left = Math.min(max, min + Math.floor(random() * (max - min + 1)));
+  };
+  reset();
+  return {
+    flick: () => --left <= 0,
+    reset,
+  };
+}
 
 /** The idle slice: due a random 40-70 s after the latest poke, taken once per quiet stretch. */
 export function createIdle(random: () => number = Math.random, min = 40_000, max = 70_000) {
