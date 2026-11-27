@@ -77,11 +77,12 @@ describe("HeroScene2", () => {
     vi.useFakeTimers();
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, assign });
-    render(<HeroScene2 random={() => 0} />); // every flick would slice
+    render(<HeroScene2 random={() => 0} />); // the shortest slice gap
     const card = screen.getByRole("button", { name: "Calling card" });
     for (let i = 0; i < 5; i++) {
-      fireEvent.pointerDown(card, { button: 0, clientX: 10, clientY: 10 });
-      fireEvent.pointerUp(card, { button: 0, clientX: 10, clientY: 10 });
+      delete card.dataset.knock;
+      tap(card);
+      expect(card.dataset.knock).toBe(""); // every rapid tap knocks
     }
     vi.advanceTimersByTime(1000);
     expect(assign).toHaveBeenCalledWith("/admin");
@@ -126,13 +127,68 @@ describe("HeroScene2", () => {
     vi.unstubAllGlobals();
   });
 
+  it("a tap knocks: the blades flash for 150 ms, nothing else changes, a reading keeps showing", () => {
+    vi.useFakeTimers();
+    const { container } = render(<HeroScene2 random={() => 0.5} />);
+    const card = screen.getByRole("button", { name: "Calling card" });
+    const caption = container.querySelector("[aria-live]")!;
+    tap(card);
+    expect(card.dataset.knock).toBe("");
+    expect(getComputedStyle(container.querySelector(".cc-blade")!).fill).toBe("var(--cc-knock)");
+    expect(card.dataset.colourway).toBe("CLASSIC");
+    expect(caption.textContent).toBe("");
+    act(() => vi.advanceTimersByTime(150));
+    expect(card.dataset.knock).toBeUndefined();
+    flick(card);
+    const fortune = caption.textContent;
+    tap(card);
+    expect(caption.textContent).toBe(fortune);
+    expect(card.dataset.colourway).toBe("CLASSIC");
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("slices on the 4th flick, then again 4 flicks later (random 0), tarot in between", () => {
+    vi.useFakeTimers();
+    const { container } = render(<HeroScene2 random={() => 0} />);
+    const card = screen.getByRole("button", { name: "Calling card" });
+    const caption = container.querySelector("[aria-live]")!;
+    for (const [n, colour] of [[1, "CLASSIC"], [2, "CLASSIC"], [3, "CLASSIC"], [4, "INKED"], [5, "INKED"], [6, "INKED"], [7, "INKED"], [8, "REDCARD"]] as const) {
+      act(() => flick(card));
+      if (n % 4) expect(caption.textContent, `flick ${n}`).not.toBe("");
+      act(() => vi.advanceTimersByTime(1300));
+      expect(card.dataset.colourway, `flick ${n}`).toBe(colour);
+    }
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("after the idle slice the next 3 flicks do not slice", () => {
+    vi.useFakeTimers();
+    let t = 0;
+    render(<HeroScene2 random={() => 0} now={() => t} />); // 40 s idle wait, gap 4
+    const card = screen.getByRole("button", { name: "Calling card" });
+    act(() => { t += 41_300; vi.advanceTimersByTime(41_300); });
+    expect(card.dataset.colourway).toBe("INKED");
+    for (let i = 0; i < 3; i++) {
+      act(() => flick(card));
+      act(() => vi.advanceTimersByTime(1300));
+      expect(card.dataset.colourway).toBe("INKED");
+    }
+    act(() => flick(card));
+    act(() => vi.advanceTimersByTime(1300));
+    expect(card.dataset.colourway).toBe("REDCARD");
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
   it("a sliced flick swaps in the next colourway, cycling CLASSIC -> INKED -> REDCARD -> CLASSIC", () => {
     vi.useFakeTimers();
     const { container } = render(<HeroScene2 random={() => 0} />);
     const card = screen.getByRole("button", { name: "Calling card" });
     const caption = container.querySelector("[aria-live]")!;
     for (const next of ["INKED", "REDCARD", "CLASSIC"]) {
-      flick(card);
+      for (let i = 0; i < 4; i++) act(() => flick(card));
       act(() => vi.advanceTimersByTime(1300));
       expect(card.dataset.colourway).toBe(next);
       expect(caption.textContent).toBe(""); // a slice draws no arcana
@@ -146,7 +202,7 @@ describe("HeroScene2", () => {
     vi.stubGlobal("matchMedia", () => ({ matches: true }));
     const { container } = render(<HeroScene2 random={() => 0} />);
     const card = screen.getByRole("button", { name: "Calling card" });
-    act(() => flick(card));
+    for (let i = 0; i < 4; i++) act(() => flick(card));
     expect(card.dataset.colourway).toBe("INKED");
     expect(container.querySelector(".cc-cuts")).toBeNull();
     vi.useRealTimers();
@@ -172,6 +228,12 @@ describe("HeroScene2", () => {
     vi.unstubAllGlobals();
   });
 });
+
+/** A press and release in place: a tap. */
+function tap(card: HTMLElement) {
+  fireEvent.pointerDown(card, { button: 0, clientX: 10, clientY: 10 });
+  fireEvent.pointerUp(card, { button: 0, clientX: 10, clientY: 10 });
+}
 
 /** A fast drag and release: a real flick. Needs fake timers. */
 function flick(card: HTMLElement) {

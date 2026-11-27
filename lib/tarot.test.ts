@@ -1,5 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { ARCANA, createIdle, createReading, dealer, HOLD_MS } from "./tarot";
+import { ARCANA, createIdle, createReading, createSlicer, dealer, HOLD_MS } from "./tarot";
+
+describe("createSlicer", () => {
+  it("slices every 4-7 flicks, never twice in a row", () => {
+    const s = createSlicer();
+    const gaps = new Set<number>();
+    let n = 0;
+    for (let i = 0; i < 5000; i++) {
+      n++;
+      if (s.flick()) {
+        gaps.add(n);
+        s.reset();
+        n = 0;
+      }
+    }
+    expect([...gaps].sort()).toEqual([4, 5, 6, 7]);
+  });
+
+  it("keeps a refused slice for the next flick, and reset restarts the gap", () => {
+    const s = createSlicer(() => 0);
+    expect([s.flick(), s.flick(), s.flick(), s.flick(), s.flick()]).toEqual([false, false, false, true, true]);
+    s.reset();
+    expect([s.flick(), s.flick(), s.flick(), s.flick()]).toEqual([false, false, false, true]);
+  });
+});
 
 describe("dealer", () => {
   it("never deals the same card twice in a row, across reshuffles, and deals them all", () => {

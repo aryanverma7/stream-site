@@ -2,15 +2,16 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createTapCounter, isTap } from "@/lib/tapCounter";
-import { ARCANA, SLICE_CHANCE, createIdle, createReading, dealer, type Arcana } from "@/lib/tarot";
+import { ARCANA, createIdle, createReading, createSlicer, dealer, type Arcana } from "@/lib/tarot";
 
 // "Calling card": a gale of cut paper shards (ink, paper, deep red) tears diagonally across
 // the red room in three depths, under a halftone, while a hand-cut card turns slowly in the
 // middle and leans toward the pointer. The card is the admin door (five taps in three seconds).
 // Flick it and it spins with momentum, knocks the loose shards around it and lands on a tarot
-// card with a fortune; after HOLD_MS it springs back to the calling card. About one real flick in
-// five (and once after 40-70 s of no interaction) the card is sliced instead: two blades cross it,
-// the quarters fall away and a new card in the next colourway slams in. The idle turn is CSS;
+// card with a fortune; after HOLD_MS it springs back to the calling card. Every 4-7 real flicks
+// (never two in a row; and once after 40-70 s of no interaction) the card is sliced instead: two
+// blades cross it, the quarters fall away and a new card in the next colourway slams in. A tap
+// knocks it: a squash-and-jolt, a small shard burst and the blades flash. The idle turn is CSS;
 // per-frame JS runs only while the card or a loose shard is still moving.
 
 /** Deterministic shards: [layer, top %, size rem, delay fraction, fill, shape]. */
@@ -28,9 +29,9 @@ const FILLS = ["#0b0b0b", "#f4efe6", "#0b0b0b", "#7a0710"];
 const SHAPES = ["polygon(0 0,100% 30%,20% 100%)", "polygon(10% 0,100% 0,0 100%)", "polygon(0 40%,100% 0,70% 100%)"];
 const DURATIONS = [9, 6, 3.6];
 const COLOURWAYS = [
-  { name: "CLASSIC", card: "#f4efe6", star: "#0b0b0b", blade: "#d80f1d", eye: "#f4efe6", plate: "#0b0b0b", text: "#f4efe6", edge: "#0b0b0b" },
-  { name: "INKED", card: "#0b0b0b", star: "#f4efe6", blade: "#d80f1d", eye: "#0b0b0b", plate: "#d80f1d", text: "#f4efe6", edge: "#f4efe6" },
-  { name: "REDCARD", card: "#b80c18", star: "#0b0b0b", blade: "#f4efe6", eye: "#b80c18", plate: "#f4efe6", text: "#0b0b0b", edge: "#0b0b0b" },
+  { name: "CLASSIC", card: "#f4efe6", star: "#0b0b0b", blade: "#d80f1d", knock: "#f4efe6", eye: "#f4efe6", plate: "#0b0b0b", text: "#f4efe6", edge: "#0b0b0b" },
+  { name: "INKED", card: "#0b0b0b", star: "#f4efe6", blade: "#d80f1d", knock: "#0b0b0b", eye: "#0b0b0b", plate: "#d80f1d", text: "#f4efe6", edge: "#f4efe6" },
+  { name: "REDCARD", card: "#b80c18", star: "#0b0b0b", blade: "#f4efe6", knock: "#d80f1d", eye: "#b80c18", plate: "#f4efe6", text: "#0b0b0b", edge: "#0b0b0b" },
 ];
 /** The slice's quarters: clip, translate x %, y %, rotate deg (corner-to-corner X cut). */
 const PIECES: [string, number, number, number][] = [
@@ -57,6 +58,7 @@ const CSS = `
 .cc-cuts path{fill:none;stroke-linecap:round;stroke-dasharray:420;stroke-dashoffset:420;animation:cc-cut .15s ease-out forwards}
 .cc-cuts .i{stroke:#0b0b0b;stroke-width:12}.cc-cuts .e{stroke:#f4efe6;stroke-width:5}.cc-cuts .two{animation-delay:.12s}
 @keyframes cc-cut{to{stroke-dashoffset:0}}
+.cc-card[data-knock] .cc-blade{fill:var(--cc-knock)}
 @media (prefers-reduced-motion:reduce){.cc-shard,.cc-card{animation:none}}
 `;
 
@@ -67,8 +69,9 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
  * The flick: drag the card and throw it; it spins with momentum, springs home and knocks the
  * loose shards. A real flick (fast release, never a tap) draws an arcana and lands tarot-up;
  * the reading's hold ends with the card springing back. Under reduced motion nothing spins:
- * a flick just turns the card over. A sliced flick (`random() < SLICE_CHANCE`) asks `onSlice` to
- * cut the card instead, which refuses (false) while a slice is still running.
+ * a flick just turns the card over. The flick `createSlicer` picks asks `onSlice` to cut the card
+ * instead, which refuses (false) while a slice is still running. A tap knocks the card (blades
+ * flash; with motion, a squash on the flip element and a small shard burst) and changes nothing else.
  */
 function mountFlick(
   card: HTMLElement,
@@ -79,6 +82,7 @@ function mountFlick(
   onSlice: () => boolean,
 ) {
   const reading = createReading(dealer(ARCANA));
+  const slicer = createSlicer(random);
   const s = { x: 0, y: 0, a: 0, z: 0, vx: 0, vy: 0, va: 0, vz: 0 };
   let w = card.getBoundingClientRect().width;
   const bits = looseEls.map((el, k) => ({ el, k, rx: 0, ry: 0, ox: 0, oy: 0, r: k * 37, vx: 0, vy: 0, vr: 0 }));
@@ -170,6 +174,7 @@ function mountFlick(
   /** Cut the card: the reading ends and the new card rests calling-card up. */
   const slice = () => {
     if (!onSlice()) return false;
+    slicer.reset();
     window.clearTimeout(hold);
     onReading(null);
     Object.assign(s, { x: 0, y: 0, a: 0, z: 0, vx: 0, vy: 0, va: 0, vz: 0 });
@@ -178,23 +183,49 @@ function mountFlick(
     return true;
   };
 
+  /** Knock the loose shards outward from the card, carried along by (vx, vy). */
+  const burst = (speed: number, vx = 0, vy = 0) => {
+    for (const b of bits) {
+      const d = Math.hypot(b.rx, b.ry) || 1;
+      const f = speed * 0.55 * (w ? w / (w + d * 0.5) : 1) * rand(0.6, 1.2);
+      b.vx += (b.rx / d) * f + vx * 0.25;
+      b.vy += (b.ry / d) * f + vy * 0.25;
+      b.vr += rand(-1, 1) * speed;
+    }
+  };
+
   const flick = (vx: number, vy: number) => {
-    if (random() < SLICE_CHANCE && slice()) return;
+    if (slicer.flick() && slice()) return;
     onReading(reading.draw(Date.now()));
     window.clearTimeout(hold);
     hold = window.setTimeout(settle, reading.until() - Date.now());
     if (!reducedMotion()) {
       Object.assign(s, { va: vx * 0.9, vx: vx * 0.2, vy: vy * 0.2, vz: vx * 0.05 });
-      const speed = Math.hypot(vx, vy);
-      for (const b of bits) {
-        const d = Math.hypot(b.rx, b.ry) || 1;
-        const f = speed * 0.55 * (w ? w / (w + d * 0.5) : 1) * rand(0.6, 1.2);
-        b.vx += (b.rx / d) * f + vx * 0.25;
-        b.vy += (b.ry / d) * f + vy * 0.25;
-        b.vr += rand(-1, 1) * speed;
-      }
+      burst(Math.hypot(vx, vy), vx, vy);
     }
     land(180);
+  };
+
+  let knockTimer = 0;
+  /** A tap: the blades flash for 150 ms; with motion the card punches in and the shards jump. */
+  const knock = () => {
+    card.dataset.knock = "";
+    window.clearTimeout(knockTimer);
+    knockTimer = window.setTimeout(() => delete card.dataset.knock, 150);
+    if (!reducedMotion()) {
+      // Added to the spring's inline transform, so a knock mid-spin keeps spinning.
+      flip.animate?.(
+        [
+          { transform: "scale(1)" },
+          { transform: "scale(.9) rotateZ(-4deg)", offset: 0.3 },
+          { transform: "scale(1.05) rotateZ(2deg)", offset: 0.65 },
+          { transform: "scale(1)" },
+        ],
+        { duration: 350, easing: "ease-out", composite: "add" },
+      );
+      burst(450);
+    }
+    land(face);
   };
 
   const onDown = (e: PointerEvent) => {
@@ -225,6 +256,7 @@ function mountFlick(
     // Taps belong to the door; a pause before letting go is not a flick.
     const thrown = !isTap(e.clientX - d.sx, e.clientY - d.sy, now - d.t0) && now - d.pt <= 80 && Math.hypot(d.vx, d.vy) > FLICK_SPEED;
     if (thrown) flick(d.vx, d.vy);
+    else if (isTap(e.clientX - d.sx, e.clientY - d.sy, now - d.t0)) knock();
     else land(face);
   };
   const onCancel = () => {
@@ -252,6 +284,7 @@ function mountFlick(
     card.removeEventListener("pointercancel", onCancel);
     cancelAnimationFrame(raf);
     window.clearTimeout(hold);
+    window.clearTimeout(knockTimer);
   };
   return { stop, slice };
 }
@@ -288,7 +321,7 @@ function TarotFace({ a }: { a: Arcana }) {
   );
 }
 
-/** `random` decides slices and the idle wait, `now` is the idle slice's clock (both injectable for tests). */
+/** `random` decides the slice gaps and the idle wait, `now` is the idle slice's clock (both injectable for tests). */
 export function HeroScene2({ random = Math.random, now = Date.now }: { random?: () => number; now?: () => number } = {}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
@@ -484,6 +517,7 @@ export function HeroScene2({ random = Math.random, now = Date.now }: { random?: 
             type="button"
             aria-label="Calling card"
             data-colourway={cw.name}
+            style={{ "--cc-knock": cw.knock } as CSSProperties}
             tabIndex={-1}
             onPointerDown={onDown}
             onPointerUp={onUp}
@@ -500,7 +534,7 @@ export function HeroScene2({ random = Math.random, now = Date.now }: { random?: 
                     return `${(100 + Math.cos(a) * r).toFixed(1)},${(128 + Math.sin(a) * r).toFixed(1)}`;
                   }).join(" ")}
                 />
-                <path d="M58 70 L150 186 L136 196 L46 82 Z M146 64 L160 76 L62 194 L48 182 Z" fill={cw.blade} />
+                <path className="cc-blade" d="M58 70 L150 186 L136 196 L46 82 Z M146 64 L160 76 L62 194 L48 182 Z" fill={cw.blade} />
                 <circle cx="100" cy="128" r="14" fill={cw.eye} stroke="#0b0b0b" strokeWidth="5" />
                 <rect x="22" y="232" width="156" height="30" fill={cw.plate} transform="rotate(-3 100 247)" />
                 <text x="100" y="254" textAnchor="middle" fontSize="20" fontWeight="900" fill={cw.text} fontFamily="inherit" transform="rotate(-3 100 247)">
