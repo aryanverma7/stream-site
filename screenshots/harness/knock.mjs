@@ -15,7 +15,13 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(HERE, "../../out");
 const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".woff2": "font/woff2" };
 const server = http.createServer(async (req, res) => {
-  const p = path.normalize(decodeURIComponent(new URL(req.url, "http://x").pathname));
+  let p;
+  try {
+    p = path.normalize(decodeURIComponent(new URL(req.url, "http://x").pathname));
+  } catch {
+    res.writeHead(400);
+    return res.end();
+  }
   for (const f of [p, p + ".html", path.join(p, "index.html")]) {
     try {
       const body = await readFile(path.join(OUT, f));
